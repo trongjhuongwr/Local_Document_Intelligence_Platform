@@ -87,7 +87,7 @@ All numbers below were produced by `python -m evals.run_all` on the machine desc
 | Retrieval (Recall@5) | hybrid **0.93** · bm25 0.93 · dense 0.65 |
 | Query routing accuracy | **92.5%** deterministic (LLM-assisted 82.5%, LLM-only few-shot 67.5%, zero-shot 20%) |
 | Workflow success (/compare path) | completion **15/15** · review-task creation accuracy **100%** · median 14.2 s per case |
-| Citation quality (end-to-end Q&A) | see `evals/reports/generation_latest.md` |
+| Citation quality (end-to-end Q&A) | citations present **79.5%** · valid **79.5%** · correct document **71.8%** · median answer latency 1.0 s (p95 1.4 s) |
 
 Two measured stories worth reading in the reports:
 

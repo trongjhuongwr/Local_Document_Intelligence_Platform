@@ -1,0 +1,83 @@
+{
+  "eval": "generation",
+  "generated_at": "2026-08-17T20:23:17+00:00",
+  "model": "llama3.2:1b",
+  "queries": 39,
+  "failed_queries_skipped": 1,
+  "citation_presence_rate": 0.7949,
+  "valid_citation_rate": 0.7949,
+  "correct_document_rate": 0.7179,
+  "no_evidence_rate": 0.0,
+  "median_latency_ms": 1009.3,
+  "p95_latency_ms": 1422.8,
+  "note": "Unsupported-claim detection beyond citation resolution requires manual review; a sample of answers is stored in query_runs for inspection.",
+  "miscited_examples": [
+    {
+      "case": "case_001",
+      "query": "What are the standard payment terms required by the accounts payable policy of Crescent Media Group?",
+      "expected": "payment_policy.pdf",
+      "cited": []
+    },
+    {
+      "case": "case_002",
+      "query": "What is the total due on invoice INV-2026-28511?",
+      "expected": "invoice_001.pdf",
+      "cited": [
+        "payment_policy.pdf"
+      ]
+    },
+    {
+      "case": "case_003",
+      "query": "What are the standard payment terms required by the accounts payable policy of Crescent Media Group?",
+      "expected": "payment_policy.pdf",
+      "cited": []
+    },
+    {
+      "case": "case_004",
+      "query": "What are the standard payment terms required by the accounts payable policy of Crescent Media Group?",
+      "expected": "payment_policy.pdf",
+      "cited": []
+    },
+    {
+      "case": "case_005",
+      "query": "What are the standard payment terms required by the accounts payable policy of Atlas Construction Holdings?",
+      "expected": "payment_policy.pdf",
+      "cited": []
+    },
+    {
+      "case": "case_006",
+      "query": "What is the maximum contract amount agreed with Northgate Security Services?",
+      "expected": "service_contract.pdf",
+      "cited": []
+    },
+    {
+      "case": "case_007",
+      "query": "What are the standard payment terms required by the accounts payable policy of Crescent Media Group?",
+      "expected": "payment_policy.pdf",
+      "cited": []
+    },
+    {
+      "case": "case_007",
+      "query": "What is the total due on invoice INV-2025-37481?",
+      "expected": "invoice_001.pdf",
+      "cited": [
+        "service_contract.pdf"
+      ]
+    },
+    {
+      "case": "case_008",
+      "query": "What is the total due on invoice INV-2025-43177?",
+      "expected": "invoice_001.pdf",
+      "cited": [
+        "payment_policy.pdf"
+      ]
+    },
+    {
+      "case": "case_009",
+      "query": "What are the standard payment terms required by the accounts payable policy of Horizon Education Partners?",
+      "expected": "payment_policy.pdf",
+      "cited": []
+    }
+  ],
+  "headline": "citations present 79%, valid 79%, correct document 72% over 39 queries"
+}

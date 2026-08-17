@@ -13,7 +13,11 @@ import statistics
 from pathlib import Path
 from typing import Any
 
+import httpx
+
+from app.core.config import get_settings
 from app.core.exceptions import OllamaUnavailableError
+from app.embeddings.ollama import OllamaEmbeddingProvider
 from app.llm.ollama import OllamaLLMProvider
 from app.retrieval.base import SearchFilters
 from app.retrieval.service import RetrievalService
@@ -32,7 +36,6 @@ async def run_generation_eval(
         cases = cases[:max_cases]
 
     await ensure_corpus(cases, benchmark_dir)
-    service = QAService(OllamaLLMProvider(), RetrievalService())
 
     total = 0
     with_citations = 0
@@ -42,36 +45,60 @@ async def run_generation_eval(
     latencies: list[float] = []
     examples: list[dict[str, Any]] = []
 
-    for case in cases:
-        for eval_query in build_queries(case):
-            result = await service.answer(
-                eval_query.query,
-                filters=SearchFilters(case_id=case.case_id),
-            )
-            total += 1
-            latencies.append(result.latency_ms)
-            if result.verification is None:
-                no_evidence += 1
-                continue
-            used = result.verification.used_citation_ids
-            if used:
-                with_citations += 1
-            if result.verification.valid and used:
-                valid_citations += 1
-            cited_files = {
-                result.citations[cid].filename for cid in used if cid in result.citations
-            }
-            if eval_query.expected_filename in cited_files:
-                correct_document += 1
-            elif len(examples) < 10:
-                examples.append(
-                    {
-                        "case": case.case_id,
-                        "query": eval_query.query,
-                        "expected": eval_query.expected_filename,
-                        "cited": sorted(cited_files),
-                    }
-                )
+    # One shared HTTP client for the whole run: hundreds of per-call
+    # connections exhaust Windows ephemeral ports and surface as transient
+    # "cannot reach Ollama" failures.
+    settings = get_settings()
+    async with httpx.AsyncClient(
+        base_url=settings.ollama_base_url, timeout=settings.ollama_timeout_seconds
+    ) as client:
+        service = QAService(
+            OllamaLLMProvider(client=client),
+            RetrievalService(embedding_provider=OllamaEmbeddingProvider(client=client)),
+        )
+        failed_queries = 0
+        for case in cases:
+            for eval_query in build_queries(case):
+                result = None
+                for attempt in (1, 2):
+                    try:
+                        result = await service.answer(
+                            eval_query.query,
+                            filters=SearchFilters(case_id=case.case_id),
+                        )
+                        break
+                    except OllamaUnavailableError:
+                        # The local Ollama runner occasionally respawns
+                        # mid-burst; skip the query rather than abort the run
+                        # and report the count honestly.
+                        await asyncio.sleep(5)
+                if result is None:
+                    failed_queries += 1
+                    continue
+                total += 1
+                latencies.append(result.latency_ms)
+                if result.verification is None:
+                    no_evidence += 1
+                    continue
+                used = result.verification.used_citation_ids
+                if used:
+                    with_citations += 1
+                if result.verification.valid and used:
+                    valid_citations += 1
+                cited_files = {
+                    result.citations[cid].filename for cid in used if cid in result.citations
+                }
+                if eval_query.expected_filename in cited_files:
+                    correct_document += 1
+                elif len(examples) < 10:
+                    examples.append(
+                        {
+                            "case": case.case_id,
+                            "query": eval_query.query,
+                            "expected": eval_query.expected_filename,
+                            "cited": sorted(cited_files),
+                        }
+                    )
 
     def _rate(count: int) -> float:
         return round(count / total, 4) if total else 0.0
@@ -79,6 +106,7 @@ async def run_generation_eval(
     payload: dict[str, Any] = {
         "model": "llama3.2:1b",
         "queries": total,
+        "failed_queries_skipped": failed_queries,
         "citation_presence_rate": _rate(with_citations),
         "valid_citation_rate": _rate(valid_citations),
         "correct_document_rate": _rate(correct_document),
