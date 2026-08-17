@@ -46,7 +46,7 @@ def _deterministic(
         severity=severity,
         description=description,
         confidence=1.0,
-        **kwargs,  # type: ignore[arg-type]
+        **kwargs,
     )
 
 
