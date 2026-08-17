@@ -1,0 +1,31 @@
+# Build specification (working document, not part of the product)
+Master_Build_Specification_*.md
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Environment
+.env
+
+# Generated data (reproducible via seeded generator)
+synthetic_data/documents/
+data/uploads/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

@@ -1,0 +1,38 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: docintel-postgres
+    environment:
+      POSTGRES_USER: docintel
+      POSTGRES_PASSWORD: docintel
+      POSTGRES_DB: docintel
+    ports:
+      # Override POSTGRES_PORT in .env if 5432 is taken on your machine.
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U docintel -d docintel"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Optional: run the API inside Docker (profile "full").
+  # Ollama stays on the host machine; the container reaches it via host.docker.internal.
+  api:
+    build: .
+    container_name: docintel-api
+    profiles: ["full"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://docintel:docintel@postgres:5432/docintel
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+    ports:
+      - "${API_PORT:-8000}:8000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  pgdata:
