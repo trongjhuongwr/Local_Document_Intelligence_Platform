@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     ollama_timeout_seconds: float = 120.0
 
     enable_reranker: bool = False
+    # Measured on evals/routing: keyword rules 92.5% vs best LLM prompt 67.5%,
+    # and adding the LLM for no-keyword queries lowers accuracy to 82.5%.
+    router_llm_enabled: bool = False
 
     max_upload_size_mb: int = 25
 

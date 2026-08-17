@@ -59,7 +59,7 @@ async def test_answer_with_valid_citations() -> None:
     assert "[C1]" in result.answer
     assert result.verification is not None and result.verification.valid is True
     assert result.citations["C1"].filename == "service_contract.pdf"
-    assert result.route == QueryRoute.FACTUAL_RAG
+    assert result.route == QueryRoute.STRUCTURED_LOOKUP  # keyword rule: "what is the"
     assert result.retrieved_count == 1
     assert "Maximum aggregate fees" in provider.generate_calls[0]["prompt"]
     assert provider.generate_calls[0]["temperature"] == 0.0

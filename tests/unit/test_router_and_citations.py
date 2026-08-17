@@ -45,7 +45,20 @@ def test_fallback_router(query: str, expected: str) -> None:
     assert fallback_route(query) == QueryRoute(expected)
 
 
-async def test_router_uses_llm_when_available() -> None:
+async def test_router_prefers_keyword_rules_and_skips_llm() -> None:
+    class ExplodingProvider:
+        async def generate(self, prompt, **kwargs):  # pragma: no cover
+            raise NotImplementedError
+
+        async def generate_structured(self, prompt, schema, **kwargs):  # pragma: no cover
+            raise AssertionError("LLM must not be called when a keyword rule fires")
+
+    result = await QueryRouter(ExplodingProvider()).route("Compare these documents")
+    assert result.route == QueryRoute.DOCUMENT_COMPARE
+    assert result.method == "keyword"
+
+
+async def test_router_uses_llm_when_no_keyword_matches() -> None:
     class GoodProvider:
         async def generate(self, prompt, **kwargs):  # pragma: no cover
             raise NotImplementedError
@@ -54,12 +67,29 @@ async def test_router_uses_llm_when_available() -> None:
             telemetry = LLMTelemetry(model="fake", temperature=0.0, success=True)
             return RouteDecision(route=QueryRoute.SUMMARIZATION), telemetry
 
-    result = await QueryRouter(GoodProvider()).route("Summarize the contract")
+    result = await QueryRouter(GoodProvider(), use_llm=True).route(
+        "What does the contract say about confidentiality?"
+    )
     assert result.route == QueryRoute.SUMMARIZATION
     assert result.method == "llm"
 
 
-async def test_router_falls_back_on_invalid_output() -> None:
+async def test_router_default_is_deterministic_for_unmatched_queries() -> None:
+    class ExplodingProvider:
+        async def generate(self, prompt, **kwargs):  # pragma: no cover
+            raise NotImplementedError
+
+        async def generate_structured(self, prompt, schema, **kwargs):  # pragma: no cover
+            raise AssertionError("LLM routing is disabled by default")
+
+    result = await QueryRouter(ExplodingProvider(), use_llm=False).route(
+        "What does the contract say about confidentiality?"
+    )
+    assert result.route == QueryRoute.FACTUAL_RAG
+    assert result.method == "keyword_default"
+
+
+async def test_router_falls_back_when_llm_fails() -> None:
     class BrokenProvider:
         async def generate(self, prompt, **kwargs):  # pragma: no cover
             raise NotImplementedError
@@ -67,8 +97,10 @@ async def test_router_falls_back_on_invalid_output() -> None:
         async def generate_structured(self, prompt, schema, **kwargs):
             raise StructuredOutputValidationError("invalid output")
 
-    result = await QueryRouter(BrokenProvider()).route("Compare these documents")
-    assert result.route == QueryRoute.DOCUMENT_COMPARE
+    result = await QueryRouter(BrokenProvider(), use_llm=True).route(
+        "What does the contract say about liability?"
+    )
+    assert result.route == QueryRoute.FACTUAL_RAG
     assert result.method == "fallback"
 
 

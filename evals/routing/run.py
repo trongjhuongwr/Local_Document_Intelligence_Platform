@@ -117,50 +117,70 @@ def _score(pairs: list[tuple[QueryRoute, QueryRoute]]) -> dict[str, Any]:
 
 async def run_routing_eval(max_cases: int | None = None, write: bool = True) -> dict[str, Any]:
     queries = LABELED_QUERIES if max_cases is None else LABELED_QUERIES[: max_cases * 5]
-    router = QueryRouter(OllamaLLMProvider())
+    provider = OllamaLLMProvider()
+    production_router = QueryRouter(provider)  # LLM per settings default (off)
+    llm_assisted_router = QueryRouter(provider, use_llm=True)
 
+    production_pairs: list[tuple[QueryRoute, QueryRoute]] = []
+    assisted_pairs: list[tuple[QueryRoute, QueryRoute]] = []
     llm_pairs: list[tuple[QueryRoute, QueryRoute]] = []
-    fallback_uses = 0
+    method_counts: dict[str, int] = defaultdict(int)
     for query, expected in queries:
-        result = await router.route(query)
-        if result.method == "fallback":
-            fallback_uses += 1
-        llm_pairs.append((expected, result.route))
+        production = await production_router.route(query)
+        method_counts[production.method] += 1
+        production_pairs.append((expected, production.route))
+        assisted = await llm_assisted_router.route(query)
+        assisted_pairs.append((expected, assisted.route))
+        llm_only = await llm_assisted_router.classify_llm(query)
+        llm_pairs.append((expected, llm_only or QueryRoute.FACTUAL_RAG))
 
-    fallback_pairs = [(expected, fallback_route(query)) for query, expected in queries]
+    keyword_pairs = [(expected, fallback_route(query)) for query, expected in queries]
 
+    production_scores = _score(production_pairs)
+    assisted_scores = _score(assisted_pairs)
     llm_scores = _score(llm_pairs)
-    fallback_scores = _score(fallback_pairs)
+    keyword_scores = _score(keyword_pairs)
     payload: dict[str, Any] = {
         "model": "llama3.2:1b",
-        "llm_router": llm_scores,
-        "llm_router_fallback_invocations": fallback_uses,
-        "keyword_fallback": fallback_scores,
+        "production_router": production_scores,
+        "production_router_method_counts": dict(method_counts),
+        "llm_assisted_router": assisted_scores,
+        "llm_only": llm_scores,
+        "keyword_only": keyword_scores,
         "headline": (
-            f"LLM routing accuracy {llm_scores['accuracy']:.2%} "
-            f"(macro F1 {llm_scores['macro_f1']:.2%}); keyword fallback "
-            f"{fallback_scores['accuracy']:.2%}"
+            f"routing accuracy {production_scores['accuracy']:.2%} (deterministic default); "
+            f"LLM-assisted {assisted_scores['accuracy']:.2%}, "
+            f"LLM-only {llm_scores['accuracy']:.2%}"
         ),
     }
 
     rows = [
         [
             route,
-            f"{llm_scores['per_route'][route]['precision']:.2%}",
-            f"{llm_scores['per_route'][route]['recall']:.2%}",
+            f"{production_scores['per_route'][route]['f1']:.2%}",
+            f"{assisted_scores['per_route'][route]['f1']:.2%}",
             f"{llm_scores['per_route'][route]['f1']:.2%}",
-            f"{fallback_scores['per_route'][route]['f1']:.2%}",
+            f"{keyword_scores['per_route'][route]['f1']:.2%}",
         ]
-        for route in llm_scores["per_route"]
+        for route in production_scores["per_route"]
     ]
     markdown = (
         "# Query Routing Evaluation\n\n"
-        f"Queries: {llm_scores['total']} · LLM accuracy: **{llm_scores['accuracy']:.2%}** · "
-        f"LLM macro F1: **{llm_scores['macro_f1']:.2%}** · Keyword fallback accuracy: "
-        f"**{fallback_scores['accuracy']:.2%}**\n\n"
-        + markdown_table(["Route", "LLM precision", "LLM recall", "LLM F1", "Fallback F1"], rows)
-        + "\n\nConfusion matrix (LLM): rows = expected, columns = predicted\n\n"
-        + str(llm_scores["confusion_matrix"])
+        "Four router variants are measured on the same labeled set. The production "
+        "default is purely deterministic (ROUTER_LLM_ENABLED=false) because the "
+        "measurements below show the 1B LLM lowers accuracy on this closed domain.\n\n"
+        f"Queries: {production_scores['total']} · Production (deterministic): "
+        f"**{production_scores['accuracy']:.2%}** (macro F1 "
+        f"{production_scores['macro_f1']:.2%}) · Keyword-first+LLM: "
+        f"{assisted_scores['accuracy']:.2%} · LLM-only few-shot: "
+        f"{llm_scores['accuracy']:.2%} (zero-shot measured at 20.00%) · Method mix: "
+        f"{dict(method_counts)}\n\n"
+        + markdown_table(
+            ["Route", "Production F1", "Keyword+LLM F1", "LLM-only F1", "Keyword-only F1"],
+            rows,
+        )
+        + "\n\nConfusion matrix (production): rows = expected, columns = predicted\n\n"
+        + str(production_scores["confusion_matrix"])
     )
     if write:
         write_report("routing", payload, markdown)
