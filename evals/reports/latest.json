@@ -2,10 +2,10 @@
   "results": {
     "discrepancy_rules": {
       "mode": "rules",
-      "cases_evaluated": 10,
-      "expected_anomalies": 9,
+      "cases_evaluated": 15,
+      "expected_anomalies": 14,
       "overall": {
-        "tp": 9,
+        "tp": 14,
         "fp": 0,
         "fn": 0,
         "precision": 1.0,
@@ -37,7 +37,31 @@
           "recall": 1.0,
           "f1": 1.0
         },
+        "incorrect_tax_calculation": {
+          "tp": 1,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
         "incorrect_total": {
+          "tp": 1,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "invoice_date_outside_contract": {
+          "tp": 1,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "missing_required_field": {
           "tp": 1,
           "fp": 0,
           "fn": 0,
@@ -62,7 +86,7 @@
           "f1": 1.0
         },
         "vendor_name_mismatch": {
-          "tp": 1,
+          "tp": 2,
           "fp": 0,
           "fn": 0,
           "precision": 1.0,
@@ -70,7 +94,7 @@
           "f1": 1.0
         },
         "wrong_currency": {
-          "tp": 1,
+          "tp": 2,
           "fp": 0,
           "fn": 0,
           "precision": 1.0,
@@ -81,123 +105,147 @@
       "mismatches": []
     },
     "extraction": {
-      "cases_evaluated": 10,
+      "cases_evaluated": 15,
       "model": "llama3.2:1b",
-      "overall_field_accuracy": 0.1151,
+      "overall_field_accuracy": 0.9662,
       "overall_schema_valid_rate": 1.0,
-      "median_llm_latency_ms": 712.1,
-      "p95_llm_latency_ms": 1036.9,
+      "median_llm_latency_ms": 1485.7,
+      "p95_llm_latency_ms": 1838.0,
       "by_document_type": {
         "invoice": {
-          "documents": 12,
+          "documents": 17,
           "schema_valid_rate": 1.0,
           "field_accuracy": {
-            "invoice_number": 0.0,
-            "vendor_name": 0.0,
-            "customer_name": 0.0,
-            "issue_date": 0.9167,
-            "due_date": 0.9167,
-            "currency": 0.8333,
-            "subtotal": 0.0,
-            "tax_rate_percent": 0.0,
-            "tax": 0.0,
-            "total": 0.0,
-            "payment_terms": 0.0,
-            "po_reference": 0.1667
+            "invoice_number": 0.9412,
+            "vendor_name": 1.0,
+            "customer_name": 1.0,
+            "issue_date": 1.0,
+            "due_date": 0.9412,
+            "currency": 1.0,
+            "subtotal": 0.9412,
+            "tax_rate_percent": 0.5882,
+            "tax": 0.9412,
+            "total": 0.9412,
+            "payment_terms": 0.9412,
+            "po_reference": 1.0
           },
-          "overall_field_accuracy": 0.2361,
-          "numeric_accuracy": 0.0,
-          "date_accuracy": 0.9167,
-          "required_field_completeness": 0.2254
+          "overall_field_accuracy": 0.9363,
+          "numeric_accuracy": 0.8529,
+          "date_accuracy": 0.9706,
+          "required_field_completeness": 1.0
         },
         "contract": {
-          "documents": 10,
+          "documents": 15,
           "schema_valid_rate": 1.0,
           "field_accuracy": {
-            "vendor_name": 0.0,
-            "customer_name": 0.0,
-            "effective_date": 0.0,
-            "expiration_date": 0.0,
-            "currency": 0.0,
-            "maximum_amount": 0.0,
-            "payment_terms": 0.1
+            "vendor_name": 1.0,
+            "customer_name": 1.0,
+            "effective_date": 1.0,
+            "expiration_date": 1.0,
+            "currency": 1.0,
+            "maximum_amount": 0.9333,
+            "payment_terms": 1.0
           },
-          "overall_field_accuracy": 0.0143,
-          "numeric_accuracy": 0.0,
-          "date_accuracy": 0.0,
-          "required_field_completeness": 0.0143
+          "overall_field_accuracy": 0.9905,
+          "numeric_accuracy": 0.9333,
+          "date_accuracy": 1.0,
+          "required_field_completeness": 1.0
         },
         "purchase_order": {
-          "documents": 10,
+          "documents": 15,
           "schema_valid_rate": 1.0,
           "field_accuracy": {
-            "po_number": 0.0,
-            "vendor_name": 0.0,
-            "issue_date": 0.0,
-            "currency": 0.0,
-            "approved_amount": 0.0
+            "po_number": 1.0,
+            "vendor_name": 1.0,
+            "issue_date": 1.0,
+            "currency": 1.0,
+            "approved_amount": 0.9333
           },
-          "overall_field_accuracy": 0.0,
-          "numeric_accuracy": 0.0,
-          "date_accuracy": 0.0,
-          "required_field_completeness": 0.0
+          "overall_field_accuracy": 0.9867,
+          "numeric_accuracy": 0.9333,
+          "date_accuracy": 1.0,
+          "required_field_completeness": 0.9867
         },
         "policy": {
-          "documents": 10,
+          "documents": 15,
           "schema_valid_rate": 1.0,
           "field_accuracy": {
-            "required_payment_terms": 0.0,
-            "po_reference_required": 0.0,
-            "manual_approval_threshold": 0.0,
-            "currency": 0.0
+            "required_payment_terms": 1.0,
+            "po_reference_required": 1.0,
+            "manual_approval_threshold": 1.0,
+            "currency": 1.0
           },
-          "overall_field_accuracy": 0.0,
-          "numeric_accuracy": 0.0,
+          "overall_field_accuracy": 1.0,
+          "numeric_accuracy": 1.0,
           "date_accuracy": 0.0,
-          "required_field_completeness": 0.0
+          "required_field_completeness": 1.0
         }
       }
     },
     "discrepancy_end_to_end": {
       "mode": "end_to_end",
-      "cases_evaluated": 10,
-      "expected_anomalies": 9,
+      "cases_evaluated": 15,
+      "expected_anomalies": 14,
       "overall": {
-        "tp": 0,
+        "tp": 12,
         "fp": 10,
-        "fn": 9,
-        "precision": 0.0,
-        "recall": 0.0,
-        "f1": 0.0
+        "fn": 2,
+        "precision": 0.5455,
+        "recall": 0.8571,
+        "f1": 0.6667
       },
       "by_type": {
-        "conflicting_invoice_number": {
+        "amount_exceeds_contract": {
           "tp": 0,
-          "fp": 0,
-          "fn": 1,
+          "fp": 1,
+          "fn": 0,
           "precision": 0.0,
           "recall": 0.0,
           "f1": 0.0
+        },
+        "conflicting_invoice_number": {
+          "tp": 1,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
         },
         "duplicate_invoice": {
-          "tp": 0,
+          "tp": 1,
           "fp": 0,
-          "fn": 1,
-          "precision": 0.0,
-          "recall": 0.0,
-          "f1": 0.0
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
         },
         "inconsistent_payment_terms": {
-          "tp": 0,
-          "fp": 0,
-          "fn": 1,
-          "precision": 0.0,
-          "recall": 0.0,
-          "f1": 0.0
+          "tp": 1,
+          "fp": 1,
+          "fn": 0,
+          "precision": 0.5,
+          "recall": 1.0,
+          "f1": 0.6667
+        },
+        "incorrect_tax_calculation": {
+          "tp": 1,
+          "fp": 6,
+          "fn": 0,
+          "precision": 0.1429,
+          "recall": 1.0,
+          "f1": 0.25
         },
         "incorrect_total": {
+          "tp": 1,
+          "fp": 1,
+          "fn": 0,
+          "precision": 0.5,
+          "recall": 1.0,
+          "f1": 0.6667
+        },
+        "invoice_date_outside_contract": {
           "tp": 0,
-          "fp": 0,
+          "fp": 1,
           "fn": 1,
           "precision": 0.0,
           "recall": 0.0,
@@ -205,177 +253,142 @@
         },
         "missing_required_field": {
           "tp": 0,
-          "fp": 10,
-          "fn": 0,
+          "fp": 0,
+          "fn": 1,
           "precision": 0.0,
           "recall": 0.0,
           "f1": 0.0
         },
         "po_mismatch": {
-          "tp": 0,
+          "tp": 1,
           "fp": 0,
-          "fn": 1,
-          "precision": 0.0,
-          "recall": 0.0,
-          "f1": 0.0
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
         },
         "policy_violation": {
-          "tp": 0,
+          "tp": 2,
           "fp": 0,
-          "fn": 2,
-          "precision": 0.0,
-          "recall": 0.0,
-          "f1": 0.0
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
         },
         "vendor_name_mismatch": {
-          "tp": 0,
+          "tp": 2,
           "fp": 0,
-          "fn": 1,
-          "precision": 0.0,
-          "recall": 0.0,
-          "f1": 0.0
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
         },
         "wrong_currency": {
-          "tp": 0,
+          "tp": 2,
           "fp": 0,
-          "fn": 1,
-          "precision": 0.0,
-          "recall": 0.0,
-          "f1": 0.0
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
         }
       },
       "mismatches": [
         {
-          "case": "case_001",
-          "kind": "false_positive",
-          "type": "missing_required_field"
-        },
-        {
-          "case": "case_001",
-          "kind": "false_negative",
-          "type": "conflicting_invoice_number"
-        },
-        {
-          "case": "case_002",
-          "kind": "false_positive",
-          "type": "missing_required_field"
-        },
-        {
-          "case": "case_003",
-          "kind": "false_positive",
-          "type": "missing_required_field"
-        },
-        {
-          "case": "case_003",
-          "kind": "false_negative",
-          "type": "policy_violation"
-        },
-        {
-          "case": "case_004",
-          "kind": "false_positive",
-          "type": "missing_required_field"
-        },
-        {
           "case": "case_005",
           "kind": "false_positive",
-          "type": "missing_required_field"
-        },
-        {
-          "case": "case_005",
-          "kind": "false_negative",
-          "type": "duplicate_invoice"
+          "type": "incorrect_tax_calculation"
         },
         {
           "case": "case_006",
           "kind": "false_positive",
-          "type": "missing_required_field"
-        },
-        {
-          "case": "case_006",
-          "kind": "false_negative",
-          "type": "vendor_name_mismatch"
-        },
-        {
-          "case": "case_006",
-          "kind": "false_negative",
-          "type": "po_mismatch"
+          "type": "incorrect_tax_calculation"
         },
         {
           "case": "case_007",
           "kind": "false_positive",
-          "type": "missing_required_field"
-        },
-        {
-          "case": "case_007",
-          "kind": "false_negative",
-          "type": "wrong_currency"
-        },
-        {
-          "case": "case_007",
-          "kind": "false_negative",
-          "type": "policy_violation"
+          "type": "incorrect_tax_calculation"
         },
         {
           "case": "case_008",
           "kind": "false_positive",
-          "type": "missing_required_field"
+          "type": "incorrect_tax_calculation"
         },
         {
-          "case": "case_008",
-          "kind": "false_negative",
+          "case": "case_011",
+          "kind": "false_positive",
+          "type": "incorrect_tax_calculation"
+        },
+        {
+          "case": "case_011",
+          "kind": "false_positive",
           "type": "incorrect_total"
         },
         {
-          "case": "case_009",
+          "case": "case_012",
           "kind": "false_positive",
-          "type": "missing_required_field"
+          "type": "invoice_date_outside_contract"
         },
         {
-          "case": "case_009",
-          "kind": "false_negative",
+          "case": "case_012",
+          "kind": "false_positive",
           "type": "inconsistent_payment_terms"
         },
         {
-          "case": "case_010",
-          "kind": "false_positive",
+          "case": "case_012",
+          "kind": "false_negative",
+          "type": "invoice_date_outside_contract"
+        },
+        {
+          "case": "case_013",
+          "kind": "false_negative",
           "type": "missing_required_field"
+        },
+        {
+          "case": "case_014",
+          "kind": "false_positive",
+          "type": "amount_exceeds_contract"
+        },
+        {
+          "case": "case_014",
+          "kind": "false_positive",
+          "type": "incorrect_tax_calculation"
         }
       ]
     },
     "retrieval": {
-      "cases_evaluated": 10,
-      "query_count": 40,
+      "cases_evaluated": 15,
+      "query_count": 60,
       "top_k": 10,
       "embedding_model": "all-minilm",
-      "corpus_documents": 42,
-      "chunks_newly_indexed": 2,
+      "corpus_documents": 62,
+      "chunks_newly_indexed": 115,
       "modes": {
         "bm25": {
-          "recall_at_1": 0.6,
-          "recall_at_3": 0.825,
-          "recall_at_5": 0.95,
-          "mrr": 0.7162,
-          "ndcg_at_5": 0.3667,
-          "mean_latency_ms": 25.9
+          "recall_at_1": 0.5833,
+          "recall_at_3": 0.75,
+          "recall_at_5": 0.9333,
+          "mrr": 0.6964,
+          "ndcg_at_5": 0.3431,
+          "mean_latency_ms": 35.5
         },
         "dense": {
-          "recall_at_1": 0.25,
-          "recall_at_3": 0.6,
-          "recall_at_5": 0.825,
-          "mrr": 0.4629,
-          "ndcg_at_5": 0.2207,
-          "mean_latency_ms": 824.4
+          "recall_at_1": 0.2333,
+          "recall_at_3": 0.4833,
+          "recall_at_5": 0.65,
+          "mrr": 0.4055,
+          "ndcg_at_5": 0.1724,
+          "mean_latency_ms": 855.9
         },
         "hybrid": {
-          "recall_at_1": 0.525,
-          "recall_at_3": 0.825,
-          "recall_at_5": 0.95,
-          "mrr": 0.6717,
-          "ndcg_at_5": 0.3225,
-          "mean_latency_ms": 787.6
+          "recall_at_1": 0.4,
+          "recall_at_3": 0.7,
+          "recall_at_5": 0.9333,
+          "mrr": 0.585,
+          "ndcg_at_5": 0.2837,
+          "mean_latency_ms": 851.1
         }
       },
-      "headline": "hybrid Recall@5 0.95 vs bm25 0.95 / dense 0.82"
+      "headline": "hybrid Recall@5 0.93 vs bm25 0.93 / dense 0.65"
     },
     "routing": {
       "model": "llama3.2:1b",
@@ -597,18 +610,18 @@
       "headline": "routing accuracy 92.50% (deterministic default); LLM-assisted 82.50%, LLM-only 67.50%"
     },
     "workflow": {
-      "cases": 10,
-      "completed": 10,
+      "cases": 15,
+      "completed": 15,
       "failed": 0,
       "completion_rate": 1.0,
-      "documents_processed": 40,
+      "documents_processed": 60,
       "extraction_failure_count": 0,
       "extraction_failure_rate": 0.0,
       "review_task_creation_accuracy": 1.0,
-      "median_duration_ms": 5988.0,
+      "median_duration_ms": 14219.9,
       "p95_duration_ms": null,
       "failures": [],
-      "headline": "workflow completion 10/10, review-task creation accuracy 100%"
+      "headline": "workflow completion 15/15, review-task creation accuracy 100%"
     }
   },
   "skipped": [

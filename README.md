@@ -77,19 +77,22 @@ Same seed, same bytes — which makes every evaluation below reproducible.
 
 All numbers below were produced by `python -m evals.run_all` on the machine described above and live in [`evals/reports/`](evals/reports/). Regenerate them yourself; the README is updated only from those reports.
 
-<!-- BENCHMARK RESULTS — regenerated from evals/reports -->
+<!-- BENCHMARK RESULTS — regenerated from evals/reports (15 cases, seed 42) -->
 
 | Evaluation | Result |
 |---|---|
-| Discrepancy rules vs ground truth (perfect extraction) | precision / recall / F1 **1.00** over 30 cases |
-| Retrieval (Recall@5) | hybrid **0.95** · bm25 0.95 · dense 0.82 (40 queries) |
-| Query routing accuracy | **92.5%** deterministic (LLM few-shot 67.5%, zero-shot 20%) |
-| Structured extraction (llama3.2:1b) | see `evals/reports/extraction_latest.md` |
-| Discrepancy detection end-to-end (LLM extraction) | see `evals/reports/discrepancy_end_to_end_latest.md` |
+| Discrepancy rules vs ground truth (perfect extraction) | precision / recall / F1 **1.00** |
+| Structured extraction (llama3.2:1b) | field accuracy **96.6%** (invoice 93.6 / contract 99.0 / PO 98.7 / policy 100) · schema validity **100%** · median 1.49 s per document |
+| Discrepancy detection end-to-end (LLM extraction) | precision **54.5%** · recall **85.7%** · F1 **66.7%** |
+| Retrieval (Recall@5) | hybrid **0.93** · bm25 0.93 · dense 0.65 |
+| Query routing accuracy | **92.5%** deterministic (LLM-assisted 82.5%, LLM-only few-shot 67.5%, zero-shot 20%) |
+| Workflow success (/compare path) | completion **15/15** · review-task creation accuracy **100%** · median 14.2 s per case |
 | Citation quality (end-to-end Q&A) | see `evals/reports/generation_latest.md` |
-| Workflow success (/compare path) | see `evals/reports/workflow_latest.md` |
 
-The interesting engineering story is the gap between the rules' F1 of 1.00 and the end-to-end score: every end-to-end miss is an extraction error by the 1B model, quantified per field and per document type in the extraction report. That gap is the measured cost of running a 1B model — and the measured payoff of keeping the rules deterministic.
+Two measured stories worth reading in the reports:
+
+1. **Extraction went from 11.5% to 96.6% field accuracy without changing the model.** The failure was architectural, not parametric: an all-optional JSON schema let the 1B model satisfy constrained decoding with `{}`. Requiring every key as a copyable string, putting the document before the instructions, and adding a focused single-field repair pass for anything left null recovered 85 points. The eval suite caught it; git history documents each step.
+2. **The gap between rules F1 (1.00) and end-to-end F1 (0.67) is the measured price of a 1B extractor.** With ~30 extracted fields per case, a single wrong field creates a false finding (precision 54.5%) or hides a real one (recall 85.7%). The error budget is fully attributable — extraction, not rules — which is exactly what the deterministic design was for.
 
 ## Reliability and guardrails
 
@@ -111,6 +114,8 @@ This constraint is a feature: a 1B generative model + 45 MB embedder, pgvector i
 ## Setup
 
 Prerequisites: Python 3.12+, Docker Desktop, [Ollama](https://ollama.com) on the host.
+
+One-shot setup: `scripts\bootstrap.ps1` (Windows) or `scripts/bootstrap.sh` (Linux/macOS/WSL2) — or step by step:
 
 ```bash
 # 1. Models (one-time, ~1.4 GB total)

@@ -1,15 +1,18 @@
 # Discrepancy Detection Evaluation — mode: end_to_end
 
-Cases: 10 · Expected anomalies: 9 · Precision: **0.00%** · Recall: **0.00%** · F1: **0.00%**
+Cases: 15 · Expected anomalies: 14 · Precision: **54.55%** · Recall: **85.71%** · F1: **66.67%**
 
 | Anomaly type | TP | FP | FN | Precision | Recall | F1 |
 | --- | --- | --- | --- | --- | --- | --- |
-| conflicting_invoice_number | 0 | 0 | 1 | 0.00% | 0.00% | 0.00% |
-| duplicate_invoice | 0 | 0 | 1 | 0.00% | 0.00% | 0.00% |
-| inconsistent_payment_terms | 0 | 0 | 1 | 0.00% | 0.00% | 0.00% |
-| incorrect_total | 0 | 0 | 1 | 0.00% | 0.00% | 0.00% |
-| missing_required_field | 0 | 10 | 0 | 0.00% | 0.00% | 0.00% |
-| po_mismatch | 0 | 0 | 1 | 0.00% | 0.00% | 0.00% |
-| policy_violation | 0 | 0 | 2 | 0.00% | 0.00% | 0.00% |
-| vendor_name_mismatch | 0 | 0 | 1 | 0.00% | 0.00% | 0.00% |
-| wrong_currency | 0 | 0 | 1 | 0.00% | 0.00% | 0.00% |
+| amount_exceeds_contract | 0 | 1 | 0 | 0.00% | 0.00% | 0.00% |
+| conflicting_invoice_number | 1 | 0 | 0 | 100.00% | 100.00% | 100.00% |
+| duplicate_invoice | 1 | 0 | 0 | 100.00% | 100.00% | 100.00% |
+| inconsistent_payment_terms | 1 | 1 | 0 | 50.00% | 100.00% | 66.67% |
+| incorrect_tax_calculation | 1 | 6 | 0 | 14.29% | 100.00% | 25.00% |
+| incorrect_total | 1 | 1 | 0 | 50.00% | 100.00% | 66.67% |
+| invoice_date_outside_contract | 0 | 1 | 1 | 0.00% | 0.00% | 0.00% |
+| missing_required_field | 0 | 0 | 1 | 0.00% | 0.00% | 0.00% |
+| po_mismatch | 1 | 0 | 0 | 100.00% | 100.00% | 100.00% |
+| policy_violation | 2 | 0 | 0 | 100.00% | 100.00% | 100.00% |
+| vendor_name_mismatch | 2 | 0 | 0 | 100.00% | 100.00% | 100.00% |
+| wrong_currency | 2 | 0 | 0 | 100.00% | 100.00% | 100.00% |

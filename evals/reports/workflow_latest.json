@@ -1,16 +1,16 @@
 {
   "eval": "workflow",
-  "generated_at": "2026-08-17T19:36:43+00:00",
-  "cases": 10,
-  "completed": 10,
+  "generated_at": "2026-08-17T20:00:05+00:00",
+  "cases": 15,
+  "completed": 15,
   "failed": 0,
   "completion_rate": 1.0,
-  "documents_processed": 40,
+  "documents_processed": 60,
   "extraction_failure_count": 0,
   "extraction_failure_rate": 0.0,
   "review_task_creation_accuracy": 1.0,
-  "median_duration_ms": 5988.0,
+  "median_duration_ms": 14219.9,
   "p95_duration_ms": null,
   "failures": [],
-  "headline": "workflow completion 10/10, review-task creation accuracy 100%"
+  "headline": "workflow completion 15/15, review-task creation accuracy 100%"
 }

@@ -1,11 +1,11 @@
 # Retrieval Evaluation (DocFlowBench)
 
-Embedding model: `all-minilm` · Cases: 10 · Queries: 40 · top_k: 10
+Embedding model: `all-minilm` · Cases: 15 · Queries: 60 · top_k: 10
 
-**hybrid Recall@5 0.95 vs bm25 0.95 / dense 0.82**
+**hybrid Recall@5 0.93 vs bm25 0.93 / dense 0.65**
 
 | Mode | Recall@1 | Recall@3 | Recall@5 | MRR | nDCG@5 | Mean latency (ms) |
 | --- | --- | --- | --- | --- | --- | --- |
-| bm25 | 0.60 | 0.82 | 0.95 | 0.72 | 0.37 | 26 |
-| dense | 0.25 | 0.60 | 0.82 | 0.46 | 0.22 | 824 |
-| hybrid | 0.53 | 0.82 | 0.95 | 0.67 | 0.32 | 788 |
+| bm25 | 0.58 | 0.75 | 0.93 | 0.70 | 0.34 | 36 |
+| dense | 0.23 | 0.48 | 0.65 | 0.41 | 0.17 | 856 |
+| hybrid | 0.40 | 0.70 | 0.93 | 0.58 | 0.28 | 851 |

@@ -180,9 +180,7 @@ async def search_documents(
     """
     normalized_mode = mode.strip().lower()
     if normalized_mode not in _VALID_MODES:
-        return _error(
-            f"invalid mode {mode!r}: must be one of 'bm25', 'dense', or 'hybrid'"
-        )
+        return _error(f"invalid mode {mode!r}: must be one of 'bm25', 'dense', or 'hybrid'")
     if not 1 <= top_k <= _MAX_TOP_K:
         return _error(f"top_k must be between 1 and {_MAX_TOP_K}, got {top_k}")
     logger.info(

@@ -119,9 +119,7 @@ def upgrade() -> None:
             nullable=False,
             server_default=_JSONB_EMPTY_ARRAY,
         ),
-        sa.Column(
-            "requires_review", sa.Boolean(), nullable=False, server_default=sa.text("false")
-        ),
+        sa.Column("requires_review", sa.Boolean(), nullable=False, server_default=sa.text("false")),
         sa.Column("duration_ms", sa.Float(), nullable=True),
         sa.Column(
             "created_at",
