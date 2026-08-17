@@ -1,6 +1,6 @@
 """Registry for versioned prompt templates stored as ``{name}_v{N}.txt`` files."""
 
-from functools import lru_cache
+from functools import cache
 from pathlib import Path
 from string import Formatter
 
@@ -17,7 +17,7 @@ class RenderedPrompt(BaseModel):
     text: str
 
 
-@lru_cache(maxsize=None)
+@cache
 def _load_template(prompts_dir: Path, name: str, version: int) -> str:
     path = prompts_dir / f"{name}_v{version}.txt"
     if not path.is_file():
@@ -30,12 +30,10 @@ def _load_template(prompts_dir: Path, name: str, version: int) -> str:
     return path.read_text(encoding="utf-8")
 
 
-@lru_cache(maxsize=None)
+@cache
 def _template_placeholders(template: str) -> frozenset[str]:
     return frozenset(
-        field_name
-        for _, field_name, _, _ in Formatter().parse(template)
-        if field_name is not None
+        field_name for _, field_name, _, _ in Formatter().parse(template) if field_name is not None
     )
 
 
@@ -65,9 +63,7 @@ class PromptRegistry:
         missing = placeholders - variables.keys()
         extra = variables.keys() - placeholders
         if missing:
-            raise ValueError(
-                f"Prompt '{name}' v{version} is missing variables: {sorted(missing)}"
-            )
+            raise ValueError(f"Prompt '{name}' v{version} is missing variables: {sorted(missing)}")
         if extra:
             raise ValueError(
                 f"Prompt '{name}' v{version} received unexpected variables: {sorted(extra)}"

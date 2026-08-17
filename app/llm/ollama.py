@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 import httpx
-from pydantic import BaseModel, ValidationError
+from pydantic import ValidationError
 
 from app.core.config import Settings, get_settings
 from app.core.exceptions import OllamaUnavailableError, StructuredOutputValidationError

@@ -82,9 +82,7 @@ class OllamaEmbeddingProvider:
         async with httpx.AsyncClient(timeout=timeout) as client:
             yield client
 
-    async def _embed_batch(
-        self, client: httpx.AsyncClient, batch: list[str]
-    ) -> list[list[float]]:
+    async def _embed_batch(self, client: httpx.AsyncClient, batch: list[str]) -> list[list[float]]:
         url = f"{self._settings.ollama_base_url.rstrip('/')}/api/embed"
         payload = {"model": self._settings.ollama_embedding_model, "input": batch}
         try:
