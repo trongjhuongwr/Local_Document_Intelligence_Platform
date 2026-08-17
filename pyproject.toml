@@ -43,7 +43,7 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["app", "synthetic_data"]
+packages = ["app", "synthetic_data", "evals"]
 
 [tool.ruff]
 line-length = 100

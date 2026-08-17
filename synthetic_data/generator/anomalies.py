@@ -245,11 +245,16 @@ def _inject_incorrect_tax(case: "BenchmarkCase", rng: random.Random) -> Expected
     invoice = case.invoices[0]
     rate = _dec(invoice.tax_rate_percent)
     if rate == 0:
+        # A zero-rate invoice gains a stated 8% rate with an understated tax:
+        # factors above 1 would grow the total past the PO's 8% safety margin
+        # and leak an unintended po_mismatch into the ground truth.
         rate = Decimal("8")
         invoice.tax_rate_percent = 8.0
+        factor = Decimal(rng.choice(["0.5", "0.75"]))
+    else:
+        factor = Decimal(rng.choice(["0.5", "0.75", "1.25", "1.5"]))
     subtotal = _dec(invoice.subtotal)
     correct_tax = _money(subtotal * rate / 100)
-    factor = Decimal(rng.choice(["0.5", "0.75", "1.25", "1.5"]))
     wrong_tax = _money(correct_tax * factor)
     if wrong_tax == correct_tax:
         wrong_tax = _money(correct_tax + Decimal(10))

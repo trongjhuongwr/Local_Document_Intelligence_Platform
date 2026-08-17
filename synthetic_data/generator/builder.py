@@ -18,7 +18,7 @@ from synthetic_data.generator.models import (
     PurchaseOrderTruth,
 )
 
-GENERATOR_VERSION = "1.0.0"
+GENERATOR_VERSION = "1.0.1"
 
 VENDORS = [
     "Acme Analytics Ltd",
