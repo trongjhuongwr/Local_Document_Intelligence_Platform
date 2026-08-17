@@ -1,0 +1,15 @@
+Extract the contract fields below from the document text.
+
+Rules:
+- vendor_name is the service provider; customer_name is the client.
+- Dates must use YYYY-MM-DD format.
+- maximum_amount is the maximum/aggregate contract amount as a plain number.
+- currency is the 3-letter code (e.g. USD, EUR, GBP).
+- payment_terms is the stated terms (e.g. "Net 30").
+- obligations is a short list of stated obligations (may be empty).
+- If a value is not stated in the document, use null. Never guess or invent values.
+
+Document text:
+---
+{document_text}
+---

@@ -1,0 +1,13 @@
+Extract the purchase order fields below from the document text.
+
+Rules:
+- po_number is the purchase order number (e.g. PO-2025-1234).
+- approved_amount is the approved amount as a plain number.
+- Dates must use YYYY-MM-DD format.
+- currency is the 3-letter code (e.g. USD, EUR, GBP).
+- If a value is not stated in the document, use null. Never guess or invent values.
+
+Document text:
+---
+{document_text}
+---
