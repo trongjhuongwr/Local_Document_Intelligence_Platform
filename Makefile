@@ -12,7 +12,7 @@ format:
 	ruff format .
 
 typecheck:
-	mypy app
+	mypy app evals synthetic_data mcp_server
 
 test:
 	pytest -m "not ollama and not integration" -q

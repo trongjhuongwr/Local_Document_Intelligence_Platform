@@ -1,0 +1,16 @@
+.git
+.venv
+__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+.mypy_cache
+.env
+data/
+synthetic_data/documents/
+synthetic_data/ground_truth/
+evals/reports/
+docs/
+ui/
+tests/
+Master_Build_Specification_*.md

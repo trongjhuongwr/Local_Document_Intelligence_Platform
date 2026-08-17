@@ -26,10 +26,45 @@ jobs:
         run: ruff format --check .
 
       - name: Mypy
-        run: mypy app
+        run: mypy app evals synthetic_data mcp_server
 
-      - name: Pytest (no local models required)
+      - name: Unit tests (no local models or database required)
         run: pytest -m "not ollama and not integration" -q
+
+  integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: docintel
+          POSTGRES_PASSWORD: docintel
+          POSTGRES_DB: docintel
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U docintel -d docintel"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+asyncpg://docintel:docintel@localhost:5432/docintel
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Apply migrations
+        run: alembic upgrade head
+
+      - name: Integration tests (Postgres, no Ollama)
+        run: pytest -m integration -q
 
   docker:
     runs-on: ubuntu-latest

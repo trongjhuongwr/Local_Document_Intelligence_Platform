@@ -8,6 +8,11 @@ WORKDIR /app
 
 COPY pyproject.toml README.md ./
 COPY app ./app
+COPY synthetic_data ./synthetic_data
+COPY evals ./evals
+COPY mcp_server ./mcp_server
+COPY migrations ./migrations
+COPY alembic.ini ./
 
 RUN pip install .
 
