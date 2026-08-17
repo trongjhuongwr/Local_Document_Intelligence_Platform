@@ -51,3 +51,13 @@ class CitationValidationError(AppError):
 class WorkflowError(AppError):
     status_code = 500
     error_code = "workflow_error"
+
+
+class DocumentNotFoundError(AppError):
+    status_code = 404
+    error_code = "document_not_found"
+
+
+class FileTooLargeError(AppError):
+    status_code = 413
+    error_code = "file_too_large"
