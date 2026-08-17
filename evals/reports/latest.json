@@ -1,0 +1,617 @@
+{
+  "results": {
+    "discrepancy_rules": {
+      "mode": "rules",
+      "cases_evaluated": 10,
+      "expected_anomalies": 9,
+      "overall": {
+        "tp": 9,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      },
+      "by_type": {
+        "conflicting_invoice_number": {
+          "tp": 1,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "duplicate_invoice": {
+          "tp": 1,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "inconsistent_payment_terms": {
+          "tp": 1,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "incorrect_total": {
+          "tp": 1,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "po_mismatch": {
+          "tp": 1,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "policy_violation": {
+          "tp": 2,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "vendor_name_mismatch": {
+          "tp": 1,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "wrong_currency": {
+          "tp": 1,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        }
+      },
+      "mismatches": []
+    },
+    "extraction": {
+      "cases_evaluated": 10,
+      "model": "llama3.2:1b",
+      "overall_field_accuracy": 0.1151,
+      "overall_schema_valid_rate": 1.0,
+      "median_llm_latency_ms": 712.1,
+      "p95_llm_latency_ms": 1036.9,
+      "by_document_type": {
+        "invoice": {
+          "documents": 12,
+          "schema_valid_rate": 1.0,
+          "field_accuracy": {
+            "invoice_number": 0.0,
+            "vendor_name": 0.0,
+            "customer_name": 0.0,
+            "issue_date": 0.9167,
+            "due_date": 0.9167,
+            "currency": 0.8333,
+            "subtotal": 0.0,
+            "tax_rate_percent": 0.0,
+            "tax": 0.0,
+            "total": 0.0,
+            "payment_terms": 0.0,
+            "po_reference": 0.1667
+          },
+          "overall_field_accuracy": 0.2361,
+          "numeric_accuracy": 0.0,
+          "date_accuracy": 0.9167,
+          "required_field_completeness": 0.2254
+        },
+        "contract": {
+          "documents": 10,
+          "schema_valid_rate": 1.0,
+          "field_accuracy": {
+            "vendor_name": 0.0,
+            "customer_name": 0.0,
+            "effective_date": 0.0,
+            "expiration_date": 0.0,
+            "currency": 0.0,
+            "maximum_amount": 0.0,
+            "payment_terms": 0.1
+          },
+          "overall_field_accuracy": 0.0143,
+          "numeric_accuracy": 0.0,
+          "date_accuracy": 0.0,
+          "required_field_completeness": 0.0143
+        },
+        "purchase_order": {
+          "documents": 10,
+          "schema_valid_rate": 1.0,
+          "field_accuracy": {
+            "po_number": 0.0,
+            "vendor_name": 0.0,
+            "issue_date": 0.0,
+            "currency": 0.0,
+            "approved_amount": 0.0
+          },
+          "overall_field_accuracy": 0.0,
+          "numeric_accuracy": 0.0,
+          "date_accuracy": 0.0,
+          "required_field_completeness": 0.0
+        },
+        "policy": {
+          "documents": 10,
+          "schema_valid_rate": 1.0,
+          "field_accuracy": {
+            "required_payment_terms": 0.0,
+            "po_reference_required": 0.0,
+            "manual_approval_threshold": 0.0,
+            "currency": 0.0
+          },
+          "overall_field_accuracy": 0.0,
+          "numeric_accuracy": 0.0,
+          "date_accuracy": 0.0,
+          "required_field_completeness": 0.0
+        }
+      }
+    },
+    "discrepancy_end_to_end": {
+      "mode": "end_to_end",
+      "cases_evaluated": 10,
+      "expected_anomalies": 9,
+      "overall": {
+        "tp": 0,
+        "fp": 10,
+        "fn": 9,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "by_type": {
+        "conflicting_invoice_number": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 1,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        },
+        "duplicate_invoice": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 1,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        },
+        "inconsistent_payment_terms": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 1,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        },
+        "incorrect_total": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 1,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        },
+        "missing_required_field": {
+          "tp": 0,
+          "fp": 10,
+          "fn": 0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        },
+        "po_mismatch": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 1,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        },
+        "policy_violation": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 2,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        },
+        "vendor_name_mismatch": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 1,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        },
+        "wrong_currency": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 1,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        }
+      },
+      "mismatches": [
+        {
+          "case": "case_001",
+          "kind": "false_positive",
+          "type": "missing_required_field"
+        },
+        {
+          "case": "case_001",
+          "kind": "false_negative",
+          "type": "conflicting_invoice_number"
+        },
+        {
+          "case": "case_002",
+          "kind": "false_positive",
+          "type": "missing_required_field"
+        },
+        {
+          "case": "case_003",
+          "kind": "false_positive",
+          "type": "missing_required_field"
+        },
+        {
+          "case": "case_003",
+          "kind": "false_negative",
+          "type": "policy_violation"
+        },
+        {
+          "case": "case_004",
+          "kind": "false_positive",
+          "type": "missing_required_field"
+        },
+        {
+          "case": "case_005",
+          "kind": "false_positive",
+          "type": "missing_required_field"
+        },
+        {
+          "case": "case_005",
+          "kind": "false_negative",
+          "type": "duplicate_invoice"
+        },
+        {
+          "case": "case_006",
+          "kind": "false_positive",
+          "type": "missing_required_field"
+        },
+        {
+          "case": "case_006",
+          "kind": "false_negative",
+          "type": "vendor_name_mismatch"
+        },
+        {
+          "case": "case_006",
+          "kind": "false_negative",
+          "type": "po_mismatch"
+        },
+        {
+          "case": "case_007",
+          "kind": "false_positive",
+          "type": "missing_required_field"
+        },
+        {
+          "case": "case_007",
+          "kind": "false_negative",
+          "type": "wrong_currency"
+        },
+        {
+          "case": "case_007",
+          "kind": "false_negative",
+          "type": "policy_violation"
+        },
+        {
+          "case": "case_008",
+          "kind": "false_positive",
+          "type": "missing_required_field"
+        },
+        {
+          "case": "case_008",
+          "kind": "false_negative",
+          "type": "incorrect_total"
+        },
+        {
+          "case": "case_009",
+          "kind": "false_positive",
+          "type": "missing_required_field"
+        },
+        {
+          "case": "case_009",
+          "kind": "false_negative",
+          "type": "inconsistent_payment_terms"
+        },
+        {
+          "case": "case_010",
+          "kind": "false_positive",
+          "type": "missing_required_field"
+        }
+      ]
+    },
+    "retrieval": {
+      "cases_evaluated": 10,
+      "query_count": 40,
+      "top_k": 10,
+      "embedding_model": "all-minilm",
+      "corpus_documents": 42,
+      "chunks_newly_indexed": 2,
+      "modes": {
+        "bm25": {
+          "recall_at_1": 0.6,
+          "recall_at_3": 0.825,
+          "recall_at_5": 0.95,
+          "mrr": 0.7162,
+          "ndcg_at_5": 0.3667,
+          "mean_latency_ms": 25.9
+        },
+        "dense": {
+          "recall_at_1": 0.25,
+          "recall_at_3": 0.6,
+          "recall_at_5": 0.825,
+          "mrr": 0.4629,
+          "ndcg_at_5": 0.2207,
+          "mean_latency_ms": 824.4
+        },
+        "hybrid": {
+          "recall_at_1": 0.525,
+          "recall_at_3": 0.825,
+          "recall_at_5": 0.95,
+          "mrr": 0.6717,
+          "ndcg_at_5": 0.3225,
+          "mean_latency_ms": 787.6
+        }
+      },
+      "headline": "hybrid Recall@5 0.95 vs bm25 0.95 / dense 0.82"
+    },
+    "routing": {
+      "model": "llama3.2:1b",
+      "production_router": {
+        "total": 40,
+        "accuracy": 0.925,
+        "macro_f1": 0.9263,
+        "per_route": {
+          "factual_rag": {
+            "precision": 0.7778,
+            "recall": 0.875,
+            "f1": 0.8235
+          },
+          "structured_lookup": {
+            "precision": 0.8889,
+            "recall": 1.0,
+            "f1": 0.9412
+          },
+          "document_compare": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0
+          },
+          "discrepancy_analysis": {
+            "precision": 1.0,
+            "recall": 0.875,
+            "f1": 0.9333
+          },
+          "summarization": {
+            "precision": 1.0,
+            "recall": 0.875,
+            "f1": 0.9333
+          }
+        },
+        "confusion_matrix": {
+          "factual_rag": {
+            "factual_rag": 7,
+            "structured_lookup": 1
+          },
+          "structured_lookup": {
+            "structured_lookup": 8
+          },
+          "document_compare": {
+            "document_compare": 8
+          },
+          "discrepancy_analysis": {
+            "discrepancy_analysis": 7,
+            "factual_rag": 1
+          },
+          "summarization": {
+            "summarization": 7,
+            "factual_rag": 1
+          }
+        }
+      },
+      "production_router_method_counts": {
+        "keyword_default": 9,
+        "keyword": 31
+      },
+      "llm_assisted_router": {
+        "total": 40,
+        "accuracy": 0.825,
+        "macro_f1": 0.8216,
+        "per_route": {
+          "factual_rag": {
+            "precision": 1.0,
+            "recall": 0.375,
+            "f1": 0.5455
+          },
+          "structured_lookup": {
+            "precision": 0.5333,
+            "recall": 1.0,
+            "f1": 0.6957
+          },
+          "document_compare": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0
+          },
+          "discrepancy_analysis": {
+            "precision": 1.0,
+            "recall": 0.875,
+            "f1": 0.9333
+          },
+          "summarization": {
+            "precision": 1.0,
+            "recall": 0.875,
+            "f1": 0.9333
+          }
+        },
+        "confusion_matrix": {
+          "factual_rag": {
+            "factual_rag": 3,
+            "structured_lookup": 5
+          },
+          "structured_lookup": {
+            "structured_lookup": 8
+          },
+          "document_compare": {
+            "document_compare": 8
+          },
+          "discrepancy_analysis": {
+            "discrepancy_analysis": 7,
+            "structured_lookup": 1
+          },
+          "summarization": {
+            "summarization": 7,
+            "structured_lookup": 1
+          }
+        }
+      },
+      "llm_only": {
+        "total": 40,
+        "accuracy": 0.675,
+        "macro_f1": 0.6709,
+        "per_route": {
+          "factual_rag": {
+            "precision": 0.5,
+            "recall": 0.375,
+            "f1": 0.4286
+          },
+          "structured_lookup": {
+            "precision": 0.5,
+            "recall": 1.0,
+            "f1": 0.6667
+          },
+          "document_compare": {
+            "precision": 0.7778,
+            "recall": 0.875,
+            "f1": 0.8235
+          },
+          "discrepancy_analysis": {
+            "precision": 1.0,
+            "recall": 0.5,
+            "f1": 0.6667
+          },
+          "summarization": {
+            "precision": 1.0,
+            "recall": 0.625,
+            "f1": 0.7692
+          }
+        },
+        "confusion_matrix": {
+          "factual_rag": {
+            "factual_rag": 3,
+            "structured_lookup": 5
+          },
+          "structured_lookup": {
+            "structured_lookup": 8
+          },
+          "document_compare": {
+            "document_compare": 7,
+            "factual_rag": 1
+          },
+          "discrepancy_analysis": {
+            "document_compare": 2,
+            "discrepancy_analysis": 4,
+            "structured_lookup": 2
+          },
+          "summarization": {
+            "summarization": 5,
+            "factual_rag": 2,
+            "structured_lookup": 1
+          }
+        }
+      },
+      "keyword_only": {
+        "total": 40,
+        "accuracy": 0.925,
+        "macro_f1": 0.9263,
+        "per_route": {
+          "factual_rag": {
+            "precision": 0.7778,
+            "recall": 0.875,
+            "f1": 0.8235
+          },
+          "structured_lookup": {
+            "precision": 0.8889,
+            "recall": 1.0,
+            "f1": 0.9412
+          },
+          "document_compare": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0
+          },
+          "discrepancy_analysis": {
+            "precision": 1.0,
+            "recall": 0.875,
+            "f1": 0.9333
+          },
+          "summarization": {
+            "precision": 1.0,
+            "recall": 0.875,
+            "f1": 0.9333
+          }
+        },
+        "confusion_matrix": {
+          "factual_rag": {
+            "factual_rag": 7,
+            "structured_lookup": 1
+          },
+          "structured_lookup": {
+            "structured_lookup": 8
+          },
+          "document_compare": {
+            "document_compare": 8
+          },
+          "discrepancy_analysis": {
+            "discrepancy_analysis": 7,
+            "factual_rag": 1
+          },
+          "summarization": {
+            "summarization": 7,
+            "factual_rag": 1
+          }
+        }
+      },
+      "headline": "routing accuracy 92.50% (deterministic default); LLM-assisted 82.50%, LLM-only 67.50%"
+    },
+    "workflow": {
+      "cases": 10,
+      "completed": 10,
+      "failed": 0,
+      "completion_rate": 1.0,
+      "documents_processed": 40,
+      "extraction_failure_count": 0,
+      "extraction_failure_rate": 0.0,
+      "review_task_creation_accuracy": 1.0,
+      "median_duration_ms": 5988.0,
+      "p95_duration_ms": null,
+      "failures": [],
+      "headline": "workflow completion 10/10, review-task creation accuracy 100%"
+    }
+  },
+  "skipped": [
+    "generation (failed: OllamaUnavailableError: Cannot reach Ollama at http://localhost:11434: )"
+  ]
+}

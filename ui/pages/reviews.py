@@ -83,13 +83,13 @@ def _render_card(task: dict[str, Any], key_prefix: str) -> None:
             note = st.text_input("Note (optional)", key=f"note_{widget_key}")
             approve_col, reject_col = st.columns(2)
             if approve_col.button(
-                "Approve", key=f"approve_{widget_key}", type="primary", use_container_width=True
+                "Approve", key=f"approve_{widget_key}", type="primary", width="stretch"
             ):
                 if reviewer.strip():
                     _decide(review_id, "approve", note)
                 else:
                     st.warning("Enter a reviewer name above first.")
-            if reject_col.button("Reject", key=f"reject_{widget_key}", use_container_width=True):
+            if reject_col.button("Reject", key=f"reject_{widget_key}", width="stretch"):
                 if reviewer.strip():
                     _decide(review_id, "reject", note)
                 else:

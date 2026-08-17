@@ -18,7 +18,11 @@ _NULL_STRINGS = {"", "null", "none", "n/a", "na", "unknown", "not specified", "n
 
 _DATE_FORMATS = ("%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y", "%B %d, %Y", "%d %B %Y", "%b %d, %Y")
 
-_CURRENCY_PREFIX = re.compile(r"(?i)^(usd|eur|gbp|vnd|\$|€|£)\s*")
+_ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
+_NUMBER = re.compile(r"-?\d[\d,]*(?:\.\d+)?")
+
+_TRUE_STRINGS = {"true", "yes", "required", "1"}
+_FALSE_STRINGS = {"false", "no", "not required", "0"}
 
 
 def _parse_date(value: Any) -> Any:
@@ -28,11 +32,19 @@ def _parse_date(value: Any) -> Any:
         text = value.strip()
         if text.lower() in _NULL_STRINGS:
             return None
+        iso = _ISO_DATE.search(text)
+        if iso:
+            try:
+                return date.fromisoformat(iso.group(0))
+            except ValueError:
+                pass
         for fmt in _DATE_FORMATS:
             try:
                 return datetime.strptime(text, fmt).date()
             except ValueError:
                 continue
+        # Unparseable model text becomes "missing" — never an invented date.
+        return None
     raise ValueError(f"unparseable date: {value!r}")
 
 
@@ -40,22 +52,53 @@ def _parse_money(value: Any) -> Any:
     if value is None or isinstance(value, int | float):
         return value
     if isinstance(value, str):
-        text = _CURRENCY_PREFIX.sub("", value.strip()).replace(",", "").strip()
+        text = value.strip()
         if text.lower() in _NULL_STRINGS:
             return None
-        return float(text)
+        match = _NUMBER.search(text)
+        if match is None:
+            return None
+        return float(match.group(0).replace(",", ""))
     raise ValueError(f"unparseable amount: {value!r}")
 
 
-def _parse_text(value: Any) -> Any:
-    if isinstance(value, str) and value.strip().lower() in _NULL_STRINGS:
+def _parse_bool(value: Any) -> Any:
+    if value is None or isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        text = value.strip().lower()
+        if text in _NULL_STRINGS:
+            return None
+        if text in _TRUE_STRINGS:
+            return True
+        if text in _FALSE_STRINGS:
+            return False
         return None
+    raise ValueError(f"unparseable boolean: {value!r}")
+
+
+def _parse_text(value: Any) -> Any:
+    if isinstance(value, str):
+        text = value.strip()
+        # Small models sometimes echo the field label ("PO Reference: X" or a
+        # bare "PO Reference:"); keep only what follows the label.
+        if ":" in text:
+            text = text.rsplit(":", 1)[-1].strip()
+        if text.lower() in _NULL_STRINGS:
+            return None
+        return text
     return value
 
 
-FlexibleDate = Annotated[date | None, BeforeValidator(_parse_date)]
-FlexibleMoney = Annotated[float | None, BeforeValidator(_parse_money)]
-FlexibleText = Annotated[str | None, BeforeValidator(_parse_text)]
+# `json_schema_input_type=str` makes every field a REQUIRED STRING in the schema
+# Ollama constrains decoding against: the 1B model only ever copies text (or
+# writes "null"), and the validators normalise to typed values. With nullable
+# anyOf schemas the model overwhelmingly took the short null branch — measured
+# 11.5% field accuracy versus copy-then-parse.
+FlexibleDate = Annotated[date | None, BeforeValidator(_parse_date, json_schema_input_type=str)]
+FlexibleMoney = Annotated[float | None, BeforeValidator(_parse_money, json_schema_input_type=str)]
+FlexibleBool = Annotated[bool | None, BeforeValidator(_parse_bool, json_schema_input_type=str)]
+FlexibleText = Annotated[str | None, BeforeValidator(_parse_text, json_schema_input_type=str)]
 
 
 class InvoiceExtraction(BaseModel):
@@ -103,7 +146,7 @@ class PolicyExtraction(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     required_payment_terms: FlexibleText = None
-    po_reference_required: bool | None = None
+    po_reference_required: FlexibleBool = None
     manual_approval_threshold: FlexibleMoney = None
     currency: FlexibleText = None
 

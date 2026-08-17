@@ -91,6 +91,12 @@ class OllamaLLMProvider:
         """
         messages = self._build_messages(prompt, system)
         json_schema = schema.model_json_schema()
+        # Require every top-level property in the constrained-decoding grammar.
+        # Small models otherwise satisfy an all-optional schema with "{}" —
+        # schema-valid but empty. Values stay nullable; only the keys are forced.
+        properties = json_schema.get("properties", {})
+        if properties:
+            json_schema["required"] = list(properties)
         raw_output = ""
         validation_error = ""
         data: dict[str, Any] = {}

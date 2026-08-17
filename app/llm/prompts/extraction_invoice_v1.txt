@@ -1,12 +1,12 @@
 Extract the invoice fields below from the document text.
 
 Rules:
-- Copy values exactly as stated in the document.
+- Copy values exactly as they appear in the document.
 - Dates must use YYYY-MM-DD format.
-- Amounts must be plain numbers without currency symbols or thousand separators.
+- Amounts may be copied verbatim, e.g. "USD 82,500.00" (subtotal from the Subtotal line, tax from the Tax line, total from the Total Due line).
 - currency is the 3-letter code (e.g. USD, EUR, GBP).
 - tax_rate_percent is the tax percentage number only (e.g. 8 for "Tax (8%)").
-- po_reference is the purchase order number the invoice references, if any.
+- po_reference is the value after "PO Reference:", if present.
 - If a value is not stated in the document, use null. Never guess or invent values.
 
 Document text:

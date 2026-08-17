@@ -73,7 +73,7 @@ if extraction:
             }
             for document_type, stats in by_type.items()
         ]
-        st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+        st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
 else:
     st.info("Extraction evaluation has not been run yet (requires a live Ollama).")
 
@@ -91,7 +91,7 @@ if retrieval and retrieval.get("modes"):
         }
         for mode, stats in retrieval["modes"].items()
     ]
-    st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
     if retrieval.get("headline"):
         st.caption(retrieval["headline"])
 else:
@@ -100,12 +100,15 @@ else:
 # -------------------------------------------------------------------------- routing
 st.subheader("Routing")
 if routing:
-    llm_router = routing.get("llm_router") or {}
-    fallback = routing.get("keyword_fallback") or {}
-    tile_1, tile_2, tile_3 = st.columns(3)
-    tile_1.metric("LLM router accuracy", _pct(llm_router.get("accuracy")))
-    tile_2.metric("LLM router macro F1", _pct(llm_router.get("macro_f1")))
-    tile_3.metric("Keyword fallback accuracy", _pct(fallback.get("accuracy")))
+    # The report schema has two known revisions; read both defensively.
+    production = routing.get("production_router") or routing.get("llm_router") or {}
+    llm_only = routing.get("llm_only") or routing.get("llm_router") or {}
+    fallback = routing.get("keyword_only") or routing.get("keyword_fallback") or {}
+    tile_1, tile_2, tile_3, tile_4 = st.columns(4)
+    tile_1.metric("Router accuracy", _pct(production.get("accuracy")))
+    tile_2.metric("Macro F1", _pct(production.get("macro_f1")))
+    tile_3.metric("LLM-only accuracy", _pct(llm_only.get("accuracy")))
+    tile_4.metric("Keyword fallback accuracy", _pct(fallback.get("accuracy")))
     if routing.get("headline"):
         st.caption(routing["headline"])
 else:

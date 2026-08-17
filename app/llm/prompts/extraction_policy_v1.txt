@@ -1,10 +1,10 @@
 Extract the accounts payable policy fields below from the document text.
 
 Rules:
-- required_payment_terms is the standard payment terms the policy mandates (e.g. "Net 30").
-- po_reference_required is true if the policy requires invoices to reference a purchase order.
-- manual_approval_threshold is the amount above which manual approval is required, as a plain number.
-- currency is the 3-letter code the policy mandates (e.g. USD, EUR, GBP).
+- required_payment_terms is the standard payment terms stated in the "Payment Terms" section (e.g. "Net 30").
+- po_reference_required is true if the policy says invoices must reference a purchase order.
+- manual_approval_threshold is the amount in the "Approval Thresholds" section, copied verbatim (e.g. "USD 10,000.00").
+- currency is the 3-letter code from the "Currency" section (e.g. USD, EUR, GBP).
 - If a value is not stated in the document, use null. Never guess or invent values.
 
 Document text:

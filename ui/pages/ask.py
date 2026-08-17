@@ -28,7 +28,7 @@ with mode_col:
 with case_col:
     case_choice = st.selectbox("Case", ["All cases", *case_ids])
 with button_col:
-    ask_clicked = st.button("Ask", type="primary", use_container_width=True)
+    ask_clicked = st.button("Ask", type="primary", width="stretch")
 
 if ask_clicked:
     if not question.strip():

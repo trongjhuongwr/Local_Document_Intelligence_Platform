@@ -1,0 +1,80 @@
+{
+  "eval": "extraction",
+  "generated_at": "2026-08-17T19:28:47+00:00",
+  "cases_evaluated": 10,
+  "model": "llama3.2:1b",
+  "overall_field_accuracy": 0.1151,
+  "overall_schema_valid_rate": 1.0,
+  "median_llm_latency_ms": 712.1,
+  "p95_llm_latency_ms": 1036.9,
+  "by_document_type": {
+    "invoice": {
+      "documents": 12,
+      "schema_valid_rate": 1.0,
+      "field_accuracy": {
+        "invoice_number": 0.0,
+        "vendor_name": 0.0,
+        "customer_name": 0.0,
+        "issue_date": 0.9167,
+        "due_date": 0.9167,
+        "currency": 0.8333,
+        "subtotal": 0.0,
+        "tax_rate_percent": 0.0,
+        "tax": 0.0,
+        "total": 0.0,
+        "payment_terms": 0.0,
+        "po_reference": 0.1667
+      },
+      "overall_field_accuracy": 0.2361,
+      "numeric_accuracy": 0.0,
+      "date_accuracy": 0.9167,
+      "required_field_completeness": 0.2254
+    },
+    "contract": {
+      "documents": 10,
+      "schema_valid_rate": 1.0,
+      "field_accuracy": {
+        "vendor_name": 0.0,
+        "customer_name": 0.0,
+        "effective_date": 0.0,
+        "expiration_date": 0.0,
+        "currency": 0.0,
+        "maximum_amount": 0.0,
+        "payment_terms": 0.1
+      },
+      "overall_field_accuracy": 0.0143,
+      "numeric_accuracy": 0.0,
+      "date_accuracy": 0.0,
+      "required_field_completeness": 0.0143
+    },
+    "purchase_order": {
+      "documents": 10,
+      "schema_valid_rate": 1.0,
+      "field_accuracy": {
+        "po_number": 0.0,
+        "vendor_name": 0.0,
+        "issue_date": 0.0,
+        "currency": 0.0,
+        "approved_amount": 0.0
+      },
+      "overall_field_accuracy": 0.0,
+      "numeric_accuracy": 0.0,
+      "date_accuracy": 0.0,
+      "required_field_completeness": 0.0
+    },
+    "policy": {
+      "documents": 10,
+      "schema_valid_rate": 1.0,
+      "field_accuracy": {
+        "required_payment_terms": 0.0,
+        "po_reference_required": 0.0,
+        "manual_approval_threshold": 0.0,
+        "currency": 0.0
+      },
+      "overall_field_accuracy": 0.0,
+      "numeric_accuracy": 0.0,
+      "date_accuracy": 0.0,
+      "required_field_completeness": 0.0
+    }
+  }
+}

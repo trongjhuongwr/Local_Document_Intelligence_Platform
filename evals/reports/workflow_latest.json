@@ -1,0 +1,16 @@
+{
+  "eval": "workflow",
+  "generated_at": "2026-08-17T19:36:43+00:00",
+  "cases": 10,
+  "completed": 10,
+  "failed": 0,
+  "completion_rate": 1.0,
+  "documents_processed": 40,
+  "extraction_failure_count": 0,
+  "extraction_failure_rate": 0.0,
+  "review_task_creation_accuracy": 1.0,
+  "median_duration_ms": 5988.0,
+  "p95_duration_ms": null,
+  "failures": [],
+  "headline": "workflow completion 10/10, review-task creation accuracy 100%"
+}

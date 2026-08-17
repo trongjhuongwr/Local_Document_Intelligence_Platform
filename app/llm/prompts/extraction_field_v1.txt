@@ -1,0 +1,8 @@
+Document text:
+---
+{document_text}
+---
+
+From the document above, extract exactly one value.
+{field_hint}
+If the document does not state this value, answer with the word null.

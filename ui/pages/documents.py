@@ -29,7 +29,7 @@ with left:
             format_func=lambda v: "Not specified" if v is None else v.replace("_", " "),
         )
         case_id = st.text_input("Case ID", placeholder="e.g. CASE-0001")
-        submitted = st.form_submit_button("Upload", type="primary", use_container_width=True)
+        submitted = st.form_submit_button("Upload", type="primary", width="stretch")
 
     if submitted:
         if uploaded_file is None:
@@ -80,7 +80,7 @@ with right:
     event = st.dataframe(
         table,
         hide_index=True,
-        use_container_width=True,
+        width="stretch",
         on_select="rerun",
         selection_mode="single-row",
     )
@@ -137,7 +137,7 @@ with right:
 
         action_index, action_delete = st.columns(2)
         with action_index:
-            if st.button("Index for search", use_container_width=True):
+            if st.button("Index for search", width="stretch"):
                 try:
                     with st.spinner("Embedding chunks and building the search index..."):
                         result = api_client.index_document(document_id)
@@ -152,7 +152,7 @@ with right:
                     st.toast(f"Indexed {result['chunks_indexed']} chunks")
         with action_delete:
             confirm = st.checkbox("Confirm deletion", key=f"confirm_delete_{document_id}")
-            if st.button("Delete", use_container_width=True, disabled=not confirm):
+            if st.button("Delete", width="stretch", disabled=not confirm):
                 try:
                     api_client.delete_document(document_id)
                 except api_client.APIError as exc:
