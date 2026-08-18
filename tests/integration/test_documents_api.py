@@ -71,13 +71,25 @@ async def test_upload_duplicate_get_chunks_delete(client):
     response = await client.post(
         "/documents",
         files={"file": (filename, data, "application/pdf")},
-        data={"case_id": case_id},
+        data={"document_type": "invoice", "case_id": case_id},
     )
     assert response.status_code == 201
     duplicate_body = response.json()
     assert duplicate_body["duplicate"] is True
     assert duplicate_body["document_id"] == document_id
     assert duplicate_body["chunk_count"] == body["chunk_count"]
+
+    # Identical content may legitimately participate in another case.
+    other_case_id = f"{case_id}-other"
+    response = await client.post(
+        "/documents",
+        files={"file": (filename, data, "application/pdf")},
+        data={"document_type": "invoice", "case_id": other_case_id},
+    )
+    assert response.status_code == 201
+    other_document_id = response.json()["document_id"]
+    assert response.json()["duplicate"] is False
+    assert other_document_id != document_id
 
     listed = await client.get("/documents", params={"case_id": case_id})
     assert listed.status_code == 200
@@ -110,6 +122,7 @@ async def test_upload_duplicate_get_chunks_delete(client):
     assert (await client.get(f"/documents/{document_id}")).status_code == 404
     assert (await client.get(f"/documents/{document_id}/chunks")).status_code == 404
     assert list(UPLOAD_DIR.glob(f"{document_id}.*")) == []
+    assert (await client.delete(f"/documents/{other_document_id}")).status_code == 204
 
 
 async def test_list_filters(client):

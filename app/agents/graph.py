@@ -16,7 +16,8 @@ from langgraph.graph import END, START, StateGraph
 from app.agents.state import CompareWorkflowState, record_step
 from app.core.logging import get_logger
 from app.discrepancy.engine import analyze_case
-from app.discrepancy.models import CaseDocuments, InvoiceRecord
+from app.discrepancy.evidence import attach_evidence, extraction_failure_review_item
+from app.discrepancy.models import CaseDocuments, DiscrepancyReport, InvoiceRecord
 from app.extraction.schemas import (
     ContractExtraction,
     InvoiceExtraction,
@@ -38,7 +39,12 @@ class CompareServices(Protocol):
         ...
 
     async def extract_document(
-        self, document_id: str, document_type: str, text: str
+        self,
+        document_id: str,
+        document_type: str,
+        text: str,
+        *,
+        force_reextract: bool = False,
     ) -> dict[str, Any] | None:
         """Extract structured fields; None if extraction failed after retries."""
         ...
@@ -88,6 +94,7 @@ def build_compare_graph(services: CompareServices) -> Any:
                 "filename": item["filename"],
                 "document_type": item["document_type"],
                 "text": item["text"],
+                "chunks": item.get("chunks", []),
             }
             for item in loaded
         }
@@ -106,7 +113,12 @@ def build_compare_graph(services: CompareServices) -> Any:
         extractions: dict[str, dict[str, Any]] = {}
         failures: list[dict[str, Any]] = []
         for document_id, info in state.get("documents", {}).items():
-            data = await services.extract_document(document_id, info["document_type"], info["text"])
+            data = await services.extract_document(
+                document_id,
+                info["document_type"],
+                info["text"],
+                force_reextract=state.get("force_reextract", False),
+            )
             if data is None:
                 failures.append(
                     {
@@ -129,7 +141,17 @@ def build_compare_graph(services: CompareServices) -> Any:
             state.get("documents", {}), state.get("extractions", {})
         )
         report = analyze_case(case)
-        discrepancies = [d.model_dump(mode="json") for d in report.discrepancies]
+        enriched = attach_evidence(
+            report.discrepancies,
+            state.get("documents", {}),
+            state.get("extractions", {}),
+        )
+        report = report.model_copy(update={"discrepancies": enriched})
+        discrepancies = [d.model_dump(mode="json") for d in enriched]
+        failure_items = [
+            extraction_failure_review_item(failure, state.get("documents", {}))
+            for failure in state.get("extraction_failures", [])
+        ]
         # Extraction failures force human review: silence must never look like a pass.
         requires_review = report.requires_human_review or bool(state.get("extraction_failures"))
         record_step(
@@ -140,6 +162,8 @@ def build_compare_graph(services: CompareServices) -> Any:
         )
         return {
             "discrepancies": discrepancies,
+            "review_items": [*discrepancies, *failure_items],
+            "engine_report": report.model_dump(mode="json"),
             "requires_review": requires_review,
             "steps": state.get("steps", []),
         }
@@ -148,16 +172,13 @@ def build_compare_graph(services: CompareServices) -> Any:
         task_ids = await services.create_review_tasks(
             state.get("workflow_run_id"),
             state.get("case_id"),
-            state.get("discrepancies", []),
+            state.get("review_items", []),
         )
         record_step(state, "create_review_tasks", created=len(task_ids))
         return {"review_task_ids": task_ids, "steps": state.get("steps", [])}
 
     async def generate_report(state: CompareWorkflowState) -> CompareWorkflowState:
-        case = case_documents_from_extractions(
-            state.get("documents", {}), state.get("extractions", {})
-        )
-        engine_report = analyze_case(case)
+        engine_report = DiscrepancyReport.model_validate(state["engine_report"])
         documents_meta = [
             {
                 "document_id": document_id,
@@ -181,8 +202,8 @@ def build_compare_graph(services: CompareServices) -> Any:
             "steps": state.get("steps", []),
         }
 
-    def has_findings(state: CompareWorkflowState) -> str:
-        return "create_review_tasks" if state.get("discrepancies") else "generate_report"
+    def has_review_items(state: CompareWorkflowState) -> str:
+        return "create_review_tasks" if state.get("review_items") else "generate_report"
 
     graph: StateGraph = StateGraph(CompareWorkflowState)
     graph.add_node("load_documents", load_documents)
@@ -196,7 +217,7 @@ def build_compare_graph(services: CompareServices) -> Any:
     graph.add_edge("extract_fields", "run_rules")
     graph.add_conditional_edges(
         "run_rules",
-        has_findings,
+        has_review_items,
         {"create_review_tasks": "create_review_tasks", "generate_report": "generate_report"},
     )
     graph.add_edge("create_review_tasks", "generate_report")

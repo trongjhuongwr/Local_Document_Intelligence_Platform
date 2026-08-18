@@ -191,7 +191,7 @@ def _filters(case_id: str | None, document_type: str | None) -> dict[str, Any] |
 def search(
     query_text: str,
     *,
-    mode: str = "hybrid",
+    mode: str = "bm25",
     top_k: int = 10,
     case_id: str | None = None,
     document_type: str | None = None,
@@ -271,9 +271,7 @@ def list_reviews(
     return payload.get("reviews", [])
 
 
-def approve_review(
-    review_id: str, *, reviewer: str | None = None, note: str | None = None
-) -> dict[str, Any]:
+def approve_review(review_id: str, *, reviewer: str, note: str | None = None) -> dict[str, Any]:
     return _request(
         "POST",
         f"/reviews/{review_id}/approve",
@@ -281,9 +279,7 @@ def approve_review(
     )
 
 
-def reject_review(
-    review_id: str, *, reviewer: str | None = None, note: str | None = None
-) -> dict[str, Any]:
+def reject_review(review_id: str, *, reviewer: str, note: str | None = None) -> dict[str, Any]:
     return _request(
         "POST",
         f"/reviews/{review_id}/reject",

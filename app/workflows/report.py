@@ -62,6 +62,10 @@ def _issue(discrepancy: Discrepancy) -> dict[str, Any]:
         issue["difference"] = discrepancy.difference
     if discrepancy.calculation is not None:
         issue["calculation"] = discrepancy.calculation.model_dump()
+    if discrepancy.evidence:
+        issue["evidence"] = [
+            reference.model_dump(mode="json") for reference in discrepancy.evidence
+        ]
     return issue
 
 
@@ -107,6 +111,15 @@ def report_to_markdown(report: dict[str, Any]) -> str:
                 calc = issue["calculation"]
                 operands = ", ".join(f"{k}={v:,}" for k, v in calc["operands"].items())
                 lines.append(f"- Calculation: `{calc['formula']}` with {operands}")
+            if issue.get("evidence"):
+                for reference in issue["evidence"]:
+                    page = (
+                        f" p.{reference['page_number']}"
+                        if reference.get("page_number") is not None
+                        else ""
+                    )
+                    field = f" · {reference['field']}" if reference.get("field") else ""
+                    lines.append(f"- Evidence: {reference['filename']}{page}{field}")
             lines.append("")
     else:
         lines += ["## Issues", "", "None detected.", ""]

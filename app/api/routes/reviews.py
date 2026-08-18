@@ -1,8 +1,8 @@
-from typing import Any
+from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.api.dependencies import get_review_service
 from app.models import ReviewTask
@@ -11,8 +11,8 @@ router = APIRouter(tags=["reviews"])
 
 
 class ReviewDecisionRequest(BaseModel):
-    reviewer: str | None = None
-    note: str | None = None
+    reviewer: Annotated[str, Field(min_length=1, max_length=128)]
+    note: Annotated[str | None, Field(max_length=2_000)] = None
 
 
 def _serialize(task: ReviewTask) -> dict[str, Any]:

@@ -14,12 +14,15 @@ class CompareWorkflowState(TypedDict, total=False):
     workflow_run_id: str
     case_id: str | None
     document_ids: list[str]
+    force_reextract: bool
     # document_id -> {"document_type": ..., "filename": ..., "text_chars": ...}
     documents: dict[str, dict[str, Any]]
     # document_id -> extraction data dict (schema depends on document_type)
     extractions: dict[str, dict[str, Any]]
     extraction_failures: list[dict[str, Any]]
     discrepancies: list[dict[str, Any]]
+    review_items: list[dict[str, Any]]
+    engine_report: dict[str, Any]
     requires_review: bool
     review_task_ids: list[str]
     report: dict[str, Any]

@@ -1,6 +1,6 @@
 """Eval 5 — citation quality of the end-to-end grounded Q&A pipeline.
 
-Runs the real stack (deterministic routing, hybrid retrieval over pgvector,
+Runs the real stack (deterministic routing, the configured retrieval default,
 llama3.2:1b synthesis, deterministic citation verification) on the benchmark
 query set and measures whether answers cite, whether citations resolve, and
 whether they point at the right document. Latency percentiles double as the
@@ -38,6 +38,7 @@ async def run_generation_eval(
     await ensure_corpus(cases, benchmark_dir)
 
     total = 0
+    attempted = 0
     with_citations = 0
     valid_citations = 0
     correct_document = 0
@@ -59,8 +60,9 @@ async def run_generation_eval(
         failed_queries = 0
         for case in cases:
             for eval_query in build_queries(case):
+                attempted += 1
                 result = None
-                for attempt in (1, 2):
+                for _attempt in (1, 2):
                     try:
                         result = await service.answer(
                             eval_query.query,
@@ -106,6 +108,8 @@ async def run_generation_eval(
     payload: dict[str, Any] = {
         "model": "llama3.2:1b",
         "queries": total,
+        "queries_attempted": attempted,
+        "query_completion_rate": round(total / attempted, 4) if attempted else 0.0,
         "failed_queries_skipped": failed_queries,
         "citation_presence_rate": _rate(with_citations),
         "valid_citation_rate": _rate(valid_citations),
@@ -131,7 +135,7 @@ async def run_generation_eval(
 
     markdown = (
         "# Citation Quality Evaluation (end-to-end Q&A)\n\n"
-        f"Queries: {total} · "
+        f"Queries completed: {total}/{attempted} · "
         + " · ".join(
             f"{label}: **{payload[key]:.2%}**"
             for label, key in [

@@ -44,8 +44,8 @@ class FakeRetriever:
         self._chunks = chunks
         self.calls: list[dict] = []
 
-    async def search(self, query, *, top_k=10, filters=None):
-        self.calls.append({"query": query, "top_k": top_k, "filters": filters})
+    async def search(self, query, *, mode, top_k=10, filters=None):
+        self.calls.append({"query": query, "mode": mode, "top_k": top_k, "filters": filters})
         return self._chunks
 
 
@@ -61,8 +61,10 @@ async def test_answer_with_valid_citations() -> None:
     assert result.citations["C1"].filename == "service_contract.pdf"
     assert result.route == QueryRoute.STRUCTURED_LOOKUP  # keyword rule: "what is the"
     assert result.retrieved_count == 1
+    assert retriever.calls[0]["mode"] == RetrievalMode.BM25
     assert "Maximum aggregate fees" in provider.generate_calls[0]["prompt"]
     assert provider.generate_calls[0]["temperature"] == 0.0
+    assert provider.generate_calls[0]["max_tokens"] == 256
 
 
 async def test_invented_citations_are_stripped() -> None:
@@ -98,3 +100,17 @@ async def test_discrepancy_route_suggests_compare_workflow() -> None:
 
     assert result.route == QueryRoute.DISCREPANCY_ANALYSIS
     assert result.suggested_action == "run_compare_workflow"
+
+
+async def test_requested_retrieval_mode_is_forwarded() -> None:
+    provider = FakeProvider("The contract cap is USD 75,000 [C1].")
+    retriever = FakeRetriever([_chunk("Maximum aggregate fees: USD 75,000.00")])
+    service = QAService(provider, retriever)
+
+    result = await service.answer(
+        "What is the maximum contract amount?",
+        mode=RetrievalMode.DENSE,
+    )
+
+    assert retriever.calls[0]["mode"] == RetrievalMode.DENSE
+    assert result.retrieval_mode == RetrievalMode.DENSE

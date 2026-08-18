@@ -103,6 +103,21 @@ if result:
                         f"{name}={value}" for name, value in calculation.get("operands", {}).items()
                     )
                     st.code(f"{calculation.get('formula', '')}  [{operands}]", language=None)
+                evidence = issue.get("evidence") or []
+                if evidence:
+                    st.caption("Evidence")
+                    for reference in evidence:
+                        location = reference.get("filename") or "unknown document"
+                        if reference.get("page_number") is not None:
+                            location += f" · page {reference['page_number']}"
+                        if reference.get("field"):
+                            location += f" · {reference['field']}"
+                        st.markdown(f"- {escape(location)}", unsafe_allow_html=True)
+                        if reference.get("snippet"):
+                            st.markdown(
+                                muted(escape(reference["snippet"])),
+                                unsafe_allow_html=True,
+                            )
                 footer = [neutral_chip(issue.get("source", ""))]
                 if issue.get("invoice_number"):
                     footer.append(neutral_chip(f"invoice {issue['invoice_number']}"))

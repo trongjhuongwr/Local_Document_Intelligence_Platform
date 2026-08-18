@@ -10,7 +10,7 @@ The system detects potential financial problems (overbilling, duplicate invoices
 
 ## Decision
 
-Detected issues become review tasks (`OPEN → APPROVED | REJECTED → RESOLVED`) persisted with reviewer identity and timestamp. High-severity findings always require review before a report is considered final. The UI's Review Queue exposes each finding with its severity, deterministic calculation, and evidence citations so a human can decide in seconds. The system never claims to make legal, accounting, or payment decisions.
+Detected issues and extraction failures become review tasks (`OPEN → APPROVED | REJECTED → RESOLVED`). Approval and rejection require a non-empty reviewer identity, which is persisted with the decision timestamp. High-severity findings and extraction failures always require review before a report is considered final. The UI's Review Queue exposes each finding with its severity, deterministic calculation, and evidence citations so a human can decide in seconds. The system never claims to make legal, accounting, or payment decisions.
 
 ## Alternatives considered
 
@@ -19,5 +19,5 @@ Detected issues become review tasks (`OPEN → APPROVED | REJECTED → RESOLVED`
 
 ## Consequences
 
-- Review actions are auditable rows, which also become an evaluation signal (review-task creation accuracy in `evals/workflow`).
+- Review actions are auditable rows. `evals/workflow` measures review-task creation consistency for both findings and extraction failures.
 - The demo honestly shows a human clicking Approve — which is what a credible enterprise workflow looks like.

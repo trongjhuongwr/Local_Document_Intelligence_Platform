@@ -22,6 +22,7 @@ class DocumentRepository:
         *,
         filename: str,
         content_sha256: str,
+        dedup_key: str | None = None,
         mime_type: str,
         size_bytes: int,
         page_count: int | None,
@@ -40,6 +41,7 @@ class DocumentRepository:
             id=document_id or uuid.uuid4(),
             filename=filename,
             content_sha256=content_sha256,
+            dedup_key=dedup_key or content_sha256,
             mime_type=mime_type,
             size_bytes=size_bytes,
             page_count=page_count,
@@ -80,11 +82,38 @@ class DocumentRepository:
     async def get(self, document_id: uuid.UUID) -> Document | None:
         return await self._session.get(Document, document_id)
 
-    async def get_by_sha256(self, content_sha256: str) -> Document | None:
+    async def get_duplicate(
+        self,
+        *,
+        dedup_key: str,
+        content_sha256: str,
+        case_id: str | None,
+        document_type: str | None,
+    ) -> Document | None:
+        """Find a scoped duplicate and lazily upgrade legacy dedup keys."""
         result = await self._session.execute(
-            select(Document).where(Document.content_sha256 == content_sha256)
+            select(Document).where(Document.dedup_key == dedup_key)
         )
-        return result.scalar_one_or_none()
+        document = result.scalar_one_or_none()
+        if document is not None:
+            return document
+
+        legacy = select(Document).where(Document.content_sha256 == content_sha256)
+        legacy = legacy.where(
+            Document.case_id.is_(None) if case_id is None else Document.case_id == case_id
+        )
+        legacy = legacy.where(
+            Document.document_type.is_(None)
+            if document_type is None
+            else Document.document_type == document_type
+        )
+        result = await self._session.execute(legacy.limit(1))
+        document = result.scalar_one_or_none()
+        if document is not None and document.dedup_key != dedup_key:
+            document.dedup_key = dedup_key
+            await self._session.commit()
+            await self._session.refresh(document)
+        return document
 
     async def list_documents(
         self,

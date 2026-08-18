@@ -11,6 +11,7 @@ from typing import Protocol
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.db.session import get_sessionmaker
 from app.embeddings.ollama import OllamaEmbeddingProvider
@@ -57,19 +58,22 @@ class RetrievalService:
         self,
         query: str,
         *,
-        mode: RetrievalMode = RetrievalMode.HYBRID,
+        mode: RetrievalMode | None = None,
         top_k: int = 10,
         filters: SearchFilters | None = None,
     ) -> list[RetrievedChunk]:
-        """Search with the requested mode and log retrieval telemetry."""
+        """Search with the requested or measured-default retrieval mode."""
         started = perf_counter()
-        candidates = await self._retrievers[mode].search(query, top_k=top_k, filters=filters)
+        selected_mode = mode or RetrievalMode(get_settings().default_retrieval_mode)
+        candidates = await self._retrievers[selected_mode].search(
+            query, top_k=top_k, filters=filters
+        )
         selected = candidates[:top_k]
         latency_ms = (perf_counter() - started) * 1000.0
         logger.info(
             "retrieval_search",
             query=query,
-            mode=str(mode),
+            mode=str(selected_mode),
             top_k=top_k,
             candidate_count=len(candidates),
             selected_count=len(selected),

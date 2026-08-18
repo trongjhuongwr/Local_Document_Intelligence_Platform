@@ -61,8 +61,14 @@ class DocumentService:
         original_filename = filename or "upload"
         safe_filename = Path(original_filename.replace("\\", "/")).name or "upload"
         content_sha256 = hashlib.sha256(data).hexdigest()
+        dedup_key = self._deduplication_key(content_sha256, case_id, document_type)
 
-        existing = await self._repository.get_by_sha256(content_sha256)
+        existing = await self._repository.get_duplicate(
+            dedup_key=dedup_key,
+            content_sha256=content_sha256,
+            case_id=case_id,
+            document_type=document_type,
+        )
         if existing is not None:
             chunk_count = await self._repository.count_chunks(existing.id)
             logger.info(
@@ -81,6 +87,7 @@ class DocumentService:
                 document_id=document_id,
                 filename=safe_filename,
                 content_sha256=content_sha256,
+                dedup_key=dedup_key,
                 mime_type=mime_type,
                 size_bytes=len(data),
                 page_count=None,
@@ -99,6 +106,7 @@ class DocumentService:
             document_id=document_id,
             filename=safe_filename,
             content_sha256=content_sha256,
+            dedup_key=dedup_key,
             mime_type=result.mime_type,
             size_bytes=result.size_bytes,
             page_count=result.page_count,
@@ -171,3 +179,13 @@ class DocumentService:
     def _stored_path(document_id: uuid.UUID, mime_type: str) -> Path:
         extension = EXTENSION_BY_MIME.get(mime_type, ".bin")
         return UPLOAD_DIR / f"{document_id}{extension}"
+
+    @staticmethod
+    def _deduplication_key(
+        content_sha256: str,
+        case_id: str | None,
+        document_type: str | None,
+    ) -> str:
+        """Deduplicate within a logical case/type, not across unrelated cases."""
+        scope = f"{content_sha256}\0{case_id or ''}\0{document_type or ''}"
+        return hashlib.sha256(scope.encode("utf-8")).hexdigest()

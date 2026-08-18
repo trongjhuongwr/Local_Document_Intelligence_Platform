@@ -24,7 +24,7 @@ question = st.text_area(
 )
 mode_col, case_col, button_col = st.columns([1, 1, 1], vertical_alignment="bottom")
 with mode_col:
-    mode = st.selectbox("Retrieval mode", ["hybrid", "bm25", "dense"])
+    mode = st.selectbox("Retrieval mode", ["bm25", "hybrid", "dense"])
 with case_col:
     case_choice = st.selectbox("Case", ["All cases", *case_ids])
 with button_col:

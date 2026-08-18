@@ -26,6 +26,8 @@ Permissions are enforced in code, not configuration:
 
 Requirements: Postgres must be running (see `.env`); Ollama is only needed for
 `search_documents` with `mode="dense"` or `mode="hybrid"` — `bm25` works without it.
+BM25 is the default because it currently has the strongest measured early-rank
+quality and latency; dense and hybrid remain explicit opt-in modes.
 
 ## Running
 

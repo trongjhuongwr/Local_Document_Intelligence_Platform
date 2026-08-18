@@ -1,9 +1,14 @@
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 from evals.common import load_benchmark_cases, markdown_table, precision_recall_f1
-from evals.discrepancy.run import perfect_case_documents, run_discrepancy_eval
+from evals.discrepancy.run import (
+    extracted_case_documents,
+    perfect_case_documents,
+    run_discrepancy_eval,
+)
 from synthetic_data.generator import generate_benchmark
 
 
@@ -58,3 +63,36 @@ async def test_rules_mode_scores_perfectly(benchmark_dir: Path) -> None:
 async def test_unknown_mode_raises(benchmark_dir: Path) -> None:
     with pytest.raises(ValueError, match="Unknown mode"):
         await run_discrepancy_eval("bogus", benchmark_dir=benchmark_dir, write=False)
+
+
+async def test_end_to_end_extraction_reuses_run_cache(benchmark_dir: Path) -> None:
+    case = load_benchmark_cases(benchmark_dir)[0]
+    perfect = perfect_case_documents(case)
+    assert perfect.contract is not None
+    assert perfect.purchase_order is not None
+    assert perfect.policy is not None
+
+    cache = {
+        (case.case_id, "contract", "service_contract.pdf"): SimpleNamespace(data=perfect.contract),
+        (case.case_id, "purchase_order", "purchase_order.pdf"): SimpleNamespace(
+            data=perfect.purchase_order
+        ),
+        (case.case_id, "policy", "payment_policy.pdf"): SimpleNamespace(data=perfect.policy),
+        **{
+            (case.case_id, "invoice", invoice.filename): SimpleNamespace(data=record.extraction)
+            for invoice, record in zip(case.invoices, perfect.invoices, strict=True)
+        },
+    }
+
+    class NoCallExtractionService:
+        async def extract(self, document_type: str, text: str) -> None:
+            raise AssertionError("cached documents must not call the LLM")
+
+    documents = await extracted_case_documents(
+        NoCallExtractionService(),  # type: ignore[arg-type]
+        case,
+        benchmark_dir,
+        cache,  # type: ignore[arg-type]
+    )
+    assert documents.contract == perfect.contract
+    assert len(documents.invoices) == len(perfect.invoices)

@@ -21,7 +21,8 @@ class Document(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     filename: Mapped[str] = mapped_column(String(512), nullable=False)
-    content_sha256: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
+    content_sha256: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    dedup_key: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
     mime_type: Mapped[str] = mapped_column(String(128), nullable=False)
     size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
     page_count: Mapped[int | None] = mapped_column(Integer, nullable=True)

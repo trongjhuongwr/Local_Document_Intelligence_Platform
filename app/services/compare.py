@@ -61,38 +61,46 @@ class _GraphServices:
                 }:
                     continue
                 chunk_rows = await session.execute(
-                    select(Chunk.text)
+                    select(Chunk.text, Chunk.page_number)
                     .where(Chunk.document_id == document.id)
                     .order_by(Chunk.order_index)
                 )
-                text = "\n".join(row[0] for row in chunk_rows)
+                chunks = [{"text": row[0], "page_number": row[1]} for row in chunk_rows]
+                text = "\n".join(chunk["text"] for chunk in chunks)
                 loaded.append(
                     {
                         "document_id": str(document.id),
                         "filename": document.filename,
                         "document_type": document.document_type,
                         "text": text,
+                        "chunks": chunks,
                     }
                 )
         return loaded
 
     async def extract_document(
-        self, document_id: str, document_type: str, text: str
+        self,
+        document_id: str,
+        document_type: str,
+        text: str,
+        *,
+        force_reextract: bool = False,
     ) -> dict[str, Any] | None:
         document_uuid = uuid.UUID(document_id)
-        async with self._sessionmaker() as session:
-            existing = await session.execute(
-                select(ExtractionRun)
-                .where(
-                    ExtractionRun.document_id == document_uuid,
-                    ExtractionRun.schema_valid.is_(True),
+        if not force_reextract:
+            async with self._sessionmaker() as session:
+                existing = await session.execute(
+                    select(ExtractionRun)
+                    .where(
+                        ExtractionRun.document_id == document_uuid,
+                        ExtractionRun.schema_valid.is_(True),
+                    )
+                    .order_by(ExtractionRun.created_at.desc())
+                    .limit(1)
                 )
-                .order_by(ExtractionRun.created_at.desc())
-                .limit(1)
-            )
-            run = existing.scalar_one_or_none()
-            if run is not None:
-                return dict(run.data)
+                run = existing.scalar_one_or_none()
+                if run is not None:
+                    return dict(run.data)
 
         try:
             outcome = await self._extraction.extract(document_type, text)
@@ -152,15 +160,23 @@ class CompareService:
         self._graph = build_compare_graph(self._graph_services)
 
     async def run(
-        self, *, document_ids: list[str] | None = None, case_id: str | None = None
+        self,
+        *,
+        document_ids: list[str] | None = None,
+        case_id: str | None = None,
+        force_reextract: bool = False,
     ) -> dict[str, Any]:
-        if not document_ids and not case_id:
-            raise CompareInputError("Provide either document_ids or case_id")
+        if bool(document_ids) == (case_id is not None):
+            raise CompareInputError("Provide exactly one of document_ids or case_id")
 
         run_row = WorkflowRun(
             workflow_type="discrepancy_analysis",
             status="running",
-            input_payload={"document_ids": document_ids or [], "case_id": case_id},
+            input_payload={
+                "document_ids": document_ids or [],
+                "case_id": case_id,
+                "force_reextract": force_reextract,
+            },
         )
         async with self._sessionmaker() as session:
             session.add(run_row)
@@ -173,6 +189,7 @@ class CompareService:
             "workflow_run_id": workflow_run_id,
             "case_id": case_id,
             "document_ids": document_ids or [],
+            "force_reextract": force_reextract,
             "steps": [],
             "errors": [],
         }

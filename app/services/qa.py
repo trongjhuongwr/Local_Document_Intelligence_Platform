@@ -6,7 +6,7 @@ without calling the model — no evidence, no answer.
 """
 
 import time
-from typing import Any
+from typing import Any, Protocol
 
 from pydantic import BaseModel
 
@@ -14,11 +14,12 @@ from app.agents.router import QueryRoute, QueryRouter, RoutingResult
 from app.citations.builder import build_citations, format_context
 from app.citations.models import Citation, VerificationResult
 from app.citations.verifier import remove_unknown_citations, verify_citations
+from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.llm.base import LLMProvider
 from app.llm.prompts.registry import PromptRegistry
 from app.models import QueryRun
-from app.retrieval.base import RetrievalMode, Retriever, SearchFilters
+from app.retrieval.base import RetrievalMode, RetrievedChunk, SearchFilters
 from app.retrieval.context import ContextBudget, build_context
 
 logger = get_logger(__name__)
@@ -34,6 +35,7 @@ NO_EVIDENCE_ANSWER = (
     "No relevant document passages were found for this question. "
     "Upload the relevant documents or rephrase the question."
 )
+MAX_ANSWER_TOKENS = 256
 
 
 class QAResult(BaseModel):
@@ -49,11 +51,24 @@ class QAResult(BaseModel):
     suggested_action: str | None = None
 
 
+class QueryRetriever(Protocol):
+    """Mode-aware retrieval contract used by the public Q&A API."""
+
+    async def search(
+        self,
+        query: str,
+        *,
+        mode: RetrievalMode,
+        top_k: int = 10,
+        filters: SearchFilters | None = None,
+    ) -> list[RetrievedChunk]: ...
+
+
 class QAService:
     def __init__(
         self,
         provider: LLMProvider,
-        retriever: Retriever,
+        retriever: QueryRetriever,
         sessionmaker: Any = None,
         registry: PromptRegistry | None = None,
         budget: ContextBudget | None = None,
@@ -69,14 +84,20 @@ class QAService:
         self,
         question: str,
         *,
-        mode: RetrievalMode = RetrievalMode.HYBRID,
+        mode: RetrievalMode | None = None,
         top_k: int = 10,
         filters: SearchFilters | None = None,
     ) -> QAResult:
         started = time.perf_counter()
+        selected_mode = mode or RetrievalMode(get_settings().default_retrieval_mode)
         routing = await self._router.route(question)
 
-        candidates = await self._retriever.search(question, top_k=top_k, filters=filters)
+        candidates = await self._retriever.search(
+            question,
+            mode=selected_mode,
+            top_k=top_k,
+            filters=filters,
+        )
         context = build_context(candidates, self._budget)
         citations = build_citations(context.chunks)
 
@@ -87,7 +108,7 @@ class QAService:
                 routing,
                 citations,
                 None,
-                mode,
+                selected_mode,
                 0,
                 0,
                 started,
@@ -105,6 +126,7 @@ class QAService:
             rendered.text,
             system=SYNTHESIS_SYSTEM_PROMPT,
             temperature=0.0,
+            max_tokens=MAX_ANSWER_TOKENS,
             prompt_name="synthesis",
             prompt_version="1",
         )
@@ -119,7 +141,7 @@ class QAService:
             routing,
             citations,
             verification,
-            mode,
+            selected_mode,
             len(candidates),
             context.total_chars,
             started,

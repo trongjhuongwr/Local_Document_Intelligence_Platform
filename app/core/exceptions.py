@@ -53,6 +53,11 @@ class WorkflowError(AppError):
     error_code = "workflow_error"
 
 
+class WorkflowNotFoundError(AppError):
+    status_code = 404
+    error_code = "workflow_not_found"
+
+
 class DocumentNotFoundError(AppError):
     status_code = 404
     error_code = "document_not_found"

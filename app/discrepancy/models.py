@@ -1,7 +1,7 @@
 from enum import StrEnum
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.extraction.schemas import (
     ContractExtraction,
@@ -47,6 +47,17 @@ class Calculation(BaseModel):
     result: float
 
 
+class EvidenceRef(BaseModel):
+    """Deterministic pointer from a finding to the source document passage."""
+
+    document_id: str | None = None
+    filename: str
+    document_type: str | None = None
+    page_number: int | None = None
+    field: str | None = None
+    snippet: str | None = None
+
+
 class Discrepancy(BaseModel):
     type: DiscrepancyKind
     source: DiscrepancySource
@@ -58,6 +69,7 @@ class Discrepancy(BaseModel):
     observed_value: float | str | None = None
     difference: float | None = None
     calculation: Calculation | None = None
+    evidence: list[EvidenceRef] = Field(default_factory=list)
     confidence: float = 1.0
 
 
@@ -74,7 +86,7 @@ class CaseDocuments(BaseModel):
 
     contract: ContractExtraction | None = None
     purchase_order: PurchaseOrderExtraction | None = None
-    invoices: list[InvoiceRecord] = []
+    invoices: list[InvoiceRecord] = Field(default_factory=list)
     policy: PolicyExtraction | None = None
 
 

@@ -166,7 +166,7 @@ def _document_metadata(document: Document) -> dict[str, Any]:
 @_guarded
 async def search_documents(
     query: str,
-    mode: str = "hybrid",
+    mode: str = "bm25",
     top_k: int = 5,
     case_id: str | None = None,
     document_type: str | None = None,

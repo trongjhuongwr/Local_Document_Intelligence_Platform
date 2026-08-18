@@ -1,7 +1,7 @@
 """Query routing: deterministic keyword rules by default, LLM behind a flag.
 
 Measured on the labeled routing eval (evals/routing): keyword rules score
-92.5% accuracy, `llama3.2:1b` scores 20% zero-shot and 67.5% few-shot, and a
+92.5% accuracy, `llama3.2:1b` scores 70.0% LLM-only, and a
 keyword-first-then-LLM composite scores 82.5% — the LLM *lowers* accuracy on
 this closed domain. Production routing is therefore purely deterministic
 unless ROUTER_LLM_ENABLED=true, and always degrades to factual RAG instead of

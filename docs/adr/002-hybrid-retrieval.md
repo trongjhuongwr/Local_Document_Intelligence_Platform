@@ -10,7 +10,9 @@ Business-document queries mix two shapes: exact identifiers ("INV-2025-83614", "
 
 ## Decision
 
-Run BM25 (rank-bm25, in-process) and dense retrieval (all-minilm embeddings in pgvector) in parallel and merge with Reciprocal Rank Fusion (`RRF(d) = Σ 1/(k + rank_i(d))`, k=60). Fusion is deterministic Python — the LLM never merges rankings. An optional CPU cross-encoder reranker sits behind `ENABLE_RERANKER=false` and the system is fully functional without it.
+Implement BM25 (rank-bm25, in-process), dense retrieval (all-minilm embeddings in pgvector), and Reciprocal Rank Fusion (`RRF(d) = Σ 1/(k + rank_i(d))`, k=60) as measured retrieval modes. Fusion is deterministic Python — the LLM never merges rankings. An optional CPU cross-encoder reranker sits behind `ENABLE_RERANKER=false`.
+
+Use **BM25 as the production default** for the current release. On the 15-case DocFlowBench run it tied hybrid at Recall@5 (0.93), while producing better Recall@1, MRR, nDCG@5, and mean latency (33 ms versus 748 ms). Dense and hybrid remain explicit options for semantic-query experiments; they do not become the default until measurements justify the trade-off.
 
 ## Alternatives considered
 
@@ -21,5 +23,6 @@ Run BM25 (rank-bm25, in-process) and dense retrieval (all-minilm embeddings in p
 
 ## Consequences
 
-- Recall@K / MRR / nDCG are measured per mode (BM25, dense, hybrid) in `evals/retrieval`, so the fusion benefit is demonstrated with numbers, not claims.
+- Recall@K / MRR / nDCG and latency are measured per mode in `evals/retrieval`; the selected default follows those measurements rather than the architecture's novelty.
 - BM25 index rebuilds per corpus change; acceptable at benchmark scale and documented as a known limitation for larger corpora.
+- Hybrid remains available for future embedding, weighting, and reranking improvements.

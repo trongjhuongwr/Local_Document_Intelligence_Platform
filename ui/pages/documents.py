@@ -1,5 +1,7 @@
 """Documents page: upload, browse, inspect chunks, index, delete."""
 
+from typing import Any
+
 import pandas as pd
 import streamlit as st
 
@@ -47,7 +49,7 @@ with left:
                 api_client.show_error(exc)
             else:
                 if outcome.get("duplicate"):
-                    st.info("Already ingested (matched by content hash).")
+                    st.info("Already ingested in this case and document type.")
                 else:
                     st.toast(f"Ingested {outcome['filename']} ({outcome['chunk_count']} chunks)")
 
@@ -77,7 +79,7 @@ with right:
             for d in documents
         ]
     )
-    event = st.dataframe(
+    event: Any = st.dataframe(
         table,
         hide_index=True,
         width="stretch",

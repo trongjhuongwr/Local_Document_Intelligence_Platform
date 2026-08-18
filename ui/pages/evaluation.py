@@ -43,8 +43,10 @@ retrieval = _load("retrieval_latest.json")
 routing = _load("routing_latest.json")
 rules = _load("discrepancy_rules_latest.json")
 end_to_end = _load("discrepancy_end_to_end_latest.json")
+generation = _load("generation_latest.json")
+workflow = _load("workflow_latest.json")
 
-if not any([combined, extraction, retrieval, routing, rules, end_to_end]):
+if not any([combined, extraction, retrieval, routing, rules, end_to_end, generation, workflow]):
     st.info(
         "No evaluation reports found yet — run `python -m evals.run_all` "
         "to generate them, then reload this page."
@@ -94,6 +96,8 @@ if retrieval and retrieval.get("modes"):
     st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
     if retrieval.get("headline"):
         st.caption(retrieval["headline"])
+    if retrieval.get("recommended_default"):
+        st.success(f"Measured production default: {retrieval['recommended_default'].upper()}")
 else:
     st.info("Retrieval evaluation has not been run yet — no report on disk.")
 
@@ -130,6 +134,35 @@ if rules or end_to_end:
         st.caption("End-to-end discrepancy evaluation (LLM extraction) has not been run yet.")
 else:
     st.info("Discrepancy evaluation has not been run yet — no report on disk.")
+
+# --------------------------------------------------------------- generation/workflow
+st.subheader("Grounded answers")
+if generation:
+    tiles = st.columns(4)
+    tiles[0].metric("Query completion", _pct(generation.get("query_completion_rate")))
+    tiles[1].metric("Citations present", _pct(generation.get("citation_presence_rate")))
+    tiles[2].metric("Valid citations", _pct(generation.get("valid_citation_rate")))
+    tiles[3].metric("Correct document", _pct(generation.get("correct_document_rate")))
+    st.caption(
+        f"Median answer latency: {_num(generation.get('median_latency_ms'), ' ms')} · "
+        f"p95: {_num(generation.get('p95_latency_ms'), ' ms')}"
+    )
+else:
+    st.info("Grounded-answer evaluation has not been run yet.")
+
+st.subheader("End-to-end workflow")
+if workflow:
+    tiles = st.columns(4)
+    tiles[0].metric("Completion", _pct(workflow.get("completion_rate")))
+    tiles[1].metric(
+        "Review-task consistency",
+        _pct(workflow.get("review_task_creation_consistency")),
+    )
+    tiles[2].metric("Extraction failures", workflow.get("extraction_failure_count", "—"))
+    tiles[3].metric("Median duration", _num(workflow.get("median_duration_ms"), " ms"))
+    st.caption(f"Extraction cache: {workflow.get('extraction_cache', 'not recorded')}")
+else:
+    st.info("Workflow evaluation has not been run yet.")
 
 if combined and combined.get("skipped"):
     with st.expander("Skipped in the last run"):

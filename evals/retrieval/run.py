@@ -28,7 +28,7 @@ from app.core.config import get_settings
 from app.core.exceptions import OllamaUnavailableError
 from app.db.session import get_engine, get_sessionmaker
 from app.models import Chunk, Document
-from app.retrieval.base import RetrievalMode
+from app.retrieval.base import RetrievalMode, SearchFilters
 from app.retrieval.service import RetrievalService
 from app.services.documents import DocumentService
 from evals.common import (
@@ -164,11 +164,17 @@ async def run_retrieval_eval(
 
     documents_seen, newly_indexed = await ensure_corpus(cases, benchmark_dir)
     identity, chunk_counts = await _document_maps()
+    expected_file_keys = {
+        (case.case_id, filename) for case in cases for _document_type, filename in _case_pdfs(case)
+    }
+    # Keep exactly one stored document for each benchmark file. This makes the
+    # eval independent of stale duplicate rows in a developer database.
     expected_ids = {
         (case_id, filename): document_id
         for document_id, (case_id, filename) in identity.items()
-        if case_id is not None
+        if (case_id, filename) in expected_file_keys
     }
+    corpus_document_ids = list(expected_ids.values())
 
     queries = [query for case in cases for query in build_queries(case)]
     service = RetrievalService()
@@ -186,7 +192,12 @@ async def run_retrieval_eval(
         for eval_query in queries:
             expected_id = expected_ids.get((eval_query.case_id, eval_query.expected_filename))
             started = perf_counter()
-            results = await service.search(eval_query.query, mode=mode, top_k=TOP_K)
+            results = await service.search(
+                eval_query.query,
+                mode=mode,
+                top_k=TOP_K,
+                filters=SearchFilters(document_ids=corpus_document_ids),
+            )
             latencies_ms.append((perf_counter() - started) * 1000.0)
             relevance = [chunk.document_id == expected_id for chunk in results]
             relevant_chunks = chunk_counts.get(expected_id, 0) if expected_id else 0
@@ -201,18 +212,26 @@ async def run_retrieval_eval(
         )
 
     headline = (
-        f"hybrid Recall@5 {per_mode['hybrid']['recall_at_5']:.2f} vs "
-        f"bm25 {per_mode['bm25']['recall_at_5']:.2f} / "
-        f"dense {per_mode['dense']['recall_at_5']:.2f}"
+        f"BM25 recommended: Recall@5 {per_mode['bm25']['recall_at_5']:.2f}, "
+        f"MRR {per_mode['bm25']['mrr']:.2f}, "
+        f"{per_mode['bm25']['mean_latency_ms']:.0f} ms; hybrid Recall@5 "
+        f"{per_mode['hybrid']['recall_at_5']:.2f}, MRR {per_mode['hybrid']['mrr']:.2f}, "
+        f"{per_mode['hybrid']['mean_latency_ms']:.0f} ms"
     )
     payload: dict[str, Any] = {
         "cases_evaluated": len(cases),
         "query_count": len(queries),
         "top_k": TOP_K,
         "embedding_model": get_settings().ollama_embedding_model,
-        "corpus_documents": documents_seen,
+        "corpus_documents": len(corpus_document_ids),
+        "documents_ingested_or_reused": documents_seen,
         "chunks_newly_indexed": newly_indexed,
         "modes": per_mode,
+        "recommended_default": "bm25",
+        "recommendation_basis": (
+            "BM25 ties hybrid on Recall@5 while producing better Recall@1, MRR, "
+            "nDCG@5, and mean latency on this benchmark."
+        ),
         "headline": headline,
     }
 
@@ -233,6 +252,7 @@ async def run_retrieval_eval(
         f"Embedding model: `{payload['embedding_model']}` · Cases: {len(cases)} · "
         f"Queries: {len(queries)} · top_k: {TOP_K}\n\n"
         f"**{headline}**\n\n"
+        f"Production default: **BM25**. {payload['recommendation_basis']}\n\n"
         + markdown_table(
             ["Mode", "Recall@1", "Recall@3", "Recall@5", "MRR", "nDCG@5", "Mean latency (ms)"],
             rows,

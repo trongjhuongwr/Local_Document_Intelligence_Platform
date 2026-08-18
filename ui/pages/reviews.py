@@ -69,6 +69,19 @@ def _render_card(task: dict[str, Any], key_prefix: str) -> None:
             diff_col.caption("Difference")
             diff_col.markdown(f"`{discrepancy.get('difference', '—')}`")
 
+        evidence = discrepancy.get("evidence") or []
+        if evidence:
+            with st.expander(f"Evidence ({len(evidence)})"):
+                for reference in evidence:
+                    location = reference.get("filename") or "unknown document"
+                    if reference.get("page_number") is not None:
+                        location += f" · page {reference['page_number']}"
+                    if reference.get("field"):
+                        location += f" · {reference['field']}"
+                    st.markdown(f"**{escape(location)}**", unsafe_allow_html=True)
+                    if reference.get("snippet"):
+                        st.caption(reference["snippet"])
+
         chips = []
         if task.get("case_id"):
             chips.append(neutral_chip(f"case {task['case_id']}"))

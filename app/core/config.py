@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -25,7 +26,10 @@ class Settings(BaseSettings):
     ollama_timeout_seconds: float = 120.0
 
     enable_reranker: bool = False
-    # Measured on evals/routing: keyword rules 92.5% vs best LLM prompt 67.5%,
+    # BM25 is the measured production default: on DocFlowBench it ties hybrid
+    # at Recall@5 while producing better early-rank metrics at much lower latency.
+    default_retrieval_mode: Literal["bm25", "dense", "hybrid"] = "bm25"
+    # Measured on evals/routing: keyword rules 92.5% vs LLM-only 70.0%,
     # and adding the LLM for no-keyword queries lowers accuracy to 82.5%.
     router_llm_enabled: bool = False
 

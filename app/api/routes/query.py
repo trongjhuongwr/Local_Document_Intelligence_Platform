@@ -1,17 +1,20 @@
 from typing import Any
 
 from fastapi import APIRouter
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
+from app.core.config import get_settings
 from app.retrieval.base import RetrievalMode, SearchFilters
 
 router = APIRouter(tags=["query"])
 
 
 class QueryRequest(BaseModel):
-    question: str
-    mode: RetrievalMode = RetrievalMode.HYBRID
-    top_k: int = 10
+    question: str = Field(min_length=1, max_length=2_000)
+    mode: RetrievalMode = Field(
+        default_factory=lambda: RetrievalMode(get_settings().default_retrieval_mode)
+    )
+    top_k: int = Field(default=10, ge=1, le=50)
     filters: SearchFilters | None = None
 
 

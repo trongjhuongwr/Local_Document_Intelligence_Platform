@@ -15,7 +15,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-import fitz
+import pymupdf
 
 from app.core.exceptions import OllamaUnavailableError, StructuredOutputValidationError
 from app.discrepancy.normalize import (
@@ -23,7 +23,7 @@ from app.discrepancy.normalize import (
     normalize_currency,
     normalize_payment_terms,
 )
-from app.extraction.service import ExtractionService
+from app.extraction.service import ExtractionOutcome, ExtractionService
 from app.llm.ollama import OllamaLLMProvider
 from evals.common import (
     case_documents_dir,
@@ -77,8 +77,11 @@ _NUMERIC_KINDS = {"money"}
 _DATE_KINDS = {"date"}
 
 
+ExtractionCache = dict[tuple[str, str, str], ExtractionOutcome | None]
+
+
 def pdf_text(path: Path) -> str:
-    with fitz.open(path) as document:
+    with pymupdf.open(path) as document:
         return "\n".join(page.get_text() for page in document)
 
 
@@ -114,7 +117,9 @@ def _case_documents(case: BenchmarkCase) -> list[tuple[str, str, Any]]:
 
 
 async def run_extraction_eval(
-    max_cases: int | None = None, benchmark_dir: Path | None = None
+    max_cases: int | None = None,
+    benchmark_dir: Path | None = None,
+    extraction_cache: ExtractionCache | None = None,
 ) -> dict[str, Any]:
     cases = load_benchmark_cases(benchmark_dir)
     if max_cases is not None:
@@ -133,16 +138,21 @@ async def run_extraction_eval(
         docs_dir = case_documents_dir(case, benchmark_dir)
         for document_type, filename, truth in _case_documents(case):
             text = pdf_text(docs_dir / filename)
+            cache_key = (case.case_id, document_type, filename)
             schema_attempts[document_type] += 1
             try:
                 outcome = await service.extract(document_type, text)
             except StructuredOutputValidationError:
+                if extraction_cache is not None:
+                    extraction_cache[cache_key] = None
                 for field, kind in FIELD_SPECS[document_type]:
                     field_totals[document_type][field].append(False)
                     kind_totals[document_type][kind].append(False)
                     if getattr(truth, field, None) is not None:
                         completeness[document_type].append(False)
                 continue
+            if extraction_cache is not None:
+                extraction_cache[cache_key] = outcome
             schema_valid[document_type] += 1
             if outcome.telemetry.total_duration_ms is not None:
                 latencies_ms.append(outcome.telemetry.total_duration_ms)

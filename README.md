@@ -1,6 +1,6 @@
 # Document Intelligence & AI Workflow Automation Platform
 
-> A local-first AI engineering platform that converts business documents into structured knowledge, performs hybrid retrieval and cross-document reasoning, and generates evidence-backed discrepancy reports using a lightweight Ollama LLM — no paid APIs, no cloud dependency.
+> A local-first AI engineering platform that converts business documents into structured knowledge, evaluates lexical, dense, and hybrid retrieval, and generates evidence-backed discrepancy reports using a lightweight Ollama LLM — no paid APIs, no cloud dependency.
 
 Built and evaluated entirely on a mid-range consumer laptop (Ryzen 5 6600H · 16 GB RAM · RTX 3050 4 GB), around `llama3.2:1b` — deliberately. The thesis of this project: **reliability comes from system design, not model size.**
 
@@ -36,11 +36,14 @@ flowchart TD
     SVC --> ING[Parsing & Chunking Pipeline]
     ING --> PG[(PostgreSQL + pgvector)]
     SVC --> ROUTE[Deterministic Query Router]
-    ROUTE --> BM25[BM25]
-    ROUTE --> VEC[pgvector Dense Search]
-    BM25 --> RRF[Reciprocal Rank Fusion]
-    VEC --> RRF
-    RRF --> CTX[Context Builder - budget and dedupe]
+    ROUTE --> MODE[Retrieval Mode - BM25 default]
+    MODE --> BM25[BM25]
+    MODE --> VEC[pgvector Dense Search]
+    BM25 -. hybrid mode .-> RRF[Reciprocal Rank Fusion]
+    VEC -. hybrid mode .-> RRF
+    BM25 --> CTX[Context Builder - budget and dedupe]
+    VEC --> CTX
+    RRF --> CTX
     CTX --> LLM[llama3.2:1b via Ollama]
     LLM --> VERIFY[Citation Verification]
     SVC --> WF[LangGraph Compare Workflow]
@@ -56,11 +59,11 @@ flowchart TD
 |---|---|
 | **Llama 3.2 1B, local via Ollama** | Fits 4 GB VRAM with room for embeddings; forces the architecture to earn reliability instead of renting it ([ADR 001](docs/adr/001-local-first-llm.md)) |
 | **Dedicated embedding model (`all-minilm`)** | Generation models make poor embedders; a 45 MB encoder outperforms and frees the LLM for generation |
-| **Hybrid BM25 + dense + RRF** | Invoices are full of exact identifiers (BM25 territory) *and* paraphrased questions (dense territory); fusion is deterministic Python, never the LLM ([ADR 002](docs/adr/002-hybrid-retrieval.md)) |
+| **Measured retrieval selection** | BM25, dense, and hybrid RRF are all implemented. On DocFlowBench, BM25 ties hybrid at Recall@5 while ranking relevant evidence earlier and running ~23× faster, so BM25 is the production default rather than the more fashionable choice ([ADR 002](docs/adr/002-hybrid-retrieval.md)) |
 | **Deterministic discrepancy rules** | Rules reproduce benchmark ground truth with F1 = 1.00 under perfect extraction, so end-to-end error is attributable to extraction — measurable and improvable in isolation ([ADR 003](docs/adr/003-deterministic-workflows.md)) |
-| **Deterministic query routing by default** | Measured: keyword rules 92.5% accuracy vs 20% zero-shot / 67.5% few-shot for the 1B LLM; even keyword-first+LLM scored lower (82.5%), so `ROUTER_LLM_ENABLED=false` by default — the eval report holds all four measurements |
-| **Citations created by software, verified after generation** | The model can only reference evidence IDs it was given; invented IDs are detected and stripped, and every citation resolves to a stored chunk |
-| **Human-in-the-loop review** | High-severity findings become OPEN review tasks with reviewer identity and timestamps; the system never claims accounting authority ([ADR 005](docs/adr/005-human-in-the-loop.md)) |
+| **Deterministic query routing by default** | Measured: keyword rules 92.5% accuracy vs 70.0% for the 1B LLM; even keyword-first+LLM scored lower (82.5%), so `ROUTER_LLM_ENABLED=false` by default |
+| **Evidence created and verified by software** | Q&A citations resolve to stored chunks; discrepancy findings carry document, page, field, and source snippets. Invented citation IDs are detected and stripped |
+| **Human-in-the-loop review** | Findings and extraction failures become OPEN review tasks; approve/reject actions require a non-blank reviewer identity and persist timestamps ([ADR 005](docs/adr/005-human-in-the-loop.md)) |
 | **PostgreSQL + pgvector only** | One database for relational data, vectors, and filtered retrieval; no second source of truth ([ADR 004](docs/adr/004-postgres-pgvector.md)) |
 
 ## DocFlowBench: the synthetic benchmark
@@ -75,24 +78,26 @@ Same seed, same bytes — which makes every evaluation below reproducible.
 
 ## Evaluation results
 
-All numbers below were produced by `python -m evals.run_all` on the machine described above and live in [`evals/reports/`](evals/reports/). Regenerate them yourself; the README is updated only from those reports.
+All numbers below were produced by the repository's eval runners on the machine described above and live in [`evals/reports/`](evals/reports/). The consolidated report records the timestamp of every source artifact, so a partial rerun cannot silently present stale metrics as one fresh run.
+
+These are **15 seeded, in-domain synthetic cases with templated questions**, not a claim of external production generalization. The benchmark is useful because it is reproducible and exposes regressions; a larger human-authored holdout set remains future work.
 
 <!-- BENCHMARK RESULTS — regenerated from evals/reports (15 cases, seed 42) -->
 
 | Evaluation | Result |
 |---|---|
 | Discrepancy rules vs ground truth (perfect extraction) | precision / recall / F1 **1.00** |
-| Structured extraction (llama3.2:1b) | field accuracy **96.6%** (invoice 93.6 / contract 99.0 / PO 98.7 / policy 100) · schema validity **100%** · median 1.49 s per document |
-| Discrepancy detection end-to-end (LLM extraction) | precision **54.5%** · recall **85.7%** · F1 **66.7%** |
-| Retrieval (Recall@5) | hybrid **0.93** · bm25 0.93 · dense 0.65 |
-| Query routing accuracy | **92.5%** deterministic (LLM-assisted 82.5%, LLM-only few-shot 67.5%, zero-shot 20%) |
-| Workflow success (/compare path) | completion **15/15** · review-task creation accuracy **100%** · median 14.2 s per case |
-| Citation quality (end-to-end Q&A) | citations present **79.5%** · valid **79.5%** · correct document **71.8%** · median answer latency 1.0 s (p95 1.4 s) |
+| Structured extraction (llama3.2:1b) | field accuracy **95.3%** (invoice 90.7 / contract 99.1 / PO 98.7 / policy 100) · schema validity **100%** · median 1.55 s per document |
+| Discrepancy detection end-to-end (LLM extraction) | precision **57.1%** · recall **85.7%** · F1 **68.6%** |
+| Retrieval | BM25 default: Recall@5 **0.93**, MRR **0.70**, mean **33 ms** · hybrid 0.93 / 0.58 / 748 ms · dense Recall@5 0.65 |
+| Query routing accuracy | **92.5%** deterministic (LLM-assisted 82.5%, LLM-only 70.0%) |
+| Workflow success (`/compare` path, extraction cache disabled) | completion **15/15** · review-task creation consistency **100%** · median **12.5 s** per case |
+| Citation quality (end-to-end Q&A) | 60/60 queries completed · citations present **88.3%** · valid **88.3%** · correct document **80.0%** · median answer latency 0.93 s (p95 2.63 s) |
 
 Two measured stories worth reading in the reports:
 
-1. **Extraction went from 11.5% to 96.6% field accuracy without changing the model.** The failure was architectural, not parametric: an all-optional JSON schema let the 1B model satisfy constrained decoding with `{}`. Requiring every key as a copyable string, putting the document before the instructions, and adding a focused single-field repair pass for anything left null recovered 85 points. The eval suite caught it; git history documents each step.
-2. **The gap between rules F1 (1.00) and end-to-end F1 (0.67) is the measured price of a 1B extractor.** With ~30 extracted fields per case, a single wrong field creates a false finding (precision 54.5%) or hides a real one (recall 85.7%). The error budget is fully attributable — extraction, not rules — which is exactly what the deterministic design was for.
+1. **Extraction went from 11.5% to 95.3% field accuracy without changing the model.** The failure was architectural, not parametric: an all-optional JSON schema let the 1B model satisfy constrained decoding with `{}`. Requiring every key as a copyable string, putting the document before the instructions, and adding a focused single-field repair pass for anything left null recovered more than 80 points.
+2. **The gap between rules F1 (1.00) and end-to-end F1 (0.69) is the measured price of a 1B extractor.** A single wrong field can create a false finding (precision 57.1%) or hide a real one (recall 85.7%). Separating deterministic-rule and end-to-end scores makes that error budget attributable.
 
 ## Reliability and guardrails
 
@@ -159,6 +164,7 @@ pytest -m ollama                             # + live Ollama (local only)
 ```bash
 python -m evals.run_all              # everything the environment supports
 python -m evals.run_all --skip-llm   # deterministic evals only (CI-safe)
+python -m evals.run_all --consolidate-existing  # refresh summary from source reports
 python -m evals.retrieval.run --cases 10
 ```
 
@@ -204,6 +210,7 @@ docs/adr/       architecture decision records
 ## Known limitations
 
 - `llama3.2:1b` extraction is the accuracy bottleneck — measured, not hidden; the per-field extraction report shows exactly where it fails. A configurable 3B model is the obvious first upgrade path.
+- The published benchmark is seeded synthetic data with templated queries; it does not measure domain shift or human-authored question diversity.
 - BM25 rebuilds its corpus per search — fine at benchmark scale (~10³ chunks), documented as a scale limitation.
 - OCR for scanned PDFs is not implemented (native-text PDFs, TXT, MD, DOCX, CSV are).
 - Citation granularity is chunk/page-level, not character-offset level.

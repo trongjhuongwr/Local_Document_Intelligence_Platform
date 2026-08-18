@@ -1,4 +1,4 @@
-"""Retrieval endpoints: chunk indexing and hybrid search."""
+"""Retrieval endpoints: chunk indexing and selectable retrieval search."""
 
 import uuid
 from time import perf_counter
@@ -7,6 +7,7 @@ from typing import Annotated
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
+from app.core.config import get_settings
 from app.retrieval.base import RetrievalMode, RetrievedChunk, SearchFilters
 from app.retrieval.service import RetrievalService
 
@@ -20,7 +21,9 @@ class IndexResponse(BaseModel):
 
 class SearchRequest(BaseModel):
     query: Annotated[str, Field(min_length=1, max_length=2000)]
-    mode: RetrievalMode = RetrievalMode.HYBRID
+    mode: RetrievalMode = Field(
+        default_factory=lambda: RetrievalMode(get_settings().default_retrieval_mode)
+    )
     top_k: Annotated[int, Field(ge=1, le=50)] = 10
     filters: SearchFilters | None = None
 

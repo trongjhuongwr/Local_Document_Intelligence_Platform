@@ -34,7 +34,7 @@ from evals.common import (
     precision_recall_f1,
     write_report,
 )
-from evals.extraction.run import pdf_text
+from evals.extraction.run import ExtractionCache, pdf_text
 from synthetic_data.generator.models import BenchmarkCase
 
 
@@ -57,16 +57,27 @@ def perfect_case_documents(case: BenchmarkCase) -> CaseDocuments:
 
 
 async def extracted_case_documents(
-    service: ExtractionService, case: BenchmarkCase, benchmark_dir: Path | None
+    service: ExtractionService,
+    case: BenchmarkCase,
+    benchmark_dir: Path | None,
+    extraction_cache: ExtractionCache | None = None,
 ) -> CaseDocuments:
     """Extract every case PDF with the LLM pipeline; failed docs become None."""
     docs_dir = case_documents_dir(case, benchmark_dir)
 
     async def _extract(document_type: str, filename: str) -> Any:
+        cache_key = (case.case_id, document_type, filename)
+        if extraction_cache is not None and cache_key in extraction_cache:
+            cached = extraction_cache[cache_key]
+            return cached.data if cached is not None else None
         try:
             outcome = await service.extract(document_type, pdf_text(docs_dir / filename))
         except StructuredOutputValidationError:
+            if extraction_cache is not None:
+                extraction_cache[cache_key] = None
             return None
+        if extraction_cache is not None:
+            extraction_cache[cache_key] = outcome
         return outcome.data
 
     contract = await _extract("contract", "service_contract.pdf")
@@ -156,6 +167,7 @@ async def run_discrepancy_eval(
     max_cases: int | None = None,
     benchmark_dir: Path | None = None,
     write: bool = True,
+    extraction_cache: ExtractionCache | None = None,
 ) -> dict[str, Any]:
     cases = load_benchmark_cases(benchmark_dir)
     if max_cases is not None:
@@ -169,7 +181,9 @@ async def run_discrepancy_eval(
     elif mode == "end_to_end":
         service = ExtractionService(OllamaLLMProvider())
         for case in cases:
-            documents = await extracted_case_documents(service, case, benchmark_dir)
+            documents = await extracted_case_documents(
+                service, case, benchmark_dir, extraction_cache
+            )
             report = analyze_case(documents)
             predictions.append({(d.type.value, d.invoice_number) for d in report.discrepancies})
     else:

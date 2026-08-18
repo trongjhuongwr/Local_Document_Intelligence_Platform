@@ -85,9 +85,12 @@ class ReviewService:
         review_id: uuid.UUID,
         decision: str,
         *,
-        reviewer: str | None = None,
+        reviewer: str,
         note: str | None = None,
     ) -> ReviewTask:
+        reviewer = reviewer.strip()
+        if not reviewer:
+            raise InvalidReviewTransitionError("Reviewer identity is required")
         if decision not in _DECISIONS:
             raise InvalidReviewTransitionError(
                 f"Decision must be one of {sorted(_DECISIONS)}", details={"given": decision}

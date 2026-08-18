@@ -3,7 +3,7 @@ from uuid import UUID
 
 from fastapi import APIRouter
 
-from app.core.exceptions import WorkflowError
+from app.core.exceptions import WorkflowNotFoundError
 from app.db.session import get_sessionmaker
 from app.models import WorkflowRun
 
@@ -15,7 +15,7 @@ async def get_workflow(workflow_id: UUID) -> dict[str, Any]:
     async with get_sessionmaker()() as session:
         run = await session.get(WorkflowRun, workflow_id)
         if run is None:
-            raise WorkflowError(f"Workflow {workflow_id} not found")
+            raise WorkflowNotFoundError(f"Workflow {workflow_id} not found")
         return {
             "workflow_id": str(run.id),
             "workflow_type": run.workflow_type,

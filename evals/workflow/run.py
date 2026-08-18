@@ -2,7 +2,7 @@
 
 Runs the real LangGraph compare workflow (LLM extraction included) per case
 and measures completion, extraction failure rate, review-task creation
-accuracy (tasks are created exactly when findings exist), and duration
+consistency (tasks are created when findings or extraction failures exist), and duration
 percentiles. This is the same path the /compare endpoint runs.
 """
 
@@ -35,13 +35,15 @@ async def run_workflow_eval(
     failed = 0
     extraction_failures = 0
     documents_processed = 0
-    review_creation_correct = 0
+    review_creation_consistent = 0
     durations: list[float] = []
     failures_detail: list[dict[str, Any]] = []
 
     for case in cases:
         try:
-            result = await service.run(case_id=case.case_id)
+            # Measure the complete extraction path, not a warm-cache shortcut
+            # left by an earlier evaluation run.
+            result = await service.run(case_id=case.case_id, force_reextract=True)
         except Exception as exc:
             failed += 1
             failures_detail.append({"case": case.case_id, "error": type(exc).__name__})
@@ -55,14 +57,17 @@ async def run_workflow_eval(
         report = result.get("report", {})
         extraction_failures += len(report.get("extraction_failures", []))
         documents_processed += len(report.get("documents_analyzed", []))
-        has_findings = bool(result.get("discrepancies"))
+        needs_review_task = bool(result.get("discrepancies")) or bool(
+            report.get("extraction_failures")
+        )
         has_tasks = bool(result.get("review_task_ids"))
-        if has_findings == has_tasks:
-            review_creation_correct += 1
+        if needs_review_task == has_tasks:
+            review_creation_consistent += 1
 
     total = len(cases)
     payload: dict[str, Any] = {
         "cases": total,
+        "extraction_cache": "disabled",
         "completed": completed,
         "failed": failed,
         "completion_rate": round(completed / total, 4) if total else 0.0,
@@ -71,7 +76,7 @@ async def run_workflow_eval(
         "extraction_failure_rate": round(extraction_failures / documents_processed, 4)
         if documents_processed
         else 0.0,
-        "review_task_creation_accuracy": round(review_creation_correct / total, 4)
+        "review_task_creation_consistency": round(review_creation_consistent / total, 4)
         if total
         else 0.0,
         "median_duration_ms": round(statistics.median(durations), 1) if durations else None,
@@ -80,8 +85,8 @@ async def run_workflow_eval(
         else None,
         "failures": failures_detail[:20],
         "headline": (
-            f"workflow completion {completed}/{total}, review-task creation accuracy "
-            f"{review_creation_correct / total:.0%}"
+            f"workflow completion {completed}/{total}, review-task creation consistency "
+            f"{review_creation_consistent / total:.0%}"
             if total
             else "no cases"
         ),
@@ -97,8 +102,8 @@ async def run_workflow_eval(
             ["Documents processed", str(documents_processed)],
             ["Extraction failure rate", f"{payload['extraction_failure_rate']:.2%}"],
             [
-                "Review-task creation accuracy",
-                f"{payload['review_task_creation_accuracy']:.2%}",
+                "Review-task creation consistency",
+                f"{payload['review_task_creation_consistency']:.2%}",
             ],
             ["Median duration", f"{payload['median_duration_ms']} ms"],
             ["P95 duration", f"{payload['p95_duration_ms']} ms"],

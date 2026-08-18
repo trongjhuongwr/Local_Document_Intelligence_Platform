@@ -16,7 +16,7 @@ class FakeServices:
     async def load_documents(self, document_ids, case_id):
         return self._documents
 
-    async def extract_document(self, document_id, document_type, text):
+    async def extract_document(self, document_id, document_type, text, *, force_reextract=False):
         if document_id in self.failed_ids:
             return None
         return self._extractions.get(document_id)
@@ -33,12 +33,21 @@ def _document_pack() -> tuple[list[dict[str, Any]], dict[str, Any]]:
             "filename": "service_contract.pdf",
             "document_type": "contract",
             "text": "contract text",
+            "chunks": [
+                {
+                    "text": "Maximum aggregate fees: USD 75,000.00",
+                    "page_number": 3,
+                }
+            ],
         },
         {
             "document_id": "d-invoice",
             "filename": "invoice_001.pdf",
             "document_type": "invoice",
             "text": "invoice text",
+            "chunks": [
+                {"text": "Invoice Number: INV-9\nTotal Due: USD 82,500.00", "page_number": 1}
+            ],
         },
     ]
     extractions = {
@@ -81,6 +90,12 @@ async def test_graph_detects_discrepancy_and_creates_reviews() -> None:
     assert state["requires_review"] is True
     assert len(state["review_task_ids"]) == len(state["discrepancies"])
     assert services.created_reviews == state["discrepancies"]
+    amount_finding = next(
+        finding
+        for finding in state["discrepancies"]
+        if finding["type"] == "amount_exceeds_contract"
+    )
+    assert {reference["page_number"] for reference in amount_finding["evidence"]} == {1, 3}
     assert state["report"]["issue_count"] == len(state["discrepancies"])
     assert "# Exception Report" in state["report_markdown"]
     step_names = [step["step"] for step in state["steps"]]
@@ -122,6 +137,8 @@ async def test_extraction_failure_forces_review() -> None:
     assert state["requires_review"] is True
     assert state["report"]["extraction_failures"]
     assert state["report"]["requires_human_review"] is True
+    assert len(state["review_task_ids"]) == 1
+    assert services.created_reviews[0]["type"] == "extraction_failure"
 
 
 def test_case_documents_assembly_ignores_unknown_types() -> None:
