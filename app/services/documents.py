@@ -62,6 +62,8 @@ class DocumentService:
         safe_filename = Path(original_filename.replace("\\", "/")).name or "upload"
         content_sha256 = hashlib.sha256(data).hexdigest()
         dedup_key = self._deduplication_key(content_sha256, case_id, document_type)
+        if case_id is not None:
+            await self._repository.ensure_case(case_id)
 
         existing = await self._repository.get_duplicate(
             dedup_key=dedup_key,

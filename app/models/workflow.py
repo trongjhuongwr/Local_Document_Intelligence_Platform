@@ -4,14 +4,17 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import Boolean, DateTime, Float, ForeignKey, String, Text, func
 from sqlalchemy import text as sql_text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+
+if TYPE_CHECKING:
+    from app.models.case import Case
 
 
 class ExtractionRun(Base):
@@ -73,6 +76,9 @@ class WorkflowRun(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     workflow_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    case_id: Mapped[str | None] = mapped_column(
+        String(128), ForeignKey("cases.case_id", ondelete="CASCADE"), nullable=True, index=True
+    )
     status: Mapped[str] = mapped_column(
         String(16), nullable=False, default="running", server_default=sql_text("'running'")
     )
@@ -96,6 +102,9 @@ class WorkflowRun(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    case: Mapped[Case | None] = relationship(back_populates="workflows")
 
 
 class ReviewTask(Base):
@@ -110,7 +119,9 @@ class ReviewTask(Base):
         nullable=True,
         index=True,
     )
-    case_id: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    case_id: Mapped[str | None] = mapped_column(
+        String(128), ForeignKey("cases.case_id", ondelete="CASCADE"), nullable=True, index=True
+    )
     discrepancy: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, default=dict, server_default=sql_text("'{}'::jsonb")
     )
@@ -124,3 +135,4 @@ class ReviewTask(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
+    case: Mapped[Case | None] = relationship(back_populates="reviews")

@@ -69,8 +69,8 @@ def _request(
     *,
     params: dict[str, Any] | None = None,
     json_body: dict[str, Any] | None = None,
-    files: dict[str, Any] | None = None,
-    form_data: dict[str, Any] | None = None,
+    files: Any | None = None,
+    form_data: Any | None = None,
     timeout: float = DEFAULT_TIMEOUT,
 ) -> Any:
     try:
@@ -180,6 +180,48 @@ def distinct_case_ids() -> list[str]:
     return sorted({d["case_id"] for d in documents if d.get("case_id")})
 
 
+# --------------------------------------------------------------------------- cases
+
+
+def create_case(name: str) -> dict[str, Any]:
+    return _request("POST", "/cases", json_body={"name": name})
+
+
+def list_cases() -> list[dict[str, Any]]:
+    payload = _request("GET", "/cases")
+    return payload.get("cases", [])
+
+
+def get_case(case_id: str) -> dict[str, Any]:
+    return _request("GET", f"/cases/{case_id}")
+
+
+def delete_case(case_id: str) -> None:
+    _request("DELETE", f"/cases/{case_id}")
+
+
+def create_demo_case() -> dict[str, Any]:
+    return _request("POST", "/demo/cases", timeout=120.0)
+
+
+def upload_case_documents(
+    case_id: str, files: list[tuple[str, bytes]], document_types: list[str]
+) -> dict[str, Any]:
+    multipart = [("files", (filename, data)) for filename, data in files]
+    form = [("document_types", document_type) for document_type in document_types]
+    return _request(
+        "POST",
+        f"/cases/{case_id}/documents",
+        files=multipart,
+        form_data=form,
+        timeout=180.0,
+    )
+
+
+def analyze_case(case_id: str) -> dict[str, Any]:
+    return _request("POST", f"/cases/{case_id}/analyses", timeout=15.0)
+
+
 # ------------------------------------------------------------------ search & query
 
 
@@ -261,14 +303,47 @@ def list_reviews(
     *,
     status: str | None = None,
     case_id: str | None = None,
+    severity: str | None = None,
     limit: int = 500,
+    offset: int = 0,
 ) -> list[dict[str, Any]]:
     payload = _request(
         "GET",
         "/reviews",
-        params=_clean({"status": status, "case_id": case_id, "limit": limit}),
+        params=_clean(
+            {
+                "status": status,
+                "case_id": case_id,
+                "severity": severity,
+                "limit": limit,
+                "offset": offset,
+            }
+        ),
     )
     return payload.get("reviews", [])
+
+
+def reviews_page(
+    *,
+    status: str | None = None,
+    case_id: str | None = None,
+    severity: str | None = None,
+    limit: int = 20,
+    offset: int = 0,
+) -> dict[str, Any]:
+    return _request(
+        "GET",
+        "/reviews",
+        params=_clean(
+            {
+                "status": status,
+                "case_id": case_id,
+                "severity": severity,
+                "limit": limit,
+                "offset": offset,
+            }
+        ),
+    )
 
 
 def approve_review(review_id: str, *, reviewer: str, note: str | None = None) -> dict[str, Any]:

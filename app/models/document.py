@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy import text as sql_text
@@ -12,6 +12,9 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+
+if TYPE_CHECKING:
+    from app.models.case import Case
 
 
 class Document(Base):
@@ -27,7 +30,9 @@ class Document(Base):
     size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
     page_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     document_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
-    case_id: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    case_id: Mapped[str | None] = mapped_column(
+        String(128), ForeignKey("cases.case_id", ondelete="CASCADE"), nullable=True, index=True
+    )
     status: Mapped[str] = mapped_column(
         String(16), nullable=False, default="pending", server_default=sql_text("'pending'")
     )
@@ -52,6 +57,7 @@ class Document(Base):
         passive_deletes=True,
         order_by="Chunk.order_index",
     )
+    case: Mapped[Case | None] = relationship(back_populates="documents")
 
 
 class DocumentElement(Base):

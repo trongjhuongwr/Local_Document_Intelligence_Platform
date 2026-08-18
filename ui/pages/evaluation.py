@@ -11,7 +11,20 @@ from ui.theme import inject_css
 
 inject_css()
 st.title("Evaluation")
-st.caption("Measured quality of every component, straight from the evaluation reports on disk.")
+st.caption("Evidence-backed quality results from read-only benchmark report artifacts.")
+st.markdown(
+    """
+**Recruiter summary.** The system measures four separate capabilities: structured field extraction,
+retrieval ranking, citation grounding, and deterministic discrepancy detection. BM25 is the product
+default because it currently gives the best early ranking/latency trade-off on DocFlowBench. The
+main known limitation is extraction quality from a small local model; every consequential finding
+therefore enters a human review workflow.
+"""
+)
+st.info(
+    "Benchmark scope: seeded synthetic business documents (DocFlowBench). These metrics are not a "
+    "claim about arbitrary real-world documents and this page never reads the product database."
+)
 
 REPORTS_DIR = Path(__file__).resolve().parents[2] / "evals" / "reports"
 
@@ -55,6 +68,7 @@ if not any([combined, extraction, retrieval, routing, rules, end_to_end, generat
 
 # ----------------------------------------------------------------------- extraction
 st.subheader("Extraction")
+st.caption("Field accuracy and schema validity: higher is better. Latency: lower is better.")
 if extraction:
     tile_1, tile_2, tile_3, tile_4 = st.columns(4)
     tile_1.metric("Field accuracy", _pct(extraction.get("overall_field_accuracy")))
@@ -81,6 +95,7 @@ else:
 
 # ------------------------------------------------------------------------ retrieval
 st.subheader("Retrieval")
+st.caption("Recall and MRR: higher is better. Latency: lower is better.")
 if retrieval and retrieval.get("modes"):
     rows = [
         {
@@ -103,6 +118,7 @@ else:
 
 # -------------------------------------------------------------------------- routing
 st.subheader("Routing")
+st.caption("Accuracy and macro F1: higher is better.")
 if routing:
     # The report schema has two known revisions; read both defensively.
     production = routing.get("production_router") or routing.get("llm_router") or {}
@@ -120,6 +136,7 @@ else:
 
 # ---------------------------------------------------------------------- discrepancy
 st.subheader("Discrepancy detection")
+st.caption("Precision, recall, and F1: higher is better.")
 if rules or end_to_end:
     tiles = st.columns(4)
     if rules:
@@ -137,6 +154,7 @@ else:
 
 # --------------------------------------------------------------- generation/workflow
 st.subheader("Grounded answers")
+st.caption("Completion, citation, and correct-document rates: higher is better.")
 if generation:
     tiles = st.columns(4)
     tiles[0].metric("Query completion", _pct(generation.get("query_completion_rate")))
@@ -151,6 +169,9 @@ else:
     st.info("Grounded-answer evaluation has not been run yet.")
 
 st.subheader("End-to-end workflow")
+st.caption(
+    "Completion and review consistency: higher is better. Duration and failures: lower is better."
+)
 if workflow:
     tiles = st.columns(4)
     tiles[0].metric("Completion", _pct(workflow.get("completion_rate")))

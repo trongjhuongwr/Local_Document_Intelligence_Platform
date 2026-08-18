@@ -66,3 +66,13 @@ class DocumentNotFoundError(AppError):
 class FileTooLargeError(AppError):
     status_code = 413
     error_code = "file_too_large"
+
+
+class CaseNotFoundError(AppError):
+    status_code = 404
+    error_code = "case_not_found"
+
+
+class CaseConflictError(AppError):
+    status_code = 409
+    error_code = "case_conflict"

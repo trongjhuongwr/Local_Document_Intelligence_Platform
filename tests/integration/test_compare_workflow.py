@@ -143,3 +143,42 @@ async def test_review_decision_lifecycle() -> None:
 
     resolved = await reviews.resolve(uuid.UUID(task_id))
     assert resolved.status == "RESOLVED"
+
+
+async def test_async_analysis_reuses_active_run_and_persists_progress() -> None:
+    case_id = f"async_case_{uuid.uuid4().hex[:8]}"
+    await _seed_documents(case_id)
+    service = CompareService(
+        get_sessionmaker(),
+        StubExtractionService(
+            {
+                "contract": ContractExtraction(
+                    vendor_name="Acme Analytics Ltd",
+                    currency="USD",
+                    maximum_amount=100000.0,
+                    payment_terms="Net 30",
+                ),
+                "invoice": InvoiceExtraction(
+                    invoice_number="INV-ASYNC-1",
+                    vendor_name="Acme Analytics Ltd",
+                    currency="USD",
+                    total=5000.0,
+                    payment_terms="Net 30",
+                ),
+            }
+        ),  # type: ignore[arg-type]
+        ReviewService(get_sessionmaker()),
+    )
+    first = await service.create_analysis(case_id)
+    second = await service.create_analysis(case_id)
+    assert first.id == second.id
+    assert first.status == "queued"
+
+    await service.run_analysis(first.id)
+    async with get_sessionmaker()() as session:
+        completed = await session.get(WorkflowRun, first.id)
+        assert completed is not None
+        assert completed.status == "completed"
+        assert all(step["status"] == "completed" for step in completed.steps)
+        assert completed.started_at is not None
+        assert completed.completed_at is not None

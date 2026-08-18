@@ -4,12 +4,12 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.exceptions import AppError
 from app.core.logging import get_logger
-from app.models import ReviewTask
+from app.models import Case, ReviewTask
 
 logger = get_logger(__name__)
 
@@ -48,6 +48,13 @@ class ReviewService:
             for discrepancy in discrepancies
         ]
         async with self._sessionmaker() as session:
+            if case_id is not None and await session.get(Case, case_id) is None:
+                session.add(Case(case_id=case_id, name=case_id, source="legacy"))
+                await session.flush()
+            if case_id is not None:
+                case = await session.get(Case, case_id)
+                if case is not None:
+                    case.updated_at = datetime.now(UTC)
             session.add_all(tasks)
             await session.commit()
             for task in tasks:
@@ -60,6 +67,7 @@ class ReviewService:
         *,
         status: str | None = None,
         case_id: str | None = None,
+        severity: str | None = None,
         limit: int = 100,
         offset: int = 0,
     ) -> list[ReviewTask]:
@@ -68,10 +76,29 @@ class ReviewService:
             statement = statement.where(ReviewTask.status == status)
         if case_id is not None:
             statement = statement.where(ReviewTask.case_id == case_id)
+        if severity is not None:
+            statement = statement.where(ReviewTask.severity == severity)
         statement = statement.limit(limit).offset(offset)
         async with self._sessionmaker() as session:
             result = await session.execute(statement)
             return list(result.scalars().all())
+
+    async def count_tasks(
+        self,
+        *,
+        status: str | None = None,
+        case_id: str | None = None,
+        severity: str | None = None,
+    ) -> int:
+        statement = select(func.count()).select_from(ReviewTask)
+        if status is not None:
+            statement = statement.where(ReviewTask.status == status)
+        if case_id is not None:
+            statement = statement.where(ReviewTask.case_id == case_id)
+        if severity is not None:
+            statement = statement.where(ReviewTask.severity == severity)
+        async with self._sessionmaker() as session:
+            return int((await session.execute(statement)).scalar_one())
 
     async def get(self, review_id: uuid.UUID) -> ReviewTask:
         async with self._sessionmaker() as session:
@@ -107,6 +134,10 @@ class ReviewService:
             task.reviewer = reviewer
             task.note = note
             task.decided_at = datetime.now(UTC)
+            if task.case_id is not None:
+                case = await session.get(Case, task.case_id)
+                if case is not None:
+                    case.updated_at = datetime.now(UTC)
             await session.commit()
             await session.refresh(task)
         logger.info("review_decided", review_id=str(review_id), decision=decision)
@@ -122,6 +153,10 @@ class ReviewService:
                     f"Review task is {task.status}; only decided tasks can be resolved"
                 )
             task.status = _RESOLVED
+            if task.case_id is not None:
+                case = await session.get(Case, task.case_id)
+                if case is not None:
+                    case.updated_at = datetime.now(UTC)
             await session.commit()
             await session.refresh(task)
         return task

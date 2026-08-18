@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from app.core.config import get_settings
 from app.db.base import Base
-from app.models import Chunk, Document, DocumentElement  # noqa: F401 (register tables)
+from app.models import Case, Chunk, Document, DocumentElement  # noqa: F401 (register tables)
 
 config = context.config
 

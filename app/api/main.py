@@ -1,9 +1,12 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from sqlalchemy import update
 
+from app.api.routes.cases import router as cases_router
 from app.api.routes.compare import router as compare_router
 from app.api.routes.documents import router as documents_router
 from app.api.routes.health import router as health_router
@@ -14,6 +17,8 @@ from app.api.routes.workflows import router as workflows_router
 from app.core.config import get_settings
 from app.core.exceptions import AppError
 from app.core.logging import configure_logging, get_logger
+from app.db.session import get_sessionmaker
+from app.models import WorkflowRun
 
 logger = get_logger(__name__)
 
@@ -23,6 +28,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     configure_logging(settings.log_level)
     logger.info("application_startup", environment=settings.environment)
+    async with get_sessionmaker()() as session:
+        await session.execute(
+            update(WorkflowRun)
+            .where(WorkflowRun.status.in_(["queued", "running"]))
+            .values(
+                status="failed",
+                errors=["Workflow interrupted by process restart"],
+                completed_at=datetime.now(UTC),
+            )
+        )
+        await session.commit()
     yield
     logger.info("application_shutdown")
 
@@ -35,6 +51,7 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
     app.include_router(health_router)
+    app.include_router(cases_router)
     app.include_router(documents_router)
     app.include_router(retrieval_router)
     app.include_router(query_router)

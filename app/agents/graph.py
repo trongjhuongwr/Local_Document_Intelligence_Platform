@@ -87,6 +87,11 @@ def case_documents_from_extractions(
 
 
 def build_compare_graph(services: CompareServices) -> Any:
+    async def notify(state: CompareWorkflowState, step: str, **details: Any) -> None:
+        callback = getattr(services, "record_progress", None)
+        if callback is not None:
+            await callback(state.get("workflow_run_id"), step, details)
+
     async def load_documents(state: CompareWorkflowState) -> CompareWorkflowState:
         loaded = await services.load_documents(state.get("document_ids", []), state.get("case_id"))
         documents = {
@@ -102,6 +107,7 @@ def build_compare_graph(services: CompareServices) -> Any:
         if not documents:
             errors.append("No parsed documents found for the requested scope")
         record_step(state, "load_documents", count=len(documents))
+        await notify(state, "load_documents", count=len(documents))
         return {
             "documents": documents,
             "document_ids": list(documents),
@@ -130,6 +136,7 @@ def build_compare_graph(services: CompareServices) -> Any:
             else:
                 extractions[document_id] = data
         record_step(state, "extract_fields", extracted=len(extractions), failed=len(failures))
+        await notify(state, "extract_fields", extracted=len(extractions), failed=len(failures))
         return {
             "extractions": extractions,
             "extraction_failures": failures,
@@ -160,6 +167,12 @@ def build_compare_graph(services: CompareServices) -> Any:
             checks_run=report.checks_run,
             findings=len(discrepancies),
         )
+        await notify(
+            state,
+            "run_discrepancy_rules",
+            checks_run=report.checks_run,
+            findings=len(discrepancies),
+        )
         return {
             "discrepancies": discrepancies,
             "review_items": [*discrepancies, *failure_items],
@@ -175,9 +188,12 @@ def build_compare_graph(services: CompareServices) -> Any:
             state.get("review_items", []),
         )
         record_step(state, "create_review_tasks", created=len(task_ids))
+        await notify(state, "create_review_tasks", created=len(task_ids))
         return {"review_task_ids": task_ids, "steps": state.get("steps", [])}
 
     async def generate_report(state: CompareWorkflowState) -> CompareWorkflowState:
+        if not state.get("review_items"):
+            await notify(state, "create_review_tasks", created=0, skipped=True)
         engine_report = DiscrepancyReport.model_validate(state["engine_report"])
         documents_meta = [
             {
@@ -196,6 +212,7 @@ def build_compare_graph(services: CompareServices) -> Any:
         report["requires_human_review"] = state.get("requires_review", False)
         report["review_task_ids"] = state.get("review_task_ids", [])
         record_step(state, "generate_report", issues=report["issue_count"])
+        await notify(state, "generate_report", issues=report["issue_count"])
         return {
             "report": report,
             "report_markdown": report_to_markdown(report),

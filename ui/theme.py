@@ -10,6 +10,37 @@ import streamlit as st
 
 _CSS = """
 <style>
+:root {
+    --primary: #2563EB; --success: #15803D; --warning: #B45309; --danger: #B91C1C;
+    --text: #111827; --muted: #4B5563; --background: #F8FAFC;
+    --surface: #FFFFFF; --border: #E2E8F0;
+}
+[data-testid="stAppViewContainer"] { background: var(--background); color: var(--text); }
+[data-testid="stMainBlockContainer"] { max-width: 1180px; padding-top: 2.5rem; }
+[data-testid="stSidebar"] { background: #FFFFFF; border-right: 1px solid var(--border); }
+h1, h2, h3 { color: var(--text); letter-spacing: -0.02em; }
+.stButton > button[kind="primary"], .stFormSubmitButton > button[kind="primary"] {
+    background: var(--primary); border-color: var(--primary); border-radius: 7px;
+}
+.stButton > button, .stDownloadButton > button { border-radius: 7px; }
+[data-testid="stMetric"] {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 1rem;
+}
+.workspace-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 1.1rem 1.25rem; margin-bottom: .8rem;
+}
+.empty-state {
+    background: var(--surface); border: 1px dashed #CBD5E1; border-radius: 10px;
+    padding: 2.25rem; text-align: center;
+}
+.eyebrow {
+    color: var(--primary); font-weight: 700; font-size: .75rem;
+    letter-spacing: .08em; text-transform: uppercase;
+}
+.check-done { color: var(--success); font-weight: 600; }
+.check-missing { color: var(--muted); }
 .badge {
     display: inline-block;
     padding: 2px 10px;
@@ -35,10 +66,15 @@ _CSS = """
     margin-bottom: 0.75rem;
     line-height: 1.55;
 }
-.muted { color: #6B7280; font-size: 0.8rem; }
+.muted { color: var(--muted); font-size: 0.8rem; }
 .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
 .dot-ok { background: #16A34A; }
 .dot-err { background: #DC2626; }
+@media (max-width: 1024px) {
+  [data-testid="stMainBlockContainer"] {
+      max-width: 100%; padding-left: 1.25rem; padding-right: 1.25rem;
+  }
+}
 </style>
 """
 

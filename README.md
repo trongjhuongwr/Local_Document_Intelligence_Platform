@@ -17,7 +17,9 @@ This platform does it differently:
 
 ## The flagship workflow
 
-Upload a document pack (`service_contract.pdf`, `purchase_order.pdf`, `invoice_001.pdf`, `payment_policy.pdf`), then ask the system to compare them. A LangGraph state machine extracts structured fields with the local model, runs twelve deterministic discrepancy rules over the normalized values, computes exact differences in Python, links each finding to page-level evidence, generates an exception report, and queues findings for human approval:
+The product UI follows one case-centered path: `Home → Create/Try Case → Upload Pack → Validate Readiness → Analyze → Review Findings → Download Report`. Analysis runs asynchronously with five persisted progress steps, so reloading the UI never loses the active workflow.
+
+Upload a document pack (`service_contract.pdf`, `purchase_order.pdf`, `invoice_001.pdf`, `payment_policy.pdf`). A LangGraph state machine extracts structured fields with the local model, runs twelve deterministic discrepancy rules over the normalized values, computes exact differences in Python, links each finding to page-level evidence, generates an exception report, and queues findings for human approval:
 
 ```text
 Potential overbilling: $7,500
@@ -120,7 +122,21 @@ This constraint is a feature: a 1B generative model + 45 MB embedder, pgvector i
 
 Prerequisites: Python 3.12+, Docker Desktop, [Ollama](https://ollama.com) on the host.
 
-One-shot setup: `scripts\bootstrap.ps1` (Windows) or `scripts/bootstrap.sh` (Linux/macOS/WSL2) — or step by step:
+Recommended one-shot setup (also creates and migrates isolated product/test/eval databases):
+
+```powershell
+# Windows PowerShell
+.\scripts\bootstrap.ps1
+```
+
+```bash
+# Linux/macOS/WSL2
+./scripts/bootstrap.sh
+```
+
+The database layout is intentionally isolated: `docintel_product` for the app, `docintel_test` for automated tests, and `docintel_eval` for database-backed benchmarks. An existing `docintel` database is kept untouched as a legacy backup.
+
+Equivalent first-time setup:
 
 ```bash
 # 1. Models (one-time, ~1.4 GB total)
@@ -135,9 +151,9 @@ python -m venv .venv
 # Windows: .venv\Scripts\activate      Linux/macOS: source .venv/bin/activate
 pip install -e ".[dev]"
 
-# 4. Configuration + schema
+# 4. Configuration + schema (bootstrap is required for an existing Docker volume)
 cp .env.example .env       # adjust POSTGRES_PORT / API_PORT if taken
-alembic upgrade head
+./scripts/bootstrap.sh      # use .\scripts\bootstrap.ps1 on Windows
 
 # 5. Generate the benchmark corpus
 python -m synthetic_data.generator --seed 42 --cases 30
@@ -147,6 +163,8 @@ uvicorn app.api.main:app --reload
 streamlit run ui/app.py
 ```
 
+Open `http://localhost:8501`, select **Try a sample case**, then **Analyze case**. The seeded sample contains a purchase-order mismatch and vendor-name mismatch and can be recreated safely; the endpoint is idempotent.
+
 `GET /ready` verifies PostgreSQL, Ollama, and both models — with actionable hints (e.g. `ollama pull all-minilm`) when something is missing.
 
 Windows note: the project runs natively on Windows (no WSL2 required). WSL2 + Docker Desktop is also supported; on 16 GB machines cap the WSL2 VM (e.g. `memory=3GB` in `%USERPROFILE%\.wslconfig`) so the database backend cannot starve the host.
@@ -155,13 +173,15 @@ Windows note: the project runs natively on Windows (no WSL2 required). WSL2 + Do
 
 ```bash
 pytest -m "not ollama and not integration"   # fast suite — no services needed
-pytest -m integration                        # + live PostgreSQL
-pytest -m ollama                             # + live Ollama (local only)
+export TEST_DATABASE_URL=postgresql+asyncpg://docintel:docintel@localhost:5432/docintel_test
+pytest -m integration                        # + isolated live PostgreSQL
+pytest -m ollama                             # + live Ollama, still isolated from product data
 ```
 
 ## Run evaluations
 
 ```bash
+export EVAL_DATABASE_URL=postgresql+asyncpg://docintel:docintel@localhost:5432/docintel_eval
 python -m evals.run_all              # everything the environment supports
 python -m evals.run_all --skip-llm   # deterministic evals only (CI-safe)
 python -m evals.run_all --consolidate-existing  # refresh summary from source reports
@@ -173,19 +193,24 @@ Reports land in `evals/reports/*_latest.{json,md}` plus a consolidated `latest.m
 ## API examples
 
 ```bash
-# Upload a document
-curl -F "file=@service_contract.pdf" -F "document_type=contract" -F "case_id=case_001" \
-     http://localhost:8000/documents
+# Create a persisted case
+curl -X POST http://localhost:8000/cases -H "Content-Type: application/json" \
+     -d '{"name": "Acme March invoice review"}'
+
+# Upload a typed document pack (repeat both fields in the same order)
+curl -X POST http://localhost:8000/cases/{case_id}/documents \
+     -F "files=@service_contract.pdf" -F "document_types=contract" \
+     -F "files=@invoice_001.pdf" -F "document_types=invoice"
 
 # Index it for search, then ask a grounded question
 curl -X POST http://localhost:8000/documents/{id}/index
 curl -X POST http://localhost:8000/query -H "Content-Type: application/json" \
      -d '{"question": "What is the maximum contract amount?", "filters": {"case_id": "case_001"}}'
 
-# Run the discrepancy workflow and review the findings
-curl -X POST http://localhost:8000/compare -H "Content-Type: application/json" \
-     -d '{"case_id": "case_001"}'
-curl http://localhost:8000/reviews?status=OPEN
+# Queue the discrepancy workflow, poll real progress, then review findings
+curl -X POST http://localhost:8000/cases/{case_id}/analyses
+curl http://localhost:8000/workflows/{workflow_id}
+curl "http://localhost:8000/reviews?case_id={case_id}&status=OPEN&limit=20"
 curl -X POST http://localhost:8000/reviews/{review_id}/approve \
      -H "Content-Type: application/json" -d '{"reviewer": "controller"}'
 ```
@@ -201,7 +226,7 @@ app/            FastAPI backend: api, core, llm, embeddings, ingestion, extracti
 synthetic_data/ DocFlowBench generator (seeded PDFs + ground truth)
 evals/          7 evaluation suites + generated reports
 mcp_server/     read-only MCP tools over existing services
-ui/             Streamlit demo (Documents · Ask · Compare · Reviews · Evaluation)
+ui/             Streamlit workspace (Home · Cases · Ask · Review Findings · Developer Evaluation)
 migrations/     Alembic (async) schema migrations
 tests/          unit · integration · ollama-marked live tests
 docs/adr/       architecture decision records

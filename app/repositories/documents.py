@@ -2,13 +2,14 @@
 
 import uuid
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ingestion.types import ChunkDraft, ParsedElement
-from app.models import Chunk, Document, DocumentElement
+from app.models import Case, Chunk, Document, DocumentElement
 
 
 class DocumentRepository:
@@ -16,6 +17,12 @@ class DocumentRepository:
 
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
+
+    async def ensure_case(self, case_id: str) -> None:
+        """Preserve legacy /documents behavior while satisfying the Case foreign key."""
+        if await self._session.get(Case, case_id) is None:
+            self._session.add(Case(case_id=case_id, name=case_id, source="legacy"))
+            await self._session.commit()
 
     async def create(
         self,
@@ -37,6 +44,11 @@ class DocumentRepository:
         chunks: Sequence[ChunkDraft] = (),
     ) -> Document:
         """Insert a document together with its elements and chunks in one transaction."""
+        if case_id is not None:
+            await self.ensure_case(case_id)
+            case = await self._session.get(Case, case_id)
+            if case is not None:
+                case.updated_at = datetime.now(UTC)
         document = Document(
             id=document_id or uuid.uuid4(),
             filename=filename,

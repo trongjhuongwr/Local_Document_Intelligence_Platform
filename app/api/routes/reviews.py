@@ -34,13 +34,16 @@ def _serialize(task: ReviewTask) -> dict[str, Any]:
 async def list_reviews(
     status: str | None = Query(default=None),
     case_id: str | None = Query(default=None),
+    severity: str | None = Query(default=None),
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
 ) -> dict[str, Any]:
-    tasks = await get_review_service().list_tasks(
-        status=status, case_id=case_id, limit=limit, offset=offset
+    service = get_review_service()
+    tasks = await service.list_tasks(
+        status=status, case_id=case_id, severity=severity, limit=limit, offset=offset
     )
-    return {"reviews": [_serialize(task) for task in tasks], "count": len(tasks)}
+    total = await service.count_tasks(status=status, case_id=case_id, severity=severity)
+    return {"reviews": [_serialize(task) for task in tasks], "count": len(tasks), "total": total}
 
 
 @router.post("/reviews/{review_id}/approve")

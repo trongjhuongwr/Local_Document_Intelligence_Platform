@@ -1,4 +1,4 @@
-"""Ask page: grounded question answering with citations over the corpus."""
+"""Case-first grounded question answering with progressive technical disclosure."""
 
 import re
 
@@ -6,110 +6,140 @@ import streamlit as st
 
 from ui import api_client
 from ui.theme import escape, evidence_card, inject_css, muted, neutral_chip
+from ui.utils import suggested_questions
 
 inject_css()
-st.title("Ask")
-st.caption("Ask a question over your documents — answers cite their evidence.")
+st.title("Ask Documents")
+st.caption("Ask a business question and inspect the exact document evidence behind the answer.")
 
 try:
-    case_ids = api_client.distinct_case_ids()
+    cases = api_client.list_cases()
 except api_client.APIError as exc:
     api_client.show_error(exc)
     st.stop()
 
+if not cases:
+    st.markdown(
+        '<div class="empty-state"><strong>No cases available</strong><br>'
+        '<span class="muted">Create a case and upload documents before asking '
+        "questions.</span></div>",
+        unsafe_allow_html=True,
+    )
+    st.stop()
+
+case_ids = [case["case_id"] for case in cases]
+active = st.session_state.get("active_case_id")
+default_index = case_ids.index(active) if active in case_ids else 0
+selected_case_id = st.selectbox(
+    "Case",
+    case_ids,
+    index=default_index,
+    format_func=lambda value: next(case["name"] for case in cases if case["case_id"] == value),
+)
+
+with st.expander("Advanced settings"):
+    all_cases = st.checkbox("Search across all cases", value=False)
+    mode = st.selectbox(
+        "Retrieval mode",
+        ["bm25", "hybrid", "dense"],
+        help="BM25 is the measured default. Hybrid and dense require the embedding model.",
+    )
+
+scope = None if all_cases else selected_case_id
+scope_key = (scope, mode)
+if st.session_state.get("ask_scope_key") != scope_key:
+    st.session_state["ask_scope_key"] = scope_key
+    st.session_state.pop("ask_result", None)
+    st.session_state.pop("ask_result_question", None)
+
+document_types = set(
+    next(case.get("document_types", []) for case in cases if case["case_id"] == selected_case_id)
+)
+st.markdown("**Suggested questions**")
+for index, suggestion in enumerate(suggested_questions(document_types)):
+    if st.button(suggestion, key=f"suggestion_{index}"):
+        st.session_state["ask_question"] = suggestion
+        st.session_state.pop("ask_result", None)
+        st.rerun()
+
 question = st.text_area(
     "Question",
-    placeholder="e.g. What is the total amount of invoice INV-2024-001?",
-    height=90,
+    key="ask_question",
+    placeholder="e.g. Do the invoice payment terms match the contract?",
+    height=100,
 )
-mode_col, case_col, button_col = st.columns([1, 1, 1], vertical_alignment="bottom")
-with mode_col:
-    mode = st.selectbox("Retrieval mode", ["bm25", "hybrid", "dense"])
-with case_col:
-    case_choice = st.selectbox("Case", ["All cases", *case_ids])
-with button_col:
-    ask_clicked = st.button("Ask", type="primary", width="stretch")
+if st.session_state.get("ask_result_question") != question:
+    st.session_state.pop("ask_result", None)
 
-if ask_clicked:
+if st.button("Ask documents", type="primary", width="stretch"):
     if not question.strip():
-        st.warning("Type a question first.")
+        st.warning("Type or choose a question first.")
     else:
         try:
-            with st.spinner(
-                "Retrieving evidence and generating a grounded answer — "
-                "the local 1B model may take a minute..."
-            ):
+            with st.spinner("Finding evidence and preparing a grounded answer..."):
                 st.session_state["ask_result"] = api_client.query(
-                    question.strip(),
-                    mode=mode,
-                    case_id=None if case_choice == "All cases" else case_choice,
+                    question.strip(), mode=mode, case_id=scope
                 )
-        except api_client.APIStatusError as exc:
-            st.session_state.pop("ask_result", None)
-            if exc.status_code == 404:
-                st.info("Query endpoint not available yet.")
-            else:
-                api_client.show_error(exc)
+                st.session_state["ask_result_question"] = question
         except api_client.APIError as exc:
             st.session_state.pop("ask_result", None)
             api_client.show_error(exc)
 
 result = st.session_state.get("ask_result")
-if result:
-    st.divider()
+if not result:
+    st.info("Your answer will appear here with citation checks and source evidence.")
+    st.stop()
+
+st.subheader("Answer")
+st.markdown(
+    evidence_card(escape(result.get("answer", "")).replace("\n", "<br>")),
+    unsafe_allow_html=True,
+)
+
+verification = result.get("verification") or {}
+valid = verification.get("valid")
+if valid is True:
+    st.success("Citation check passed — every cited source was found in the retrieved evidence.")
+elif valid is False:
+    st.warning(
+        "Some citations could not be verified. Review the evidence before relying on this answer."
+    )
+else:
+    st.info("No citation verification status was returned.")
+
+citations = result.get("citations") or {}
+st.subheader("Evidence")
+if not citations:
+    st.warning("No evidence citations were returned for this answer.")
+else:
+
+    def marker_order(marker: str) -> int:
+        match = re.search(r"\d+", marker)
+        return int(match.group()) if match else 0
+
+    for marker in sorted(citations, key=marker_order):
+        citation = citations[marker] or {}
+        filename = citation.get("filename") or "unknown file"
+        location = filename
+        if citation.get("page_number") is not None:
+            location += f" · page {citation['page_number']}"
+        if citation.get("section"):
+            location += f" · {citation['section']}"
+        with st.expander(f"{marker} · {location}"):
+            st.write(citation.get("evidence") or "No excerpt available.")
+
+with st.expander("Technical details"):
+    chips = [
+        neutral_chip(f"retrieval: {result.get('retrieval_mode', 'unknown')}"),
+        neutral_chip(f"route: {result.get('route', 'unknown')}"),
+        neutral_chip(f"router: {result.get('routing_method', 'unknown')}"),
+    ]
+    st.markdown(" ".join(chips), unsafe_allow_html=True)
     st.markdown(
-        evidence_card(escape(result.get("answer", "")).replace("\n", "<br>")),
+        muted(
+            f"{result.get('retrieved_count', 0)} chunks · "
+            f"{result.get('context_chars', 0):,} context characters · "
+            f"{result.get('latency_ms', 0):.0f} ms"
+        ),
         unsafe_allow_html=True,
     )
-
-    verification = result.get("verification") or {}
-    valid = verification.get("valid")
-    chips = []
-    if result.get("route"):
-        chips.append(neutral_chip(f"route: {result['route']}"))
-    if result.get("routing_method"):
-        chips.append(neutral_chip(f"router: {result['routing_method']}"))
-    if result.get("retrieval_mode"):
-        chips.append(neutral_chip(f"retrieval: {result['retrieval_mode']}"))
-    if result.get("latency_ms") is not None:
-        chips.append(neutral_chip(f"{result['latency_ms']:.0f} ms"))
-    if valid is not None:
-        chips.append(neutral_chip("citations valid ✓" if valid else "citations valid ✗"))
-    if chips:
-        st.markdown(" ".join(chips), unsafe_allow_html=True)
-    if result.get("suggested_action"):
-        st.markdown(
-            muted(f"Suggested action: {result['suggested_action']}"), unsafe_allow_html=True
-        )
-
-    citations = result.get("citations") or {}
-    if citations:
-        st.subheader("Evidence")
-
-        def _marker_order(marker: str) -> int:
-            match = re.search(r"\d+", marker)
-            return int(match.group()) if match else 0
-
-        for marker in sorted(citations, key=_marker_order):
-            citation = citations[marker] or {}
-            filename = citation.get("filename") or "unknown file"
-            page = citation.get("page_number")
-            section = citation.get("section")
-            header = f"<strong>{escape(marker)}</strong> · {escape(filename)}"
-            if page is not None:
-                header += f" · page {escape(page)}"
-            if section:
-                header += f" · {escape(section)}"
-            evidence = citation.get("evidence") or ""
-            body = header
-            if evidence:
-                body += f'<br><span class="muted">{escape(evidence)}</span>'
-            st.markdown(evidence_card(body), unsafe_allow_html=True)
-
-    extra = []
-    if result.get("retrieved_count") is not None:
-        extra.append(f"{result['retrieved_count']} chunks retrieved")
-    if result.get("context_chars") is not None:
-        extra.append(f"{result['context_chars']:,} context characters")
-    if extra:
-        st.caption(" · ".join(extra))

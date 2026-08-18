@@ -1,5 +1,6 @@
 from functools import lru_cache
 from typing import Literal
+from urllib.parse import urlsplit
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -17,7 +18,7 @@ class Settings(BaseSettings):
     api_host: str = "127.0.0.1"
     api_port: int = 8000
 
-    database_url: str = "postgresql+asyncpg://docintel:docintel@localhost:5432/docintel"
+    database_url: str = "postgresql+asyncpg://docintel:docintel@localhost:5432/docintel_product"
 
     ollama_base_url: str = "http://localhost:11434"
     ollama_llm_model: str = "llama3.2:1b"
@@ -34,6 +35,24 @@ class Settings(BaseSettings):
     router_llm_enabled: bool = False
 
     max_upload_size_mb: int = 25
+    product_mode: bool = True
+
+
+def database_name(url: str) -> str:
+    """Return the database component without ever exposing credentials."""
+    return urlsplit(url.replace("postgresql+asyncpg", "postgresql", 1)).path.lstrip("/")
+
+
+def assert_safe_database_url(url: str, *, role: Literal["test", "eval"]) -> None:
+    """Prevent automated workloads from writing to the product database."""
+    name = database_name(url)
+    expected = f"docintel_{role}"
+    if name == "docintel_product":
+        raise RuntimeError(f"Refusing to run {role} workload against docintel_product")
+    if name != expected:
+        raise RuntimeError(
+            f"{role.upper()} database must be named {expected}; received {name or 'unknown'}"
+        )
 
 
 @lru_cache
