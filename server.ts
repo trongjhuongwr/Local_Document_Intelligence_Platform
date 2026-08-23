@@ -1077,14 +1077,20 @@ app.get('/api/health', (req, res) => {
 });
 
 app.get('/api/ready', (req, res) => {
+  const hasGemini = Boolean(process.env.GEMINI_API_KEY);
   res.json({
     status: 'ready',
+    engine_summary: hasGemini 
+      ? 'Gemini 3.7 Flash + Local Deterministic Engine' 
+      : 'Local Deterministic Audit Engine (v1.4)',
+    ai_model: hasGemini ? 'gemini-3.7-flash (Gemini 2.5/Flash resilient fallback)' : 'deterministic-rule-engine-v1.4',
+    deterministic_rules_count: 12,
     checks: {
       database: { status: 'healthy', provider: 'in-memory-fast-store' },
-      engine: { status: 'ready', version: '1.4.2' },
+      engine: { status: 'ready', version: '1.4.2', rules: 12 },
       ollama: {
-        status: 'simulated_or_gemini',
-        llm_model: { model: process.env.GEMINI_API_KEY ? 'gemini-3.7-flash (auto-resilient fallback)' : 'local-deterministic-engine' },
+        status: hasGemini ? 'cloud_gemini_active' : 'local_rule_engine',
+        llm_model: { model: hasGemini ? 'Gemini 3.7 Flash + Local Deterministic Engine' : 'Local Deterministic Engine (v1.4)' },
       },
     },
   });
