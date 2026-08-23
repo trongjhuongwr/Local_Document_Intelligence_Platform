@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { CaseItem, DocumentType, WorkflowRun, Discrepancy } from '../types';
+import React, { useState, useEffect, useRef } from 'react';
+import { CaseItem, DocumentType, WorkflowRun, Discrepancy, CaseReadiness } from '../types';
 import { SeverityBadge, ReadinessChip } from './StatusBadges';
 import { 
   ArrowLeft, 
@@ -14,7 +14,14 @@ import {
   Check, 
   ChevronDown, 
   ChevronRight,
-  Calculator
+  Calculator,
+  Search,
+  Filter,
+  Eye,
+  X,
+  Copy,
+  Hash,
+  FileSpreadsheet
 } from 'lucide-react';
 
 interface CasesViewProps {
@@ -43,6 +50,10 @@ function inferDocType(filename: string): DocumentType {
 }
 
 export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, onNavigateToReviews }: CasesViewProps) {
+  // Search & Filter state for Cases list
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | CaseReadiness>('ALL');
+
   // Create case state
   const [createFormOpen, setCreateFormOpen] = useState(false);
   const [newCaseName, setNewCaseName] = useState('');
@@ -52,10 +63,25 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
   const [caseDetail, setCaseDetail] = useState<CaseItem | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
-  // Upload state
+  // Upload & Drag-and-Drop state
   const [selectedFiles, setSelectedFiles] = useState<Array<{ file: File; type: DocumentType }>>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadMessage, setUploadMessage] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Quick Peek Modal state
+  const [peekDoc, setPeekDoc] = useState<{
+    document_id: string;
+    filename: string;
+    document_type: string;
+    status: string;
+    size_bytes: number;
+    sha256: string;
+    text_content?: string;
+    extracted_data?: Record<string, any>;
+  } | null>(null);
+  const [loadingPeek, setLoadingPeek] = useState(false);
+  const [copiedHash, setCopiedHash] = useState(false);
 
   // Analysis / Workflow state
   const [activeWorkflow, setActiveWorkflow] = useState<WorkflowRun | null>(null);
@@ -128,14 +154,39 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
     }
   };
 
-  const handleFileSelection = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files) return;
-    const files = Array.from(e.target.files);
+  const processFiles = (files: File[]) => {
+    if (files.length === 0) return;
     const mapped = files.map(file => ({
       file,
       type: inferDocType(file.name),
     }));
-    setSelectedFiles(mapped);
+    setSelectedFiles(prev => [...prev, ...mapped]);
+  };
+
+  const handleFileSelection = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    processFiles(Array.from(e.target.files));
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      processFiles(Array.from(e.dataTransfer.files));
+    }
   };
 
   const handleUploadPack = async () => {
@@ -166,6 +217,28 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
     } finally {
       setUploading(false);
     }
+  };
+
+  const handleOpenPeek = async (docId: string) => {
+    setLoadingPeek(true);
+    try {
+      const res = await fetch(`/api/documents/${docId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setPeekDoc(data);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingPeek(false);
+    }
+  };
+
+  const handleCopySha256 = () => {
+    if (!peekDoc?.sha256) return;
+    navigator.clipboard.writeText(peekDoc.sha256);
+    setCopiedHash(true);
+    setTimeout(() => setCopiedHash(false), 2000);
   };
 
   const handleRunAnalysis = async () => {
@@ -219,6 +292,14 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
     URL.revokeObjectURL(url);
   };
 
+  // Filtered cases list based on search and status
+  const filteredCases = cases.filter(c => {
+    const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          c.case_id.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === 'ALL' || c.readiness === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
   // -------------------------------------------------------------------------
   // Render: List View
   // -------------------------------------------------------------------------
@@ -235,10 +316,39 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
           <button
             id="create-case-toggle-btn"
             onClick={() => setCreateFormOpen(!createFormOpen)}
-            className="px-4 py-2 rounded-lg bg-neutral-900 text-white font-semibold text-sm hover:bg-neutral-800 transition-colors shadow-sm cursor-pointer"
+            className="px-4 py-2 rounded-lg bg-neutral-900 text-white font-semibold text-sm hover:bg-neutral-800 transition-colors shadow-xs cursor-pointer"
           >
             {createFormOpen ? 'Cancel' : '+ New case'}
           </button>
+        </div>
+
+        {/* Search & Filter Bar */}
+        <div className="flex flex-col sm:flex-row gap-3 items-center justify-between bg-white p-3 rounded-xl border border-neutral-200 shadow-2xs">
+          <div className="relative flex-1 w-full">
+            <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              placeholder="Search cases by name or ID..."
+              className="w-full pl-9 pr-3.5 py-1.5 text-xs border border-neutral-200 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-neutral-900 bg-neutral-50 focus:bg-white"
+            />
+          </div>
+
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <Filter className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+            <span className="text-xs font-semibold text-neutral-600 shrink-0">Status:</span>
+            <select
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value as any)}
+              className="px-2.5 py-1.5 text-xs border border-neutral-200 rounded-lg bg-neutral-50 focus:bg-white focus:outline-hidden font-medium text-neutral-800 w-full sm:w-auto"
+            >
+              <option value="ALL">All Statuses ({cases.length})</option>
+              <option value="ready">Ready for Audit ({cases.filter(c => c.readiness === 'ready').length})</option>
+              <option value="limited">Limited ({cases.filter(c => c.readiness === 'limited').length})</option>
+              <option value="blocked">Blocked ({cases.filter(c => c.readiness === 'blocked').length})</option>
+            </select>
+          </div>
         </div>
 
         {/* Create Case Form Expander */}
@@ -279,23 +389,27 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
         )}
 
         {/* Cases List */}
-        {cases.length === 0 ? (
+        {filteredCases.length === 0 ? (
           <div className="p-12 text-center rounded-xl border border-dashed border-neutral-300 bg-white">
-            <h4 className="text-base font-semibold text-neutral-800">Your workspace is empty</h4>
+            <h4 className="text-base font-semibold text-neutral-800">
+              {cases.length === 0 ? 'Your workspace is empty' : 'No matching cases found'}
+            </h4>
             <p className="text-xs text-neutral-500 mt-1">
-              Create a case above or try the sample pack on the Home page.
+              {cases.length === 0
+                ? 'Create a case above or try the sample pack on the Home page.'
+                : 'Try adjusting your search query or status filter.'}
             </p>
           </div>
         ) : (
           <div className="space-y-3">
-            {cases.map(c => (
+            {filteredCases.map(c => (
               <div
                 key={c.case_id}
-                className="p-5 rounded-xl border border-neutral-200 bg-white shadow-xs hover:border-neutral-300 transition-all flex items-center justify-between"
+                className="p-5 rounded-xl border border-neutral-200 bg-white shadow-2xs hover:border-neutral-300 transition-all flex items-center justify-between"
               >
                 <div className="space-y-1">
                   <h3 className="text-base font-bold text-neutral-900">{c.name}</h3>
-                  <p className="text-xs text-neutral-500">
+                  <p className="text-xs text-neutral-500 font-mono">
                     {c.document_count} documents · updated {c.updated_at ? c.updated_at.slice(0, 10) : 'recent'}
                   </p>
                 </div>
@@ -394,31 +508,53 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
         </div>
       )}
 
-      {/* STEP 1: Add Document Pack */}
+      {/* STEP 1: Add Document Pack with Drag & Drop Dropzone */}
       <div className="space-y-4">
         <h2 className="text-base font-bold text-neutral-900">1. Add document pack</h2>
-        <div className="p-6 rounded-xl border border-dashed border-neutral-300 bg-white text-center space-y-3">
-          <UploadCloud className="w-8 h-8 text-neutral-400 mx-auto" />
+        <div 
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          className={`p-8 rounded-xl border-2 border-dashed text-center space-y-3 transition-all ${
+            isDragging 
+              ? 'border-blue-500 bg-blue-50/80 scale-[1.01] shadow-md' 
+              : 'border-neutral-300 bg-white hover:border-neutral-400'
+          }`}
+        >
+          <UploadCloud className={`w-10 h-10 mx-auto transition-colors ${isDragging ? 'text-blue-600 scale-110' : 'text-neutral-400'}`} />
           <div>
-            <label className="cursor-pointer inline-block px-4 py-2 rounded-lg bg-neutral-100 hover:bg-neutral-200 text-neutral-800 font-semibold text-xs transition-colors">
-              Choose one or more documents
-              <input
-                type="file"
-                multiple
-                accept=".pdf,.docx,.txt,.md,.csv"
-                onChange={handleFileSelection}
-                className="hidden"
-              />
-            </label>
-            <p className="text-[11px] text-neutral-500 mt-1.5">PDF, DOCX, TXT, MD, CSV supported</p>
+            <p className="text-sm font-bold text-neutral-900">
+              {isDragging ? 'Drop files here to upload...' : 'Drag & drop business files here, or browse'}
+            </p>
+            <div className="mt-2">
+              <label className="cursor-pointer inline-block px-4 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white font-semibold text-xs transition-colors shadow-xs">
+                Choose files to upload
+                <input
+                  type="file"
+                  multiple
+                  accept=".pdf,.docx,.txt,.md,.csv"
+                  onChange={handleFileSelection}
+                  className="hidden"
+                />
+              </label>
+            </div>
+            <p className="text-[11px] text-neutral-500 mt-2">
+              Supports PDF, DOCX, TXT, MD, CSV (Contracts, Invoices, Purchase Orders, Policies)
+            </p>
           </div>
         </div>
 
         {/* Selected files preview table */}
         {selectedFiles.length > 0 && (
           <div className="rounded-xl border border-neutral-200 bg-white overflow-hidden shadow-xs">
-            <div className="p-3 bg-neutral-50 border-b border-neutral-200 text-xs font-bold text-neutral-700">
-              Selected Files ({selectedFiles.length})
+            <div className="p-3 bg-neutral-50 border-b border-neutral-200 text-xs font-bold text-neutral-700 flex items-center justify-between">
+              <span>Selected Files ({selectedFiles.length})</span>
+              <button 
+                onClick={() => setSelectedFiles([])}
+                className="text-[11px] font-semibold text-red-600 hover:underline cursor-pointer"
+              >
+                Clear all
+              </button>
             </div>
             <div className="divide-y divide-neutral-200">
               {selectedFiles.map((item, idx) => (
@@ -437,7 +573,7 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
                         next[idx].type = e.target.value as DocumentType;
                         setSelectedFiles(next);
                       }}
-                      className="text-xs border border-neutral-300 rounded px-2 py-1 bg-white"
+                      className="text-xs border border-neutral-300 rounded px-2 py-1 bg-white font-medium"
                     >
                       <option value="contract">Contract</option>
                       <option value="invoice">Invoice</option>
@@ -445,6 +581,15 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
                       <option value="policy">Payment Policy</option>
                       <option value="other">Other</option>
                     </select>
+                    <button
+                      onClick={() => {
+                        setSelectedFiles(selectedFiles.filter((_, i) => i !== idx));
+                      }}
+                      className="p-1 text-neutral-400 hover:text-red-600 rounded cursor-pointer"
+                      title="Remove file"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
               ))}
@@ -454,41 +599,56 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
                 id="upload-pack-btn"
                 onClick={handleUploadPack}
                 disabled={uploading}
-                className="px-4 py-2 rounded-lg bg-neutral-900 text-white text-xs font-semibold hover:bg-neutral-800 disabled:opacity-50 cursor-pointer"
+                className="px-4 py-2 rounded-lg bg-neutral-900 text-white text-xs font-semibold hover:bg-neutral-800 disabled:opacity-50 cursor-pointer shadow-xs"
               >
-                {uploading ? 'Parsing & Indexing...' : 'Upload document pack'}
+                {uploading ? 'Parsing & Indexing...' : `Upload and Index ${selectedFiles.length} file(s)`}
               </button>
             </div>
           </div>
         )}
 
         {uploadMessage && (
-          <div className="p-3 rounded-lg bg-neutral-100 text-neutral-800 text-xs font-medium">
-            {uploadMessage}
+          <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{uploadMessage}</span>
           </div>
         )}
 
-        {/* Existing documents accordion */}
+        {/* Existing documents with Quick Peek */}
         {caseDetail.documents && caseDetail.documents.length > 0 && (
-          <div className="rounded-xl border border-neutral-200 bg-white p-4 space-y-2">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-500">
-              Documents in this case ({caseDetail.documents.length})
-            </h3>
+          <div className="rounded-xl border border-neutral-200 bg-white p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-500">
+                Documents in this case ({caseDetail.documents.length})
+              </h3>
+              <span className="text-[11px] text-neutral-400">Click any document to inspect content &amp; metadata</span>
+            </div>
             <div className="divide-y divide-neutral-100">
               {caseDetail.documents.map(d => (
-                <div key={d.document_id} className="py-2.5 flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-neutral-500" />
-                    <span className="font-semibold text-neutral-900">{d.filename}</span>
-                    <span className="text-neutral-400">·</span>
-                    <span className="text-neutral-600">{DOCUMENT_LABELS[d.document_type] || d.document_type}</span>
-                    <span className="text-neutral-400">·</span>
-                    <span className="px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-600 font-mono text-[10px]">
-                      {d.status}
-                    </span>
+                <div 
+                  key={d.document_id} 
+                  onClick={() => handleOpenPeek(d.document_id)}
+                  className="py-2.5 px-2 -mx-2 rounded-lg hover:bg-neutral-50 transition-colors flex items-center justify-between text-xs cursor-pointer group"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-7 h-7 rounded-md bg-neutral-100 text-neutral-600 flex items-center justify-center group-hover:bg-blue-100 group-hover:text-blue-700 transition-colors">
+                      <FileText className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-neutral-900 group-hover:text-blue-700 transition-colors">{d.filename}</span>
+                        <span className="px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-600 font-mono text-[10px]">
+                          {DOCUMENT_LABELS[d.document_type] || d.document_type}
+                        </span>
+                      </div>
+                      <div className="text-neutral-400 font-mono text-[10px] mt-0.5">
+                        SHA-256: {d.sha256.slice(0, 10)}... · {(d.size_bytes / 1024).toFixed(1)} KB
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-neutral-400 font-mono text-[10px]">
-                    SHA-256: {d.sha256.slice(0, 8)}... · {(d.size_bytes / 1024).toFixed(1)} KB
+                  <div className="flex items-center gap-2 text-neutral-400 group-hover:text-neutral-700">
+                    <span className="text-[11px] font-medium hidden sm:inline">Inspect</span>
+                    <Eye className="w-4 h-4" />
                   </div>
                 </div>
               ))}
@@ -496,6 +656,96 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
           </div>
         )}
       </div>
+
+      {/* Quick Peek Modal */}
+      {peekDoc && (
+        <div className="fixed inset-0 bg-neutral-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-neutral-200 shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="p-4 border-b border-neutral-200 bg-neutral-50 flex items-center justify-between">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
+                  <FileText className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-sm font-bold text-neutral-900 truncate">{peekDoc.filename}</h3>
+                  <div className="flex items-center gap-2 text-[11px] text-neutral-500">
+                    <span className="capitalize font-semibold text-neutral-700">{DOCUMENT_LABELS[peekDoc.document_type] || peekDoc.document_type}</span>
+                    <span>·</span>
+                    <span>{(peekDoc.size_bytes / 1024).toFixed(1)} KB</span>
+                    <span>·</span>
+                    <span className="text-emerald-700 font-medium">Indexed (v1.4)</span>
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setPeekDoc(null)}
+                className="p-1.5 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-200/60 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto space-y-5">
+              {/* Metadata Bar */}
+              <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-200 text-xs flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2 font-mono text-[11px] text-neutral-600">
+                  <Hash className="w-3.5 h-3.5 text-neutral-400" />
+                  <span className="font-semibold text-neutral-700">SHA-256:</span>
+                  <span className="select-all">{peekDoc.sha256}</span>
+                </div>
+                <button
+                  onClick={handleCopySha256}
+                  className="px-2.5 py-1 bg-white hover:bg-neutral-100 border border-neutral-200 rounded-md font-semibold text-[11px] text-neutral-700 flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                >
+                  <Copy className="w-3 h-3" />
+                  <span>{copiedHash ? 'Copied!' : 'Copy Hash'}</span>
+                </button>
+              </div>
+
+              {/* Extracted Structured Schema if present */}
+              {peekDoc.extracted_data && Object.keys(peekDoc.extracted_data).length > 0 && (
+                <div>
+                  <h4 className="text-xs font-bold text-neutral-500 uppercase tracking-wider mb-2">
+                    Normalized Schema Fields
+                  </h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
+                    {Object.entries(peekDoc.extracted_data).map(([k, v]) => (
+                      <div key={k} className="p-2.5 rounded-lg bg-neutral-50 border border-neutral-200">
+                        <span className="text-[10px] uppercase font-bold text-neutral-400 block">{k.replace(/_/g, ' ')}</span>
+                        <span className="font-mono font-semibold text-neutral-900 mt-0.5 block truncate">
+                          {typeof v === 'object' ? JSON.stringify(v) : String(v || 'N/A')}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Raw Document Content */}
+              <div>
+                <h4 className="text-xs font-bold text-neutral-500 uppercase tracking-wider mb-2">
+                  Document Text Content
+                </h4>
+                <div className="p-4 rounded-xl bg-neutral-900 text-neutral-100 font-mono text-xs leading-relaxed max-h-80 overflow-y-auto whitespace-pre-wrap select-text">
+                  {peekDoc.text_content || 'No text content available.'}
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-neutral-200 bg-neutral-50 flex justify-end">
+              <button
+                onClick={() => setPeekDoc(null)}
+                className="px-4 py-2 rounded-lg bg-neutral-900 text-white font-semibold text-xs hover:bg-neutral-800 transition-colors cursor-pointer"
+              >
+                Close Preview
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* STEP 2: Analyze Case */}
       <div className="space-y-4 pt-4 border-t border-neutral-200">
@@ -506,7 +756,7 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
             id="analyze-case-btn"
             onClick={handleRunAnalysis}
             disabled={caseDetail.readiness === 'blocked' || activeWorkflow?.status === 'running'}
-            className="px-6 py-2.5 rounded-lg bg-neutral-900 text-white font-semibold text-sm hover:bg-neutral-800 disabled:opacity-50 transition-colors shadow-sm flex items-center gap-2 cursor-pointer"
+            className="px-6 py-2.5 rounded-lg bg-neutral-900 text-white font-semibold text-sm hover:bg-neutral-800 disabled:opacity-50 transition-colors shadow-xs flex items-center gap-2 cursor-pointer"
           >
             <Play className="w-4 h-4 fill-white" />
             <span>Analyze case</span>
