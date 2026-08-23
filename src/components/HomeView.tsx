@@ -1,7 +1,7 @@
 import React from 'react';
 import { CaseItem } from '../types';
 import { ReadinessChip } from './StatusBadges';
-import { ArrowRight, Sparkles, FolderPlus, FileText, CheckCircle2, Search, Sliders } from 'lucide-react';
+import { ArrowRight, Sparkles, FolderPlus, FileText, CheckCircle2, Search, Briefcase, AlertTriangle, ShieldCheck } from 'lucide-react';
 
 interface HomeViewProps {
   cases: CaseItem[];
@@ -12,6 +12,14 @@ interface HomeViewProps {
 }
 
 export function HomeView({ cases, onCreateCase, onTrySampleCase, onOpenCase, loadingSample }: HomeViewProps) {
+  // Compute key summary metrics
+  const totalCases = cases.length;
+  const totalOpenFindings = cases.reduce((acc, c) => acc + (c.open_review_count || 0), 0);
+  
+  // Calculate average compliance rate (Cases with 0 open findings or 'ready' status vs total)
+  const fullyCompliantCases = cases.filter(c => (c.open_review_count === 0 && c.readiness === 'ready')).length;
+  const averageComplianceRate = totalCases > 0 ? Math.round((fullyCompliantCases / totalCases) * 100) : 100;
+
   const steps = [
     {
       num: '1',
@@ -71,6 +79,48 @@ export function HomeView({ cases, onCreateCase, onTrySampleCase, onOpenCase, loa
             <Sparkles className="w-4 h-4 text-amber-600" />
             <span>{loadingSample ? 'Preparing sample pack...' : 'Try a sample case'}</span>
           </button>
+        </div>
+      </div>
+
+      {/* Quick Metric Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="p-5 rounded-xl border border-neutral-200 bg-white shadow-xs flex items-center justify-between">
+          <div>
+            <span className="text-xs font-bold text-neutral-500 uppercase tracking-wider">Active Cases</span>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className="text-2xl font-black text-neutral-900">{totalCases}</span>
+              <span className="text-xs font-medium text-neutral-500">managed</span>
+            </div>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center">
+            <Briefcase className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className="p-5 rounded-xl border border-neutral-200 bg-white shadow-xs flex items-center justify-between">
+          <div>
+            <span className="text-xs font-bold text-neutral-500 uppercase tracking-wider">Open Findings</span>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className="text-2xl font-black text-amber-600">{totalOpenFindings}</span>
+              <span className="text-xs font-medium text-neutral-500">awaiting review</span>
+            </div>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+            <AlertTriangle className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className="p-5 rounded-xl border border-neutral-200 bg-white shadow-xs flex items-center justify-between">
+          <div>
+            <span className="text-xs font-bold text-neutral-500 uppercase tracking-wider">Compliance Rate</span>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className="text-2xl font-black text-emerald-600">{averageComplianceRate}%</span>
+              <span className="text-xs font-medium text-neutral-500">clean packs</span>
+            </div>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
+            <ShieldCheck className="w-5 h-5" />
+          </div>
         </div>
       </div>
 
