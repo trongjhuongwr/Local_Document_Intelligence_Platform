@@ -42,7 +42,9 @@ import {
   DollarSign,
   FileSpreadsheet,
   CornerDownLeft,
+  Columns,
 } from 'lucide-react';
+import { DocumentSplitViewer } from './DocumentSplitViewer';
 
 interface AskViewProps {
   cases: CaseItem[];
@@ -95,6 +97,8 @@ export function AskView({ cases, selectedCaseId, onSelectCase }: AskViewProps) {
   } | null>(null);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [selectedDocPreview, setSelectedDocPreview] = useState<CaseDocument | null>(null);
+  const [splitViewerOpen, setSplitViewerOpen] = useState(false);
+  const [splitViewerDocs, setSplitViewerDocs] = useState<CaseDocument[]>([]);
 
   // Interaction feedback states
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -864,14 +868,26 @@ export function AskView({ cases, selectedCaseId, onSelectCase }: AskViewProps) {
                     </div>
                   </div>
 
-                  <div className="flex gap-2 pt-2">
+                  <div className="flex flex-col gap-2 pt-2">
                     <button
                       onClick={() => handleCopy(selectedCitation.cite.evidence, 'inspect-copy', 'Đã sao chép trích dẫn bằng chứng vào clipboard')}
-                      className="flex-1 py-1.5 px-3 rounded-xl border border-neutral-300 hover:bg-neutral-50 text-xs font-medium text-neutral-700 flex items-center justify-center gap-1.5 cursor-pointer"
+                      className="w-full py-1.5 px-3 rounded-xl border border-neutral-300 hover:bg-neutral-50 text-xs font-medium text-neutral-700 flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       <Copy className="w-3.5 h-3.5" />
                       <span>{copiedId === 'inspect-copy' ? 'Copied' : 'Copy Quote'}</span>
                     </button>
+                    {activeCase && activeCase.documents && activeCase.documents.length >= 2 && (
+                      <button
+                        onClick={() => {
+                          setSplitViewerDocs(activeCase.documents || []);
+                          setSplitViewerOpen(true);
+                        }}
+                        className="w-full py-1.5 px-3 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+                      >
+                        <Columns className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Compare in Split Viewer</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               ) : selectedDocPreview ? (
@@ -894,6 +910,19 @@ export function AskView({ cases, selectedCaseId, onSelectCase }: AskViewProps) {
                       {selectedDocPreview.content || 'No text extracted.'}
                     </div>
                   </div>
+
+                  {activeCase && activeCase.documents && activeCase.documents.length >= 2 && (
+                    <button
+                      onClick={() => {
+                        setSplitViewerDocs(activeCase.documents || []);
+                        setSplitViewerOpen(true);
+                      }}
+                      className="w-full py-1.5 px-3 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+                    >
+                      <Columns className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Compare in Split Viewer</span>
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="h-full flex flex-col items-center justify-center text-center p-4 text-neutral-400 space-y-2">
@@ -907,6 +936,17 @@ export function AskView({ cases, selectedCaseId, onSelectCase }: AskViewProps) {
           </div>
         )}
       </div>
+
+      {/* Side-by-Side Split Document Viewer Modal */}
+      {splitViewerOpen && splitViewerDocs.length > 0 && (
+        <DocumentSplitViewer
+          documents={splitViewerDocs}
+          initialLeftDocId={selectedDocPreview?.document_id || splitViewerDocs[0]?.document_id}
+          initialRightDocId={splitViewerDocs[1]?.document_id}
+          caseId={activeCase?.case_id}
+          onClose={() => setSplitViewerOpen(false)}
+        />
+      )}
     </div>
   );
 }

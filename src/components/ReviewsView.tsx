@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CaseItem, ReviewFinding, Severity, ReviewStatus } from '../types';
 import { SeverityBadge, StatusChip } from './StatusBadges';
+import { DocumentSplitViewer } from './DocumentSplitViewer';
 import { exportReviewsToCSV, exportReviewsToMarkdown, printOrExportPDF } from '../utils/exportUtils';
 import { 
   CheckCircle2, 
@@ -22,7 +23,8 @@ import {
   Layers,
   Sparkles,
   Check,
-  AlertCircle
+  AlertCircle,
+  Columns
 } from 'lucide-react';
 
 interface ReviewsViewProps {
@@ -42,6 +44,31 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
   const [batchActionLoading, setBatchActionLoading] = useState(false);
   const [batchNote, setBatchNote] = useState('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Split Viewer state for evidence cross-inspection
+  const [splitViewerConfig, setSplitViewerConfig] = useState<{
+    open: boolean;
+    caseId?: string;
+    documents?: any[];
+    finding?: any;
+  }>({ open: false });
+
+  const handleOpenSplitForFinding = async (finding: ReviewFinding) => {
+    try {
+      const res = await fetch(`/api/cases/${finding.case_id}`);
+      if (res.ok) {
+        const caseData = await res.json();
+        setSplitViewerConfig({
+          open: true,
+          caseId: finding.case_id,
+          documents: caseData.documents || [],
+          finding: finding.discrepancy,
+        });
+      }
+    } catch (err) {
+      console.error('Failed to load case documents for split viewer', err);
+    }
+  };
 
   const [reviews, setReviews] = useState<ReviewFinding[]>([]);
   const [totalReviews, setTotalReviews] = useState(0);
@@ -500,10 +527,19 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
 
                 {/* Evidence citations */}
                 {disc.evidence && disc.evidence.length > 0 && (
-                  <div className="space-y-1">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">
-                      Audit Evidence
-                    </span>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">
+                        Audit Evidence ({disc.evidence.length})
+                      </span>
+                      <button
+                        onClick={() => handleOpenSplitForFinding(item)}
+                        className="px-2.5 py-1 rounded-md bg-neutral-900 hover:bg-neutral-800 text-white text-[11px] font-semibold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+                      >
+                        <Columns className="w-3 h-3 text-emerald-400" />
+                        <span>Split Compare Documents</span>
+                      </button>
+                    </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                       {disc.evidence.map((ev: any, ei: number) => (
                         <div key={ei} className="p-2.5 rounded-lg bg-neutral-50 border border-neutral-100 text-[11px]">
@@ -608,6 +644,28 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
             </div>
           </div>
         </div>
+      )}
+
+      {/* Side-by-Side Split Document Viewer Modal */}
+      {splitViewerConfig.open && splitViewerConfig.documents && splitViewerConfig.documents.length > 0 && (
+        <DocumentSplitViewer
+          documents={splitViewerConfig.documents}
+          finding={splitViewerConfig.finding}
+          caseId={splitViewerConfig.caseId}
+          onClose={() => setSplitViewerConfig({ open: false })}
+          onApproveFinding={async (finding) => {
+            const reviewItem = reviews.find(r => r.discrepancy?.description === finding.description);
+            if (reviewItem) {
+              await handleAction(reviewItem.review_id, 'approve');
+            }
+          }}
+          onRejectFinding={async (finding) => {
+            const reviewItem = reviews.find(r => r.discrepancy?.description === finding.description);
+            if (reviewItem) {
+              await handleAction(reviewItem.review_id, 'reject');
+            }
+          }}
+        />
       )}
     </div>
   );

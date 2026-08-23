@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { CaseItem, DocumentType, WorkflowRun, Discrepancy, CaseReadiness } from '../types';
 import { SeverityBadge, ReadinessChip } from './StatusBadges';
+import { DocumentSplitViewer } from './DocumentSplitViewer';
 import { 
   ArrowLeft, 
   UploadCloud, 
@@ -21,7 +22,9 @@ import {
   X,
   Copy,
   Hash,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Columns,
+  ArrowLeftRight
 } from 'lucide-react';
 
 interface CasesViewProps {
@@ -89,6 +92,14 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
 
   // Delete state
   const [deleteConfirm, setDeleteConfirm] = useState(false);
+
+  // Side-by-Side Split Viewer state
+  const [splitViewerConfig, setSplitViewerConfig] = useState<{
+    open: boolean;
+    leftDocId?: string;
+    rightDocId?: string;
+    finding?: Discrepancy | null;
+  }>({ open: false });
 
   // Load detailed case data when activeCaseId changes
   useEffect(() => {
@@ -617,27 +628,45 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
         {/* Existing documents with Quick Peek */}
         {caseDetail.documents && caseDetail.documents.length > 0 && (
           <div className="rounded-xl border border-neutral-200 bg-white p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-500">
-                Documents in this case ({caseDetail.documents.length})
-              </h3>
-              <span className="text-[11px] text-neutral-400">Click any document to inspect content &amp; metadata</span>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-500">
+                  Documents in this case ({caseDetail.documents.length})
+                </h3>
+                <span className="text-[11px] text-neutral-400">Click any document to inspect content &amp; metadata</span>
+              </div>
+              {caseDetail.documents.length >= 2 && (
+                <button
+                  id="open-split-viewer-btn"
+                  onClick={() => setSplitViewerConfig({
+                    open: true,
+                    leftDocId: caseDetail.documents![0]?.document_id,
+                    rightDocId: caseDetail.documents![1]?.document_id,
+                  })}
+                  className="px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+                >
+                  <Columns className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Compare Documents (Split View)</span>
+                </button>
+              )}
             </div>
             <div className="divide-y divide-neutral-100">
               {caseDetail.documents.map(d => (
                 <div 
                   key={d.document_id} 
-                  onClick={() => handleOpenPeek(d.document_id)}
-                  className="py-2.5 px-2 -mx-2 rounded-lg hover:bg-neutral-50 transition-colors flex items-center justify-between text-xs cursor-pointer group"
+                  className="py-2.5 px-2 -mx-2 rounded-lg hover:bg-neutral-50 transition-colors flex items-center justify-between text-xs group"
                 >
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-md bg-neutral-100 text-neutral-600 flex items-center justify-center group-hover:bg-blue-100 group-hover:text-blue-700 transition-colors">
+                  <div 
+                    onClick={() => handleOpenPeek(d.document_id)}
+                    className="flex items-center gap-2.5 cursor-pointer flex-1 min-w-0"
+                  >
+                    <div className="w-7 h-7 rounded-md bg-neutral-100 text-neutral-600 flex items-center justify-center group-hover:bg-blue-100 group-hover:text-blue-700 transition-colors shrink-0">
                       <FileText className="w-4 h-4" />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="font-semibold text-neutral-900 group-hover:text-blue-700 transition-colors">{d.filename}</span>
-                        <span className="px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-600 font-mono text-[10px]">
+                        <span className="font-semibold text-neutral-900 group-hover:text-blue-700 transition-colors truncate">{d.filename}</span>
+                        <span className="px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-600 font-mono text-[10px] shrink-0">
                           {DOCUMENT_LABELS[d.document_type] || d.document_type}
                         </span>
                       </div>
@@ -646,9 +675,32 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 text-neutral-400 group-hover:text-neutral-700">
-                    <span className="text-[11px] font-medium hidden sm:inline">Inspect</span>
-                    <Eye className="w-4 h-4" />
+                  <div className="flex items-center gap-2 text-neutral-400 shrink-0">
+                    {caseDetail.documents && caseDetail.documents.length >= 2 && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const otherDoc = caseDetail.documents!.find(other => other.document_id !== d.document_id);
+                          setSplitViewerConfig({
+                            open: true,
+                            leftDocId: d.document_id,
+                            rightDocId: otherDoc?.document_id,
+                          });
+                        }}
+                        className="px-2 py-1 rounded-md bg-neutral-100 hover:bg-neutral-200 text-neutral-700 text-[11px] font-medium flex items-center gap-1 cursor-pointer"
+                        title="Compare this document side-by-side"
+                      >
+                        <Columns className="w-3 h-3 text-neutral-500" />
+                        <span className="hidden sm:inline">Compare</span>
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleOpenPeek(d.document_id)}
+                      className="px-2 py-1 rounded-md hover:bg-neutral-100 text-neutral-600 text-[11px] font-medium flex items-center gap-1 cursor-pointer"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Inspect</span>
+                    </button>
                   </div>
                 </div>
               ))}
@@ -735,7 +787,24 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
             </div>
 
             {/* Modal Footer */}
-            <div className="p-4 border-t border-neutral-200 bg-neutral-50 flex justify-end">
+            <div className="p-4 border-t border-neutral-200 bg-neutral-50 flex items-center justify-between gap-3">
+              {caseDetail.documents && caseDetail.documents.length >= 2 ? (
+                <button
+                  onClick={() => {
+                    const otherDoc = caseDetail.documents!.find(d => d.document_id !== peekDoc.document_id);
+                    setSplitViewerConfig({
+                      open: true,
+                      leftDocId: peekDoc.document_id,
+                      rightDocId: otherDoc?.document_id,
+                    });
+                    setPeekDoc(null);
+                  }}
+                  className="px-3.5 py-1.5 rounded-lg border border-neutral-300 bg-white hover:bg-neutral-100 text-neutral-800 font-semibold text-xs transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                >
+                  <Columns className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Open in Side-by-Side Split Viewer</span>
+                </button>
+              ) : <div />}
               <button
                 onClick={() => setPeekDoc(null)}
                 className="px-4 py-2 rounded-lg bg-neutral-900 text-white font-semibold text-xs hover:bg-neutral-800 transition-colors cursor-pointer"
@@ -863,9 +932,28 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
 
                       {/* Evidence snippets */}
                       {issue.evidence && issue.evidence.length > 0 && (
-                        <div className="pt-2 border-t border-neutral-100 space-y-1.5">
-                          <div className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">
-                            Evidence ({issue.evidence.length})
+                        <div className="pt-2 border-t border-neutral-100 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">
+                              Evidence ({issue.evidence.length})
+                            </div>
+                            <button
+                              onClick={() => {
+                                const doc1 = caseDetail.documents?.find(d => d.filename === issue.evidence![0]?.filename);
+                                const doc2 = caseDetail.documents?.find(d => d.filename === issue.evidence![1]?.filename) || 
+                                             caseDetail.documents?.find(d => d.document_id !== doc1?.document_id);
+                                setSplitViewerConfig({
+                                  open: true,
+                                  leftDocId: doc1?.document_id || caseDetail.documents![0]?.document_id,
+                                  rightDocId: doc2?.document_id || caseDetail.documents![1]?.document_id,
+                                  finding: issue,
+                                });
+                              }}
+                              className="px-2.5 py-1 rounded-md bg-neutral-900 hover:bg-neutral-800 text-white text-[11px] font-semibold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+                            >
+                              <Columns className="w-3 h-3 text-emerald-400" />
+                              <span>Compare Evidence in Split View</span>
+                            </button>
                           </div>
                           {issue.evidence.map((ev, ei) => (
                             <div key={ei} className="text-xs bg-neutral-50 p-2 rounded border border-neutral-100">
@@ -928,6 +1016,22 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
           </button>
         </div>
       </div>
+
+      {/* Side-by-Side Split Document Viewer Modal */}
+      {splitViewerConfig.open && caseDetail.documents && (
+        <DocumentSplitViewer
+          documents={caseDetail.documents}
+          initialLeftDocId={splitViewerConfig.leftDocId}
+          initialRightDocId={splitViewerConfig.rightDocId}
+          finding={splitViewerConfig.finding}
+          caseId={caseDetail.case_id}
+          onClose={() => setSplitViewerConfig({ open: false })}
+          onApproveFinding={async (finding) => {
+            // Find review finding id if any or trigger workflow review update
+            onNavigateToReviews(caseDetail.case_id);
+          }}
+        />
+      )}
     </div>
   );
 }

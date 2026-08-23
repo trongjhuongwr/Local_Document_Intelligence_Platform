@@ -1037,39 +1037,33 @@ function formatCaseDetail(caseId: string) {
 // Helper: Robust Gemini Generation with Multi-Model Fallback & Retry
 // ---------------------------------------------------------------------------
 
-async function generateGeminiAnswer(ai: GoogleGenAI, prompt: string): Promise<string> {
+async function generateGeminiAnswer(ai: GoogleGenAI, prompt: string): Promise<string | null> {
   const modelsToTry = ['gemini-3.7-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
-  let lastError: any = null;
 
   for (const model of modelsToTry) {
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        const response = await ai.models.generateContent({
-          model,
-          contents: prompt,
-        });
-        if (response.text) {
-          return response.text;
-        }
-      } catch (err: any) {
-        lastError = err;
-        const errMsg = err?.message || String(err);
-        const isTransient = errMsg.includes('503') || errMsg.includes('429') || errMsg.includes('UNAVAILABLE') || errMsg.includes('high demand') || errMsg.includes('RESOURCE_EXHAUSTED');
-        
-        console.warn(`[Gemini API] Model ${model} attempt ${attempt + 1} failed (${errMsg}).`);
-
-        if (isTransient && attempt === 0) {
-          // Brief exponential backoff before retry
-          await new Promise(r => setTimeout(r, 800));
-          continue;
-        }
-        // If second attempt or non-retriable, break to try next model
-        break;
+    try {
+      const response = await ai.models.generateContent({
+        model,
+        contents: prompt,
+      });
+      if (response && response.text) {
+        return response.text;
       }
+    } catch (err: any) {
+      const errMsg = err?.message || String(err);
+      // If 503 (high demand / unavailable) or 429 (rate limit), failover seamlessly to next available model
+      const isTransient = errMsg.includes('503') || errMsg.includes('429') || errMsg.includes('UNAVAILABLE') || errMsg.includes('high demand') || errMsg.includes('RESOURCE_EXHAUSTED');
+      
+      if (isTransient) {
+        // Quick failover to backup model
+        continue;
+      }
+      // For any other unexpected error, attempt next model before yielding
     }
   }
 
-  throw lastError || new Error('All Gemini models exhausted');
+  // Gracefully degrade to deterministic engine if all models encounter temporary cloud demand spikes
+  return null;
 }
 
 app.get('/api/health', (req, res) => {
@@ -1425,7 +1419,14 @@ app.post('/api/query', async (req, res) => {
   // If Gemini API is configured, use GoogleGenAI for rich conversational answers
   if (process.env.GEMINI_API_KEY) {
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const ai = new GoogleGenAI({
+        apiKey: process.env.GEMINI_API_KEY,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          },
+        },
+      });
       const contextDocs = docs.map((d, i) => `--- [Document ${i + 1}]: ${d.filename} (Type: ${d.document_type}) ---\n${d.text_content}`).join('\n\n');
       
       const historyFormatted = Array.isArray(history) && history.length > 0
