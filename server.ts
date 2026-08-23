@@ -528,14 +528,136 @@ function runDiscrepancyEngine(caseDocs: DocumentRecord[]): { discrepancies: any[
 }
 
 // ---------------------------------------------------------------------------
-// Demo Seed Data Generator
+// Demo Seed Data Generator (Realistic Multi-Case Audit Pack)
 // ---------------------------------------------------------------------------
 
-function seedSampleCase(): { case_id: string; name: string } {
-  const caseId = `case_demo_${Date.now()}`;
-  const caseName = 'Acme Analytics Q1 2026 Audit Review';
+function seedComprehensiveDemoData() {
+  // Clear any existing store data to make seeding deterministic and clean
+  casesStore.clear();
+  documentsStore.clear();
+  workflowsStore.clear();
+  reviewsStore.clear();
 
-  const contractText = `MASTER SERVICES AGREEMENT
+  const createCaseWithDocs = (
+    caseId: string,
+    caseName: string,
+    docs: Array<{ type: 'contract' | 'invoice' | 'purchase_order' | 'policy'; filename: string; text: string }>,
+    options?: { runAnalysisImmediately?: boolean; reviewDecisions?: Array<{ index: number; status: 'APPROVED' | 'REJECTED' | 'OPEN'; reviewer: string; note: string }> }
+  ) => {
+    const docIds: string[] = [];
+
+    docs.forEach((d, idx) => {
+      const docId = `doc_${caseId}_${idx + 1}`;
+      const chunks = [
+        {
+          chunk_id: `chunk_${docId}_1`,
+          page_number: 1,
+          section: d.type.toUpperCase(),
+          text: d.text,
+        },
+      ];
+
+      const extracted = extractStructuredData(d.type, d.text);
+
+      documentsStore.set(docId, {
+        document_id: docId,
+        case_id: caseId,
+        filename: d.filename,
+        document_type: d.type,
+        status: 'indexed',
+        size_bytes: Buffer.byteLength(d.text, 'utf8'),
+        sha256: crypto.createHash('sha256').update(d.text).digest('hex'),
+        parser_version: 'v1.4-text-structured',
+        text_content: d.text,
+        chunks,
+        extracted_data: extracted,
+        created_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * (idx + 1)).toISOString(),
+      });
+      docIds.push(docId);
+    });
+
+    casesStore.set(caseId, {
+      case_id: caseId,
+      name: caseName,
+      document_ids: docIds,
+      created_at: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+
+    if (options?.runAnalysisImmediately) {
+      const workflowId = `wf_${caseId}_audit`;
+      const caseDocs = docIds.map(id => documentsStore.get(id)!).filter(Boolean);
+      const { discrepancies, requires_review, summary } = runDiscrepancyEngine(caseDocs);
+
+      discrepancies.forEach((d, index) => {
+        const reviewId = `rev_${caseId}_${index + 1}`;
+        const override = options?.reviewDecisions?.find(o => o.index === index);
+
+        reviewsStore.set(reviewId, {
+          review_id: reviewId,
+          case_id: caseId,
+          workflow_id: workflowId,
+          severity: d.severity,
+          status: override ? override.status : 'OPEN',
+          discrepancy: d,
+          reviewer: override ? override.reviewer : null,
+          note: override ? override.note : null,
+          created_at: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString(),
+          decided_at: override && override.status !== 'OPEN' ? new Date().toISOString() : null,
+        });
+      });
+
+      const markdown = `# Discrepancy Exception Report
+**Case:** ${caseName} (${caseId})  
+**Generated At:** ${new Date().toISOString()}  
+**Documents Analyzed:** ${caseDocs.map(d => d.filename).join(', ')}  
+**Status:** ${requires_review ? 'Human Review Required' : 'Passed'}
+
+## Summary
+${summary}
+
+## Findings (${discrepancies.length})
+${discrepancies.length === 0 ? '*No discrepancies detected.*' : discrepancies.map((d, i) => `### ${i + 1}. [${d.severity.toUpperCase()}] ${d.type.replace(/_/g, ' ').toUpperCase()}
+- **Description:** ${d.description}
+${d.expected_value !== undefined ? `- **Expected:** \`${d.expected_value}\` | **Observed:** \`${d.observed_value}\`` : ''}
+${d.calculation ? `- **Calculation:** \`${d.calculation.formula}\` => \`${d.calculation.result}\`` : ''}
+${d.evidence ? `- **Evidence:**\n${d.evidence.map((e: any) => `  - *${e.filename}* (p. ${e.page_number || 1}): "${e.snippet}"`).join('\n')}` : ''}
+`).join('\n\n')}
+`;
+
+      workflowsStore.set(workflowId, {
+        workflow_id: workflowId,
+        case_id: caseId,
+        status: 'completed',
+        progress_percent: 100,
+        current_step: 'Completed',
+        steps: [
+          { step: 'extract', label: 'Extract document schema fields', status: 'completed' },
+          { step: 'rules', label: 'Run deterministic cross-document rules', status: 'completed' },
+          { step: 'review_tasks', label: 'Generate human audit tasks', status: 'completed' },
+        ],
+        requires_review,
+        result: { discrepancies, requires_review, summary },
+        report_markdown: markdown,
+        started_at: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString(),
+        completed_at: new Date(Date.now() - 1000 * 60 * 60 * 12 + 2500).toISOString(),
+      });
+    }
+
+    return caseId;
+  };
+
+  // -------------------------------------------------------------------------
+  // Case 1: Acme Analytics Q1 2026 Audit Review (Price Cap, Term Drift, Tax Math)
+  // -------------------------------------------------------------------------
+  createCaseWithDocs(
+    'case_acme_q1_2026',
+    'Acme Analytics Q1 2026 Audit Review',
+    [
+      {
+        type: 'contract',
+        filename: 'acme_master_services_agreement.pdf',
+        text: `MASTER SERVICES AGREEMENT
 BETWEEN: Acme Analytics Ltd (Provider)
 AND: Vertex Retail Corporation (Client)
 EFFECTIVE DATE: 2025-01-15
@@ -544,12 +666,15 @@ CURRENCY: USD
 MAXIMUM AMOUNT: $45,000.00
 PAYMENT TERMS: Net 30
 
-1. SCOPE OF SERVICES: Provider shall furnish data analytics and implementation services.
-2. FINANCIAL CEILING: Total aggregate fees under this agreement shall not exceed $45,000.00 USD.
-3. INVOICING: Invoices shall be submitted monthly and paid within Net 30 days of receipt.
-4. CONFIDENTIALITY: All client data remains strictly confidential.`;
-
-  const poText = `PURCHASE ORDER
+1. SCOPE OF SERVICES: Provider shall furnish enterprise data warehouse modeling and implementation services.
+2. FINANCIAL CEILING: Total aggregate fees billed under this agreement across all statements of work shall not exceed $45,000.00 USD.
+3. INVOICING & PAYMENT TERMS: Invoices shall be submitted monthly and paid within Net 30 days of client approval.
+4. TAXES: All prices are subject to state statutory sales tax of 8.0%.`,
+      },
+      {
+        type: 'purchase_order',
+        filename: 'purchase_order_po8842.pdf',
+        text: `PURCHASE ORDER
 PO NUMBER: PO-2025-8842
 VENDOR: Acme Analytics Ltd
 DELIVER TO: Vertex Retail Corporation
@@ -558,11 +683,14 @@ CURRENCY: USD
 APPROVED AMOUNT: $32,000.00
 
 LINE ITEMS:
-1. Software license subscription (Annual) - 1 unit @ $15,000.00 = $15,000.00
-2. Implementation & Onboarding Services - 1 unit @ $17,000.00 = $17,000.00
-TOTAL APPROVED BUDGET: $32,000.00`;
-
-  const invoiceText = `COMMERCIAL INVOICE
+1. Software license subscription (Annual Tier 1) - 1 unit @ $15,000.00 = $15,000.00
+2. Implementation & Onboarding Engineering - 1 unit @ $17,000.00 = $17,000.00
+TOTAL APPROVED BUDGET: $32,000.00`,
+      },
+      {
+        type: 'invoice',
+        filename: 'invoice_inv64282.pdf',
+        text: `COMMERCIAL INVOICE
 INVOICE NUMBER: INV-2025-64282
 FROM: Acme Analytics Ltd
 BILL TO: Vertex Retail Corporation
@@ -573,76 +701,272 @@ PO REFERENCE: PO-2025-8842
 PAYMENT TERMS: Net 60
 
 ITEMS BILLED:
-1. Implementation services - 1 @ $30,000.00
-2. Premium data migration - 1 @ $18,500.00
+1. Core implementation services - 1 @ $30,000.00
+2. Premium data migration & ETL pipeline - 1 @ $18,500.00
 
 SUBTOTAL: $48,500.00
 TAX RATE: 8.0%
 TAX: $3,500.00
-TOTAL DUE: $52,000.00`;
-
-  const policyText = `ACCOUNTS PAYABLE & PROCUREMENT POLICY
+TOTAL DUE: $52,000.00`,
+      },
+      {
+        type: 'policy',
+        filename: 'vertex_accounts_payable_policy_2025.pdf',
+        text: `ACCOUNTS PAYABLE & PROCUREMENT POLICY
 ORGANIZATION: Vertex Retail Corporation
 POLICY VERSION: 2025.2
 CURRENCY: USD
 
-1. STANDARD PAYMENT TERMS: Standard vendor payment terms shall be Net 30 days.
+1. STANDARD PAYMENT TERMS: Standard vendor payment terms shall be Net 30 days. No deviation without VP Finance sign-off.
 2. PURCHASE ORDER REQUIREMENT: A valid, approved Purchase Order reference is mandatory on all vendor invoices.
 3. DISCREPANCY RESOLUTION: Any invoice exceeding the contracted cap or containing incorrect tax computations must be held for human review.
-4. APPROVAL THRESHOLD: Invoices exceeding $10,000.00 require dual-tier departmental sign-off.`;
-
-  const docs = [
-    { type: 'contract' as const, filename: 'service_contract.pdf', text: contractText },
-    { type: 'purchase_order' as const, filename: 'purchase_order_8842.pdf', text: poText },
-    { type: 'invoice' as const, filename: 'invoice_64282.pdf', text: invoiceText },
-    { type: 'policy' as const, filename: 'accounts_payable_policy.pdf', text: policyText },
-  ];
-
-  const docIds: string[] = [];
-
-  docs.forEach((d, idx) => {
-    const docId = `doc_${caseId}_${idx + 1}`;
-    const chunks = [
-      {
-        chunk_id: `chunk_${docId}_1`,
-        page_number: 1,
-        section: d.type.toUpperCase(),
-        text: d.text,
+4. APPROVAL THRESHOLD: Invoices exceeding $10,000.00 require dual-tier departmental sign-off.`,
       },
-    ];
+    ],
+    {
+      runAnalysisImmediately: true,
+      reviewDecisions: [
+        {
+          index: 0,
+          status: 'APPROVED',
+          reviewer: 'Davis (Lead Controller)',
+          note: 'Confirmed $7,000 overage against Master Agreement cap ($52,000 vs $45,000). Credit note requested.',
+        },
+      ],
+    }
+  );
 
-    const extracted = extractStructuredData(d.type, d.text);
+  // -------------------------------------------------------------------------
+  // Case 2: CloudScale Infrastructure - Annual Cloud Hosting (100% Compliant)
+  // -------------------------------------------------------------------------
+  createCaseWithDocs(
+    'case_cloudscale_hosting',
+    'CloudScale Infrastructure - Annual Cloud Hosting (Compliant)',
+    [
+      {
+        type: 'contract',
+        filename: 'cloudscale_master_cloud_agreement.pdf',
+        text: `MASTER CLOUD HOSTING AGREEMENT
+BETWEEN: CloudScale Technologies Inc (Provider)
+AND: Vertex Retail Corporation (Client)
+EFFECTIVE DATE: 2025-06-01
+EXPIRATION DATE: 2026-06-01
+CURRENCY: USD
+MAXIMUM AMOUNT: $120,000.00
+PAYMENT TERMS: Net 45
 
-    documentsStore.set(docId, {
-      document_id: docId,
-      case_id: caseId,
-      filename: d.filename,
-      document_type: d.type,
-      status: 'indexed',
-      size_bytes: Buffer.byteLength(d.text, 'utf8'),
-      sha256: crypto.createHash('sha256').update(d.text).digest('hex'),
-      parser_version: 'v1.4-text-structured',
-      text_content: d.text,
-      chunks,
-      extracted_data: extracted,
-      created_at: new Date().toISOString(),
-    });
-    docIds.push(docId);
-  });
+1. SERVICES: High-availability cloud Kubernetes compute clusters, Redis caching, and managed object storage.
+2. FINANCIAL CEILING: Maximum contract spend $120,000.00 USD.
+3. INVOICING: Quarterly in arrears, Net 45 terms.`,
+      },
+      {
+        type: 'purchase_order',
+        filename: 'purchase_order_po9920.pdf',
+        text: `PURCHASE ORDER
+PO NUMBER: PO-2025-9920
+VENDOR: CloudScale Technologies Inc
+DELIVER TO: Vertex Retail Corporation
+ORDER DATE: 2025-06-05
+CURRENCY: USD
+APPROVED AMOUNT: $60,000.00
 
-  casesStore.set(caseId, {
-    case_id: caseId,
-    name: caseName,
-    document_ids: docIds,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  });
+LINE ITEMS:
+1. Q3-Q4 Cloud compute clusters - 2 quarters @ $25,000.00 = $50,000.00
+2. Enterprise SLA 99.99% support tier - 1 @ $10,000.00 = $10,000.00
+TOTAL APPROVED BUDGET: $60,000.00`,
+      },
+      {
+        type: 'invoice',
+        filename: 'invoice_cs1049.pdf',
+        text: `COMMERCIAL INVOICE
+INVOICE NUMBER: INV-2025-1049
+FROM: CloudScale Technologies Inc
+BILL TO: Vertex Retail Corporation
+INVOICE DATE: 2025-09-30
+DUE DATE: 2025-11-14
+CURRENCY: USD
+PO REFERENCE: PO-2025-9920
+PAYMENT TERMS: Net 45
 
-  return { case_id: caseId, name: caseName };
+ITEMS BILLED:
+1. Q3 Cloud infrastructure cluster operations - $25,000.00
+
+SUBTOTAL: $25,000.00
+TAX RATE: 5.0%
+TAX: $1,250.00
+TOTAL DUE: $26,250.00`,
+      },
+      {
+        type: 'policy',
+        filename: 'accounts_payable_policy_v2.pdf',
+        text: `ACCOUNTS PAYABLE POLICY
+ORGANIZATION: Vertex Retail Corporation
+CURRENCY: USD
+
+1. Standard IT infrastructure invoices up to $50,000 with valid PO reference and matching Net 45 terms are pre-approved.
+2. Invoices must align with Master SLA schedules.`,
+      },
+    ],
+    { runAnalysisImmediately: true }
+  );
+
+  // -------------------------------------------------------------------------
+  // Case 3: Global Freight & Cargo - Cross-Border EUR Currency Drift
+  // -------------------------------------------------------------------------
+  createCaseWithDocs(
+    'case_global_freight_eur',
+    'Global Freight & Cargo - Cross-Border EUR Currency Drift',
+    [
+      {
+        type: 'contract',
+        filename: 'global_freight_logistics_agreement.pdf',
+        text: `INTERNATIONAL LOGISTICS & FREIGHT FRAMEWORK
+BETWEEN: Global Freight Logistics Ltd (Provider)
+AND: Vertex Retail Corporation (Client)
+EFFECTIVE DATE: 2025-03-01
+EXPIRATION DATE: 2026-03-01
+CURRENCY: EUR
+MAXIMUM AMOUNT: €85,000.00
+PAYMENT TERMS: Net 30
+
+1. FREIGHT SERVICES: Multimodal container shipping and customs clearance across European ports.
+2. DENOMINATION: All commitments, POs, and invoicing must strictly be settled in Euros (EUR).
+3. MAXIMUM AMOUNT: €85,000.00 EUR total aggregate cap.`,
+      },
+      {
+        type: 'purchase_order',
+        filename: 'po_eu_4412.pdf',
+        text: `PURCHASE ORDER (EU TRANSIT)
+PO NUMBER: PO-2025-4412
+VENDOR: Global Freight Logistics Ltd
+DELIVER TO: Vertex Retail Corporation (Rotterdam Hub)
+ORDER DATE: 2025-05-15
+CURRENCY: EUR
+APPROVED AMOUNT: €42,000.00
+
+LINE ITEMS:
+1. Rotterdam to Hamburg container transit (4 units) - €42,000.00
+TOTAL APPROVED BUDGET: €42,000.00`,
+      },
+      {
+        type: 'invoice',
+        filename: 'invoice_eur_7721.pdf',
+        text: `FREIGHT INVOICE
+INVOICE NUMBER: INV-EUR-7721
+FROM: Global Freight Shipping Corp
+BILL TO: Vertex Retail Corporation
+INVOICE DATE: 2025-07-20
+DUE DATE: 2025-08-19
+CURRENCY: USD
+PO REFERENCE: PO-2025-4412
+PAYMENT TERMS: Net 30
+
+ITEMS BILLED:
+1. European container transport operations - $49,500.00
+
+SUBTOTAL: $49,500.00
+TAX RATE: 0.0%
+TAX: $0.00
+TOTAL DUE: $49,500.00`,
+      },
+      {
+        type: 'policy',
+        filename: 'global_treasury_fx_policy.pdf',
+        text: `CORPORATE TREASURY & FX HEDGING POLICY
+ORGANIZATION: Vertex Retail Corporation
+CURRENCY: USD / EUR
+
+1. Invoices for contracts denominated in EUR must strictly bill in EUR to avoid unhedged foreign exchange volatility.
+2. Vendor legal entity name must exactly match registered procurement vendor master records.`,
+      },
+    ],
+    { runAnalysisImmediately: true }
+  );
+
+  // -------------------------------------------------------------------------
+  // Case 4: Nexus CyberGuard - Missing PO & Duplicate Billing Audit
+  // -------------------------------------------------------------------------
+  createCaseWithDocs(
+    'case_nexus_cyberguard',
+    'Nexus CyberGuard - Missing PO & Duplicate Billing Audit',
+    [
+      {
+        type: 'contract',
+        filename: 'nexus_cybersecurity_master_agreement.pdf',
+        text: `ENTERPRISE CYBERSECURITY & SOC SERVICES AGREEMENT
+BETWEEN: Nexus Guard Corp (Provider)
+AND: Vertex Retail Corporation (Client)
+EFFECTIVE DATE: 2025-02-01
+EXPIRATION DATE: 2026-02-01
+CURRENCY: USD
+MAXIMUM AMOUNT: $150,000.00
+PAYMENT TERMS: Net 30
+
+1. SERVICES: 24/7 Security Operations Center (SOC) monitoring, threat hunting, and penetration testing.
+2. INVOICE PROCEDURE: Invoices shall reference an authorized Purchase Order issued prior to service execution.`,
+      },
+      {
+        type: 'invoice',
+        filename: 'invoice_sec_3301_a.pdf',
+        text: `CYBERSECURITY INVOICE
+INVOICE NUMBER: INV-SEC-3301
+FROM: Nexus Guard Corp
+BILL TO: Vertex Retail Corporation
+INVOICE DATE: 2025-08-15
+DUE DATE: 2025-09-14
+CURRENCY: USD
+PAYMENT TERMS: Net 30
+
+ITEMS BILLED:
+1. Q3 SOC Managed Monitoring Services - $35,000.00
+
+SUBTOTAL: $35,000.00
+TAX: $0.00
+TOTAL DUE: $35,000.00`,
+      },
+      {
+        type: 'invoice',
+        filename: 'invoice_sec_3301_duplicate.pdf',
+        text: `CYBERSECURITY INVOICE (RE-ISSUED)
+INVOICE NUMBER: INV-SEC-3301
+FROM: Nexus Guard Corp
+BILL TO: Vertex Retail Corporation
+INVOICE DATE: 2025-08-18
+DUE DATE: 2025-09-17
+CURRENCY: USD
+PAYMENT TERMS: Net 30
+
+ITEMS BILLED:
+1. Q3 SOC Managed Monitoring Services & Threat Response - $38,500.00
+
+SUBTOTAL: $38,500.00
+TAX: $0.00
+TOTAL DUE: $38,500.00`,
+      },
+      {
+        type: 'policy',
+        filename: 'accounts_payable_policy_mandatory_po.pdf',
+        text: `ACCOUNTS PAYABLE POLICY: PURCHASE ORDER MANDATE
+ORGANIZATION: Vertex Retail Corporation
+CURRENCY: USD
+
+1. PO REQUIREMENT: Invoices over $10,000 without an approved Purchase Order number will be automatically blocked and flagged for fraud/compliance audit.
+2. DUPLICATE INVOICES: Submissions with identical invoice numbers must be immediately placed in human review.`,
+      },
+    ],
+    { runAnalysisImmediately: true }
+  );
+
+  return 'case_acme_q1_2026';
 }
 
-// Seed the initial case on server startup
-seedSampleCase();
+function seedSampleCase(): { case_id: string; name: string } {
+  seedComprehensiveDemoData();
+  return { case_id: 'case_acme_q1_2026', name: 'Acme Analytics Q1 2026 Audit Review' };
+}
+
+// Seed comprehensive enterprise cases on startup
+seedComprehensiveDemoData();
 
 // ---------------------------------------------------------------------------
 // Helper functions for formatting responses
