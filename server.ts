@@ -69,10 +69,64 @@ interface ReviewRecord {
   decided_at?: string | null;
 }
 
+interface AuditTrailRecord {
+  log_id: string;
+  timestamp: string;
+  action: string;
+  actor: string;
+  case_id?: string;
+  case_name?: string;
+  entity_type: 'document' | 'workflow' | 'review_finding' | 'case' | 'report' | 'attestation';
+  entity_id: string;
+  details: string;
+  metadata?: Record<string, any>;
+  prev_hash: string;
+  integrity_hash: string;
+}
+
 const casesStore = new Map<string, CaseRecord>();
 const documentsStore = new Map<string, DocumentRecord>();
 const workflowsStore = new Map<string, WorkflowRecord>();
 const reviewsStore = new Map<string, ReviewRecord>();
+const auditLogsStore: AuditTrailRecord[] = [];
+
+function logAuditEvent(
+  action: string,
+  actor: string,
+  entityType: 'document' | 'workflow' | 'review_finding' | 'case' | 'report' | 'attestation',
+  entityId: string,
+  details: string,
+  caseId?: string,
+  caseName?: string,
+  metadata?: Record<string, any>
+): AuditTrailRecord {
+  const prevRecord = auditLogsStore[auditLogsStore.length - 1];
+  const prev_hash = prevRecord ? prevRecord.integrity_hash : '0000000000000000000000000000000000000000000000000000000000000000';
+  const timestamp = new Date().toISOString();
+  const log_id = `audit_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
+  // Cryptographic tamper-evident chain hash (SOX 404 / ISO 27001 standard)
+  const hashPayload = `${prev_hash}|${timestamp}|${action}|${actor}|${entityType}|${entityId}|${details}|${JSON.stringify(metadata || {})}`;
+  const integrity_hash = crypto.createHash('sha256').update(hashPayload).digest('hex');
+
+  const record: AuditTrailRecord = {
+    log_id,
+    timestamp,
+    action,
+    actor,
+    case_id: caseId,
+    case_name: caseName,
+    entity_type: entityType,
+    entity_id: entityId,
+    details,
+    metadata,
+    prev_hash,
+    integrity_hash,
+  };
+
+  auditLogsStore.push(record);
+  return record;
+}
 
 // ---------------------------------------------------------------------------
 // Helper normalizers & Discrepancy Engine
@@ -584,10 +638,49 @@ function seedComprehensiveDemoData() {
       updated_at: new Date().toISOString(),
     });
 
+    logAuditEvent(
+      'CASE_CREATED',
+      'system_seeder',
+      'case',
+      caseId,
+      `Case initialized: ${caseName}`,
+      caseId,
+      caseName,
+      { initial_document_count: docs.length }
+    );
+
+    docs.forEach((d, idx) => {
+      const docId = `doc_${caseId}_${idx + 1}`;
+      const doc = documentsStore.get(docId);
+      if (doc) {
+        logAuditEvent(
+          'DOCUMENT_INGESTED',
+          'system_seeder',
+          'document',
+          docId,
+          `Ingested ${d.filename} (${d.type.toUpperCase()}) with SHA-256 validation`,
+          caseId,
+          caseName,
+          { filename: d.filename, type: d.type, size_bytes: doc.size_bytes, sha256: doc.sha256 }
+        );
+      }
+    });
+
     if (options?.runAnalysisImmediately) {
       const workflowId = `wf_${caseId}_audit`;
       const caseDocs = docIds.map(id => documentsStore.get(id)!).filter(Boolean);
       const { discrepancies, requires_review, summary } = runDiscrepancyEngine(caseDocs);
+
+      logAuditEvent(
+        'WORKFLOW_COMPLETED',
+        'deterministic_engine_v1.4',
+        'workflow',
+        workflowId,
+        `Automated cross-document audit completed: ${discrepancies.length} finding(s) identified`,
+        caseId,
+        caseName,
+        { discrepancies_count: discrepancies.length, requires_review }
+      );
 
       discrepancies.forEach((d, index) => {
         const reviewId = `rev_${caseId}_${index + 1}`;
@@ -605,6 +698,19 @@ function seedComprehensiveDemoData() {
           created_at: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString(),
           decided_at: override && override.status !== 'OPEN' ? new Date().toISOString() : null,
         });
+
+        if (override && override.status !== 'OPEN') {
+          logAuditEvent(
+            override.status === 'APPROVED' ? 'FINDING_APPROVED' : 'FINDING_REJECTED',
+            override.reviewer || 'auditor_lead',
+            'review_finding',
+            reviewId,
+            `Finding ${d.type} marked as ${override.status}. Note: "${override.note}"`,
+            caseId,
+            caseName,
+            { finding_type: d.type, severity: d.severity, status: override.status, note: override.note }
+          );
+        }
       });
 
       const markdown = `# Discrepancy Exception Report
@@ -1109,6 +1215,17 @@ app.post('/api/cases', (req, res) => {
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   });
+
+  logAuditEvent(
+    'CASE_CREATED',
+    req.body?.actor || 'Lead Auditor',
+    'case',
+    caseId,
+    `New audit case created: ${name}`,
+    caseId,
+    name
+  );
+
   res.status(201).json(formatCaseDetail(caseId));
 });
 
@@ -1124,12 +1241,23 @@ app.delete('/api/cases/:id', (req, res) => {
   const caseId = req.params.id;
   const c = casesStore.get(caseId);
   if (c) {
+    const caseName = c.name;
     c.document_ids.forEach(id => documentsStore.delete(id));
     casesStore.delete(caseId);
     // Delete reviews
     Array.from(reviewsStore.keys()).forEach(rid => {
       if (reviewsStore.get(rid)?.case_id === caseId) reviewsStore.delete(rid);
     });
+
+    logAuditEvent(
+      'CASE_DELETED',
+      'Lead Auditor',
+      'case',
+      caseId,
+      `Case deleted and all associated records purged: ${caseName}`,
+      caseId,
+      caseName
+    );
   }
   res.status(204).send();
 });
@@ -1205,6 +1333,17 @@ app.post('/api/cases/:id/documents', upload.array('files'), (req, res) => {
     c.document_ids.push(docId);
     c.updated_at = new Date().toISOString();
 
+    logAuditEvent(
+      'DOCUMENT_INGESTED',
+      'Auditor / Document Processor',
+      'document',
+      docId,
+      `Uploaded and indexed document: ${filename} (${rawType.toUpperCase()})`,
+      caseId,
+      c.name,
+      { filename, document_type: rawType, size_bytes: file.size, sha256 }
+    );
+
     results.push({
       filename,
       document_type: rawType,
@@ -1266,6 +1405,17 @@ app.post('/api/cases/:id/analyses', (req, res) => {
   const workflowId = `wf_${Date.now()}`;
   const docs = c.document_ids.map(id => documentsStore.get(id)).filter(Boolean) as DocumentRecord[];
 
+  logAuditEvent(
+    'WORKFLOW_STARTED',
+    'Audit Workflow Engine',
+    'workflow',
+    workflowId,
+    `Started automated cross-document audit on ${docs.length} document(s)`,
+    caseId,
+    c.name,
+    { documents_count: docs.length, filenames: docs.map(d => d.filename) }
+  );
+
   const wf: WorkflowRecord = {
     workflow_id: workflowId,
     case_id: caseId,
@@ -1308,6 +1458,18 @@ app.post('/api/cases/:id/analyses', (req, res) => {
           created_at: new Date().toISOString(),
         });
       });
+
+      logAuditEvent(
+        'WORKFLOW_COMPLETED',
+        'Audit Workflow Engine',
+        'workflow',
+        workflowId,
+        `Audit analysis completed: detected ${discrepancies.length} discrepancy finding(s)`,
+        caseId,
+        c.name,
+        { findings_count: discrepancies.length, requires_review, summary }
+      );
+
 
       // Markdown report generator
       const markdown = `# Discrepancy Exception Report
@@ -1591,10 +1753,25 @@ app.post('/api/reviews/:id/approve', (req, res) => {
   const review = reviewsStore.get(req.params.id);
   if (!review) return res.status(404).json({ error: 'not_found', message: 'Review finding not found' });
 
+  const reviewer = req.body.reviewer || 'Auditor';
+  const note = req.body.note || null;
+  const caseRecord = casesStore.get(review.case_id);
+
   review.status = 'APPROVED';
-  review.reviewer = req.body.reviewer || 'Auditor';
-  review.note = req.body.note || null;
+  review.reviewer = reviewer;
+  review.note = note;
   review.decided_at = new Date().toISOString();
+
+  logAuditEvent(
+    'FINDING_APPROVED',
+    reviewer,
+    'review_finding',
+    review.review_id,
+    `Auditor approved finding: ${review.discrepancy?.type || 'Discrepancy'}${note ? ` ("${note}")` : ''}`,
+    review.case_id,
+    caseRecord?.name,
+    { discrepancy: review.discrepancy, note }
+  );
 
   res.json(review);
 });
@@ -1603,10 +1780,25 @@ app.post('/api/reviews/:id/reject', (req, res) => {
   const review = reviewsStore.get(req.params.id);
   if (!review) return res.status(404).json({ error: 'not_found', message: 'Review finding not found' });
 
+  const reviewer = req.body.reviewer || 'Auditor';
+  const note = req.body.note || null;
+  const caseRecord = casesStore.get(review.case_id);
+
   review.status = 'REJECTED';
-  review.reviewer = req.body.reviewer || 'Auditor';
-  review.note = req.body.note || null;
+  review.reviewer = reviewer;
+  review.note = note;
   review.decided_at = new Date().toISOString();
+
+  logAuditEvent(
+    'FINDING_REJECTED',
+    reviewer,
+    'review_finding',
+    review.review_id,
+    `Auditor rejected finding (false positive/exception granted): ${review.discrepancy?.type || 'Discrepancy'}${note ? ` ("${note}")` : ''}`,
+    review.case_id,
+    caseRecord?.name,
+    { discrepancy: review.discrepancy, note }
+  );
 
   res.json(review);
 });
@@ -1615,8 +1807,20 @@ app.post('/api/reviews/:id/resolve', (req, res) => {
   const review = reviewsStore.get(req.params.id);
   if (!review) return res.status(404).json({ error: 'not_found', message: 'Review finding not found' });
 
+  const caseRecord = casesStore.get(review.case_id);
   review.status = 'RESOLVED';
   review.decided_at = new Date().toISOString();
+
+  logAuditEvent(
+    'FINDING_RESOLVED',
+    req.body.reviewer || 'Auditor',
+    'review_finding',
+    review.review_id,
+    `Finding resolved: ${review.discrepancy?.type || 'Discrepancy'}`,
+    review.case_id,
+    caseRecord?.name,
+    { discrepancy: review.discrepancy }
+  );
 
   res.json(review);
 });
@@ -1639,6 +1843,7 @@ app.post('/api/reviews/batch', (req, res) => {
   review_ids.forEach(id => {
     const review = reviewsStore.get(id);
     if (review) {
+      const caseRecord = casesStore.get(review.case_id);
       if (action === 'approve') {
         review.status = 'APPROVED';
         review.reviewer = reviewer;
@@ -1654,6 +1859,17 @@ app.post('/api/reviews/batch', (req, res) => {
         review.decided_at = now;
       }
       updated.push(review);
+
+      logAuditEvent(
+        'FINDING_BATCH_ACTION',
+        reviewer,
+        'review_finding',
+        review.review_id,
+        `Batch ${action.toUpperCase()}: ${review.discrepancy?.type || 'Discrepancy'}`,
+        review.case_id,
+        caseRecord?.name,
+        { action, note }
+      );
     }
   });
 
@@ -1661,6 +1877,126 @@ app.post('/api/reviews/batch', (req, res) => {
     status: 'success',
     updated_count: updated.length,
     reviews: updated,
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Audit Trail & SOX / ISO 27001 Compliance Endpoints
+// ---------------------------------------------------------------------------
+
+app.get('/api/audit-trail', (req, res) => {
+  const { case_id, action, search, limit = 200, offset = 0 } = req.query as any;
+  let list = [...auditLogsStore];
+
+  if (case_id) {
+    list = list.filter(item => item.case_id === case_id);
+  }
+  if (action) {
+    list = list.filter(item => item.action === action);
+  }
+  if (search) {
+    const s = String(search).toLowerCase();
+    list = list.filter(item => 
+      item.details.toLowerCase().includes(s) ||
+      item.actor.toLowerCase().includes(s) ||
+      (item.case_name && item.case_name.toLowerCase().includes(s)) ||
+      item.action.toLowerCase().includes(s) ||
+      item.integrity_hash.toLowerCase().includes(s)
+    );
+  }
+
+  // Verify cryptographic chain validity
+  let chain_valid = true;
+  let running_prev = '0000000000000000000000000000000000000000000000000000000000000000';
+  for (const entry of auditLogsStore) {
+    if (entry.prev_hash !== running_prev) {
+      chain_valid = false;
+      break;
+    }
+    const checkPayload = `${entry.prev_hash}|${entry.timestamp}|${entry.action}|${entry.actor}|${entry.entity_type}|${entry.entity_id}|${entry.details}|${JSON.stringify(entry.metadata || {})}`;
+    const expectedHash = crypto.createHash('sha256').update(checkPayload).digest('hex');
+    if (expectedHash !== entry.integrity_hash) {
+      chain_valid = false;
+      break;
+    }
+    running_prev = entry.integrity_hash;
+  }
+
+  // Return newest entries first
+  list.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+  const total = list.length;
+  const page = list.slice(Number(offset), Number(offset) + Number(limit));
+
+  res.json({
+    entries: page,
+    total,
+    chain_valid,
+    total_ledger_records: auditLogsStore.length,
+    standard_compliance: 'SOX 404 & ISO 27001 Cryptographic Audit Trail',
+  });
+});
+
+app.post('/api/audit-trail', (req, res) => {
+  const { case_id, actor = 'Senior Lead Auditor', details, metadata = {} } = req.body || {};
+  if (!details || !details.trim()) {
+    return res.status(400).json({ error: 'invalid_request', message: 'Attestation/details are required' });
+  }
+
+  const caseRecord = case_id ? casesStore.get(case_id) : undefined;
+  const entryId = `attest_${Date.now()}`;
+
+  const record = logAuditEvent(
+    'MANUAL_ATTESTATION',
+    actor,
+    'attestation',
+    entryId,
+    details.trim(),
+    case_id,
+    caseRecord?.name,
+    { ...metadata, signed_at: new Date().toISOString(), formal_signoff: true }
+  );
+
+  res.status(201).json(record);
+});
+
+app.get('/api/audit-trail/export', (req, res) => {
+  const { case_id, format = 'json' } = req.query as any;
+  let list = [...auditLogsStore];
+  if (case_id) {
+    list = list.filter(item => item.case_id === case_id);
+  }
+  list.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+  if (format === 'csv') {
+    const headers = ['Log ID', 'Timestamp (UTC)', 'Action', 'Actor', 'Case ID', 'Case Name', 'Entity Type', 'Details', 'SHA-256 Hash', 'Previous Hash'];
+    const rows = list.map(e => [
+      `"${e.log_id}"`,
+      `"${e.timestamp}"`,
+      `"${e.action}"`,
+      `"${e.actor.replace(/"/g, '""')}"`,
+      `"${e.case_id || ''}"`,
+      `"${(e.case_name || '').replace(/"/g, '""')}"`,
+      `"${e.entity_type}"`,
+      `"${e.details.replace(/"/g, '""')}"`,
+      `"${e.integrity_hash}"`,
+      `"${e.prev_hash}"`,
+    ]);
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename=audit_trail_${case_id || 'all'}_${Date.now()}.csv`);
+    return res.send(csvContent);
+  }
+
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Content-Disposition', `attachment; filename=audit_trail_${case_id || 'all'}_${Date.now()}.json`);
+  res.json({
+    compliance_framework: 'SOX Section 404 & ISO/IEC 27001:2022',
+    exported_at: new Date().toISOString(),
+    total_records: list.length,
+    case_id: case_id || 'ALL_CASES',
+    records: list,
   });
 });
 

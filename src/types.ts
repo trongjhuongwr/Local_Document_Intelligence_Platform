@@ -163,3 +163,32 @@ export interface ChatMessage {
   };
 }
 
+export type AuditAction = 
+  | 'DOCUMENT_INGESTED'
+  | 'WORKFLOW_STARTED'
+  | 'WORKFLOW_COMPLETED'
+  | 'FINDING_APPROVED'
+  | 'FINDING_REJECTED'
+  | 'FINDING_RESOLVED'
+  | 'FINDING_BATCH_ACTION'
+  | 'CASE_CREATED'
+  | 'CASE_DELETED'
+  | 'REPORT_EXPORTED'
+  | 'MANUAL_ATTESTATION';
+
+export interface AuditTrailEntry {
+  log_id: string;
+  timestamp: string;
+  action: AuditAction;
+  actor: string;
+  case_id?: string;
+  case_name?: string;
+  entity_type: 'document' | 'workflow' | 'review_finding' | 'case' | 'report' | 'attestation';
+  entity_id: string;
+  details: string;
+  metadata?: Record<string, any>;
+  prev_hash: string;
+  integrity_hash: string;
+}
+
+

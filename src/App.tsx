@@ -5,8 +5,10 @@ import { CasesView } from './components/CasesView';
 import { AskView } from './components/AskView';
 import { ReviewsView } from './components/ReviewsView';
 import { EvaluationView } from './components/EvaluationView';
+import { AuditTrailView } from './components/AuditTrailView';
+import { CommandPalette } from './components/CommandPalette';
 import { CaseItem } from './types';
-import { Menu, ShieldCheck } from 'lucide-react';
+import { Menu, ShieldCheck, Search } from 'lucide-react';
 
 export function App() {
   const [currentTab, setCurrentTab] = useState<string>('home');
@@ -15,11 +17,17 @@ export function App() {
   const [loadingSample, setLoadingSample] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
 
-  // Keyboard shortcut Ctrl+B or Cmd+B to toggle sidebar
+  // Global Keyboard shortcuts:
+  // - Ctrl+K / Cmd+K: Toggle Command Palette
+  // - Ctrl+B / Cmd+B: Toggle Sidebar
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setCommandPaletteOpen(prev => !prev);
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
         e.preventDefault();
         setSidebarCollapsed(prev => !prev);
       }
@@ -72,8 +80,23 @@ export function App() {
     setCurrentTab('reviews');
   };
 
+  const handleNavigateToAuditTrail = (caseId?: string) => {
+    if (caseId) setActiveCaseId(caseId);
+    setCurrentTab('audit_trail');
+  };
+
   return (
     <div className="flex flex-col lg:flex-row min-h-screen bg-neutral-50/60 font-sans text-neutral-900">
+      {/* Global Command Palette (Ctrl + K) */}
+      <CommandPalette
+        isOpen={commandPaletteOpen}
+        onClose={() => setCommandPaletteOpen(false)}
+        cases={cases}
+        onSelectCase={setActiveCaseId}
+        onNavigateTab={setCurrentTab}
+        onOpenAuditTrail={handleNavigateToAuditTrail}
+      />
+
       {/* Mobile Top App Bar with Hamburger Toggle */}
       <header className="lg:hidden bg-white border-b border-neutral-200 px-4 py-3 flex items-center justify-between sticky top-0 z-30 shadow-2xs">
         <div className="flex items-center gap-2.5">
@@ -92,14 +115,24 @@ export function App() {
           </div>
         </div>
 
-        {totalOpenFindings > 0 && (
+        <div className="flex items-center gap-2">
           <button
-            onClick={() => setCurrentTab('reviews')}
-            className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-bold flex items-center gap-1"
+            onClick={() => setCommandPaletteOpen(true)}
+            className="p-1.5 text-neutral-600 hover:bg-neutral-100 rounded-lg cursor-pointer transition-colors border border-neutral-200"
+            title="Search (Ctrl + K)"
           >
-            <span>{totalOpenFindings} open findings</span>
+            <Search className="w-4 h-4" />
           </button>
-        )}
+
+          {totalOpenFindings > 0 && (
+            <button
+              onClick={() => setCurrentTab('reviews')}
+              className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-bold flex items-center gap-1"
+            >
+              <span>{totalOpenFindings}</span>
+            </button>
+          )}
+        </div>
       </header>
 
       {/* Sidebar with Drawer on Mobile & Collapsible Rail on Desktop */}
@@ -114,6 +147,7 @@ export function App() {
         onCloseMobile={() => setMobileMenuOpen(false)}
         collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+        onOpenCommandPalette={() => setCommandPaletteOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -142,14 +176,6 @@ export function App() {
           </div>
         )}
 
-        {currentTab === 'ask' && (
-          <AskView
-            cases={cases}
-            selectedCaseId={activeCaseId}
-            onSelectCase={setActiveCaseId}
-          />
-        )}
-
         {currentTab === 'reviews' && (
           <div className="h-full overflow-y-auto pb-12">
             <ReviewsView
@@ -159,6 +185,25 @@ export function App() {
               onRefreshCases={fetchCases}
             />
           </div>
+        )}
+
+        {currentTab === 'audit_trail' && (
+          <div className="h-full overflow-hidden">
+            <AuditTrailView
+              cases={cases}
+              selectedCaseId={activeCaseId}
+              onSelectCase={setActiveCaseId}
+              onNavigateToCase={handleOpenCase}
+            />
+          </div>
+        )}
+
+        {currentTab === 'ask' && (
+          <AskView
+            cases={cases}
+            selectedCaseId={activeCaseId}
+            onSelectCase={setActiveCaseId}
+          />
         )}
 
         {currentTab === 'evaluation' && (

@@ -23,7 +23,9 @@ import {
   Info,
   Database,
   ExternalLink,
-  ChevronRight
+  ChevronRight,
+  History,
+  Search
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -34,6 +36,7 @@ interface SidebarProps {
   onCloseMobile?: () => void;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
+  onOpenCommandPalette?: () => void;
 }
 
 export function Sidebar({ 
@@ -43,7 +46,8 @@ export function Sidebar({
   mobileOpen = false, 
   onCloseMobile,
   collapsed = false,
-  onToggleCollapse
+  onToggleCollapse,
+  onOpenCommandPalette
 }: SidebarProps) {
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [diagnosticsModalOpen, setDiagnosticsModalOpen] = useState(false);
@@ -100,6 +104,7 @@ export function Sidebar({
       icon: CheckSquare,
       badge: openFindingCount > 0 ? openFindingCount : undefined
     },
+    { id: 'audit_trail', label: 'Audit Trail', icon: History },
     { id: 'ask', label: 'Ask Documents', icon: MessageSquare },
   ];
 
@@ -203,7 +208,28 @@ export function Sidebar({
           </div>
 
           {/* Navigation Items */}
-          <div className="p-2.5 flex flex-col gap-5">
+          <div className="p-2.5 flex flex-col gap-4">
+            {/* Command Palette Trigger */}
+            {onOpenCommandPalette && (
+              <button
+                onClick={onOpenCommandPalette}
+                className={`w-full flex items-center rounded-xl border border-neutral-200/80 bg-neutral-50 hover:bg-neutral-100 hover:border-neutral-300 text-neutral-600 hover:text-neutral-900 transition-all cursor-pointer shadow-2xs ${
+                  collapsed ? 'justify-center p-2.5' : 'justify-between px-2.5 py-2'
+                }`}
+                title="Quick Search & Actions (Ctrl + K)"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <Search className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                  {!collapsed && <span className="text-xs font-medium text-neutral-500">Quick Search...</span>}
+                </div>
+                {!collapsed && (
+                  <kbd className="inline-flex items-center px-1.5 py-0.5 text-[9px] font-mono font-semibold text-neutral-500 bg-white rounded border border-neutral-200">
+                    ⌘K / Ctrl+K
+                  </kbd>
+                )}
+              </button>
+            )}
+
             {/* Workspace section */}
             <div>
               {!collapsed && (
