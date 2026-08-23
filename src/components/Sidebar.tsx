@@ -94,13 +94,13 @@ export function Sidebar({
   const workspaceNav = [
     { id: 'home', label: 'Home', icon: Home },
     { id: 'cases', label: 'Cases', icon: FolderOpen },
-    { id: 'ask', label: 'Ask Documents', icon: MessageSquare },
     { 
       id: 'reviews', 
       label: 'Review Findings', 
       icon: CheckSquare,
       badge: openFindingCount > 0 ? openFindingCount : undefined
     },
+    { id: 'ask', label: 'Ask Documents', icon: MessageSquare },
   ];
 
   const devNav = [
