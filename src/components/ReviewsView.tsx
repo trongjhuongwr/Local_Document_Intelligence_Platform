@@ -27,6 +27,7 @@ import {
   Columns,
   Tag
 } from 'lucide-react';
+import { useThemeLanguage } from '../context/ThemeLanguageContext';
 
 interface ReviewsViewProps {
   cases: CaseItem[];
@@ -35,19 +36,28 @@ interface ReviewsViewProps {
   onRefreshCases: () => void;
 }
 
-const QUICK_NOTE_PRESETS = [
-  'Đã xác minh qua hợp đồng bổ sung',
-  'Chênh lệch làm tròn hợp lệ (Rounding Diff)',
-  'Đã liên hệ vendor đối soát lại hóa đơn',
-  'Vi phạm điều khoản thanh toán Net-30',
-  'Phạt chậm tiến độ theo phụ lục hợp đồng',
-  'Chứng từ chưa đủ chữ ký thẩm quyền'
-];
-
 export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCases }: ReviewsViewProps) {
+  const { lang, t } = useThemeLanguage();
+
+  const quickNotePresets = lang === 'vi' ? [
+    'Đã xác minh qua hợp đồng bổ sung',
+    'Chênh lệch làm tròn hợp lệ (Rounding Diff)',
+    'Đã liên hệ bên bán đối soát lại hóa đơn',
+    'Vi phạm điều khoản thanh toán Net-30',
+    'Phạt chậm tiến độ theo phụ lục hợp đồng',
+    'Chứng từ chưa đủ chữ ký thẩm quyền'
+  ] : [
+    'Verified via supplemental agreement',
+    'Acceptable rounding discrepancy',
+    'Contacted vendor for revised invoice',
+    'Violation of Net-30 payment term',
+    'Late penalty applied per contract appendix',
+    'Missing required executive signature'
+  ];
+
   const [statusFilter, setStatusFilter] = useState<string>('OPEN');
   const [severityFilter, setSeverityFilter] = useState<string>('all');
-  const [reviewerName, setReviewerName] = useState<string>('Lead Auditor (Huong Nguyen)');
+  const [reviewerName, setReviewerName] = useState<string>(lang === 'vi' ? 'Kiểm toán trưởng (Huong Nguyen)' : 'Lead Auditor (Huong Nguyen)');
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [helpOpen, setHelpOpen] = useState(false);
   const [selectedReviewIds, setSelectedReviewIds] = useState<string[]>([]);
@@ -160,7 +170,8 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
       });
       fetchReviews();
       onRefreshCases();
-      showToast(`Finding ${action.toUpperCase()} recorded.`);
+      const actionLabel = action === 'approve' ? (lang === 'vi' ? 'CHẤP THUẬN' : 'APPROVED') : action === 'reject' ? (lang === 'vi' ? 'BÁC BỎ' : 'REJECTED') : (lang === 'vi' ? 'ĐÃ XỬ LÝ' : 'RESOLVED');
+      showToast(lang === 'vi' ? `Đã ghi nhận quyết định: ${actionLabel}` : `Finding ${action.toUpperCase()} recorded.`);
     } catch (err) {
       console.error(err);
     }
@@ -196,13 +207,13 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
           review_ids: selectedReviewIds,
           action,
           reviewer: reviewerName,
-          note: batchNote || `Bulk ${action} applied by ${reviewerName}`,
+          note: batchNote || (lang === 'vi' ? `Xử lý hàng loạt (${action}) bởi ${reviewerName}` : `Bulk ${action} applied by ${reviewerName}`),
         }),
       });
       const data = await res.json();
       fetchReviews();
       onRefreshCases();
-      showToast(`Batch ${action.toUpperCase()} applied to ${data.updated_count || selectedReviewIds.length} findings.`);
+      showToast(lang === 'vi' ? `Đã áp dụng quyết định hàng loạt cho ${data.updated_count || selectedReviewIds.length} hạng mục.` : `Batch ${action.toUpperCase()} applied to ${data.updated_count || selectedReviewIds.length} findings.`);
       setSelectedReviewIds([]);
       setBatchNote('');
     } catch (err) {
@@ -243,7 +254,7 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
       ? reviews.filter(r => selectedReviewIds.includes(r.review_id))
       : await fetchAllFindingsForExport();
     exportReviewsToCSV(list, `audit_findings_${selectedCaseId || 'all'}_${Date.now()}.csv`);
-    showToast(`Exported ${list.length} findings to CSV/Excel format.`);
+    showToast(lang === 'vi' ? `Đã xuất ${list.length} phát hiện ra tệp CSV/Excel.` : `Exported ${list.length} findings to CSV/Excel format.`);
   };
 
   const handleExportMarkdown = async () => {
@@ -251,7 +262,7 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
       ? reviews.filter(r => selectedReviewIds.includes(r.review_id))
       : await fetchAllFindingsForExport();
     exportReviewsToMarkdown(list, `Audit Findings & Review Report (${selectedCaseId || 'All Cases'})`);
-    showToast(`Exported ${list.length} findings to Markdown document.`);
+    showToast(lang === 'vi' ? `Đã xuất ${list.length} phát hiện ra định dạng Markdown.` : `Exported ${list.length} findings to Markdown document.`);
   };
 
   const handlePrintPDF = async () => {
@@ -268,8 +279,8 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
     <div className="max-w-5xl mx-auto py-8 px-6 space-y-6">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-60 bg-neutral-900 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-2xl border border-neutral-700 animate-in fade-in slide-in-from-bottom-3 duration-200 flex items-center gap-2">
-          <Check className="w-4 h-4 text-emerald-400" />
+        <div className="fixed bottom-6 right-6 z-60 bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 text-xs font-semibold px-4 py-3 rounded-xl shadow-2xl border border-neutral-700 dark:border-neutral-200 animate-in fade-in slide-in-from-bottom-3 duration-200 flex items-center gap-2">
+          <Check className="w-4 h-4 text-emerald-400 dark:text-emerald-600" />
           <span>{toastMessage}</span>
         </div>
       )}
@@ -277,12 +288,12 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
       {/* Header & Export Toolbar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className="text-xs font-semibold uppercase tracking-wider text-neutral-500 mb-0.5">
-            Audit Human Verification Queue
+          <div className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 mb-0.5">
+            {lang === 'vi' ? 'Hàng đợi thẩm định & Bất thường' : 'Review & Discrepancy Queue'}
           </div>
-          <h1 className="text-2xl font-bold text-neutral-900 tracking-tight">Review Findings</h1>
-          <p className="text-sm text-neutral-500 mt-0.5">
-            Audit human queue: review, batch approve or reject automatically generated discrepancy exceptions.
+          <h1 className="text-2xl font-bold text-neutral-900 dark:text-white tracking-tight">{t.reviews.title}</h1>
+          <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-0.5">
+            {t.reviews.subtitle}
           </p>
         </div>
 
@@ -291,37 +302,37 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
           <button
             id="export-csv-btn"
             onClick={handleExportCSV}
-            title="Export full findings to CSV / Excel spreadsheet"
-            className="px-3 py-2 rounded-lg border border-neutral-300 bg-white hover:bg-neutral-50 text-neutral-800 text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+            title={lang === 'vi' ? 'Xuất toàn bộ phát hiện ra bảng tính CSV / Excel' : 'Export full findings to CSV / Excel spreadsheet'}
+            className="px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
           >
-            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
             <span>CSV / Excel</span>
           </button>
 
           <button
             id="export-md-btn"
             onClick={handleExportMarkdown}
-            title="Export findings report as Markdown document"
-            className="px-3 py-2 rounded-lg border border-neutral-300 bg-white hover:bg-neutral-50 text-neutral-800 text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+            title={lang === 'vi' ? 'Xuất báo cáo phát hiện ra tệp Markdown' : 'Export findings report as Markdown document'}
+            className="px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
           >
-            <FileText className="w-3.5 h-3.5 text-blue-600" />
+            <FileText className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
             <span>Markdown</span>
           </button>
 
           <button
             id="export-pdf-btn"
             onClick={handlePrintPDF}
-            title="Print or export official audit findings report as PDF"
-            className="px-3 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+            title={lang === 'vi' ? 'In hoặc xuất báo cáo chính thức ra PDF' : 'Print or export official audit findings report as PDF'}
+            className="px-3 py-2 rounded-lg bg-neutral-900 dark:bg-neutral-100 hover:bg-neutral-800 dark:hover:bg-white text-white dark:text-neutral-900 text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
           >
-            <Printer className="w-3.5 h-3.5 text-amber-400" />
+            <Printer className="w-3.5 h-3.5 text-amber-400 dark:text-amber-600" />
             <span>Print / PDF</span>
           </button>
 
           <button
             onClick={() => setHelpOpen(!helpOpen)}
-            className="text-xs text-neutral-500 hover:text-neutral-900 p-2 rounded-lg hover:bg-neutral-100 cursor-pointer"
-            title="Action Guidelines"
+            className="text-xs text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+            title={lang === 'vi' ? 'Hướng dẫn thẩm định' : 'Auditor Guidelines'}
           >
             <HelpCircle className="w-4 h-4" />
           </button>
@@ -330,45 +341,45 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
 
       {/* Guide dialog / expander */}
       {helpOpen && (
-        <div className="p-4 rounded-xl border border-neutral-200 bg-neutral-50 text-xs text-neutral-700 space-y-2 animate-in fade-in duration-150">
-          <div className="font-bold text-neutral-900">Audit Action Guidelines &amp; Protocol</div>
+        <div className="p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-850 text-xs text-neutral-700 dark:text-neutral-300 space-y-2 animate-in fade-in duration-150">
+          <div className="font-bold text-neutral-900 dark:text-white">{lang === 'vi' ? 'Hướng dẫn thẩm định' : 'Auditor Guidelines'}</div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
-            <div className="bg-white p-3 rounded-lg border border-neutral-200 shadow-2xs">
-              <span className="font-bold text-emerald-700 flex items-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5" /> Approve
+            <div className="bg-white dark:bg-neutral-900 p-3 rounded-lg border border-neutral-200 dark:border-neutral-800 shadow-2xs">
+              <span className="font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" /> {t.reviews.approveBtn}
               </span>
-              <p className="mt-1 text-neutral-600">Confirms this discrepancy is a real business issue and blocks payment or triggers a vendor inquiry.</p>
+              <p className="mt-1 text-neutral-600 dark:text-neutral-400">{lang === 'vi' ? 'Xác nhận sai lệch hợp lệ với lý do lưu hồ sơ' : 'Confirms variance is acceptable with documented rationale'}</p>
             </div>
-            <div className="bg-white p-3 rounded-lg border border-neutral-200 shadow-2xs">
-              <span className="font-bold text-rose-700 flex items-center gap-1">
-                <XCircle className="w-3.5 h-3.5" /> Reject
+            <div className="bg-white dark:bg-neutral-900 p-3 rounded-lg border border-neutral-200 dark:border-neutral-800 shadow-2xs">
+              <span className="font-bold text-rose-700 dark:text-rose-400 flex items-center gap-1">
+                <XCircle className="w-3.5 h-3.5" /> {t.reviews.rejectBtn}
               </span>
-              <p className="mt-1 text-neutral-600">Dismisses the finding as an acceptable business exception or parsing false alarm.</p>
+              <p className="mt-1 text-neutral-600 dark:text-neutral-400">{lang === 'vi' ? 'Bác bỏ mục sai lệch / yêu cầu xuất lại hóa đơn' : 'Flags finding as non-compliant or billing error'}</p>
             </div>
-            <div className="bg-white p-3 rounded-lg border border-neutral-200 shadow-2xs">
-              <span className="font-bold text-neutral-700 flex items-center gap-1">
-                <RotateCcw className="w-3.5 h-3.5" /> Resolve
+            <div className="bg-white dark:bg-neutral-900 p-3 rounded-lg border border-neutral-200 dark:border-neutral-800 shadow-2xs">
+              <span className="font-bold text-neutral-700 dark:text-neutral-300 flex items-center gap-1">
+                <RotateCcw className="w-3.5 h-3.5" /> {lang === 'vi' ? 'Giải quyết' : 'Resolve'}
               </span>
-              <p className="mt-1 text-neutral-600">Marks a previously approved finding as resolved following corrective invoice submission.</p>
+              <p className="mt-1 text-neutral-600 dark:text-neutral-400">{lang === 'vi' ? 'Đóng bất thường sau khi đã giải quyết remediate' : 'Closes finding after vendor re-bill or remediation'}</p>
             </div>
           </div>
         </div>
       )}
 
       {/* Filter Toolbar */}
-      <div className="p-4 rounded-xl border border-neutral-200 bg-white space-y-3 shadow-xs">
+      <div className="p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 space-y-3 shadow-xs">
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
           <div>
-            <label className="block text-xs font-semibold text-neutral-700 mb-1">Filter case</label>
+            <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">{t.reviews.filterCaseLabel}</label>
             <select
               value={selectedCaseId || 'all'}
               onChange={e => {
                 onSelectCase(e.target.value === 'all' ? null : e.target.value);
                 setPage(1);
               }}
-              className="w-full px-2.5 py-1.5 text-xs border border-neutral-300 rounded-lg bg-white"
+              className="w-full px-2.5 py-1.5 text-xs border border-neutral-300 dark:border-neutral-700 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white"
             >
-              <option value="all">All cases</option>
+              <option value="all">{t.reviews.allCasesOption}</option>
               {cases.map(c => (
                 <option key={c.case_id} value={c.case_id}>
                   {c.name}
@@ -378,49 +389,49 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-neutral-700 mb-1">Status</label>
+            <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">{t.reviews.filterStatusLabel}</label>
             <select
               value={statusFilter}
               onChange={e => {
                 setStatusFilter(e.target.value);
                 setPage(1);
               }}
-              className="w-full px-2.5 py-1.5 text-xs border border-neutral-300 rounded-lg bg-white"
+              className="w-full px-2.5 py-1.5 text-xs border border-neutral-300 dark:border-neutral-700 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white"
             >
-              <option value="all">All statuses</option>
-              <option value="OPEN">OPEN</option>
-              <option value="APPROVED">APPROVED</option>
-              <option value="REJECTED">REJECTED</option>
-              <option value="RESOLVED">RESOLVED</option>
+              <option value="all">{t.reviews.allStatuses}</option>
+              <option value="OPEN">{lang === 'vi' ? 'Chưa duyệt (Mở)' : 'Open'}</option>
+              <option value="APPROVED">{lang === 'vi' ? 'Đã duyệt' : 'Approved'}</option>
+              <option value="REJECTED">{lang === 'vi' ? 'Đã bác bỏ' : 'Rejected'}</option>
+              <option value="RESOLVED">{lang === 'vi' ? 'Đã giải quyết' : 'Resolved'}</option>
             </select>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-neutral-700 mb-1">Severity</label>
+            <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">{t.reviews.filterSeverityLabel}</label>
             <select
               value={severityFilter}
               onChange={e => {
                 setSeverityFilter(e.target.value);
                 setPage(1);
               }}
-              className="w-full px-2.5 py-1.5 text-xs border border-neutral-300 rounded-lg bg-white"
+              className="w-full px-2.5 py-1.5 text-xs border border-neutral-300 dark:border-neutral-700 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white"
             >
-              <option value="all">All severities</option>
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
+              <option value="all">{t.reviews.allSeverities}</option>
+              <option value="high">{lang === 'vi' ? 'Nghiêm trọng (High)' : 'High'}</option>
+              <option value="medium">{lang === 'vi' ? 'Trung bình (Medium)' : 'Medium'}</option>
+              <option value="low">{lang === 'vi' ? 'Thấp (Low)' : 'Low'}</option>
             </select>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-neutral-700 mb-1">Reviewer identity</label>
+            <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">{lang === 'vi' ? 'Tên Kiểm toán viên:' : 'Auditor Identity:'}</label>
             <div className="relative">
               <input
                 type="text"
                 value={reviewerName}
                 onChange={e => setReviewerName(e.target.value)}
                 placeholder="Auditor Name"
-                className="w-full pl-7 pr-2.5 py-1.5 text-xs border border-neutral-300 rounded-lg bg-white"
+                className="w-full pl-7 pr-2.5 py-1.5 text-xs border border-neutral-300 dark:border-neutral-700 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white"
               />
               <User className="w-3.5 h-3.5 text-neutral-400 absolute left-2 top-2" />
             </div>
@@ -429,15 +440,15 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
       </div>
 
       {/* Batch Actions Bar */}
-      <div className="p-3.5 rounded-xl border border-neutral-200 bg-neutral-50/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+      <div className="p-3.5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50/80 dark:bg-neutral-850 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
         <div className="flex items-center gap-3">
           <button
             onClick={toggleSelectAllVisible}
             disabled={reviews.length === 0}
-            className="flex items-center gap-2 text-xs font-semibold text-neutral-800 hover:text-neutral-900 cursor-pointer disabled:opacity-50"
+            className="flex items-center gap-2 text-xs font-semibold text-neutral-800 dark:text-neutral-200 hover:text-neutral-900 dark:hover:text-white cursor-pointer disabled:opacity-50"
           >
             {allVisibleSelected ? (
-              <CheckSquare className="w-4 h-4 text-emerald-600" />
+              <CheckSquare className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
             ) : selectedReviewIds.length > 0 ? (
               <div className="w-4 h-4 bg-emerald-600 text-white rounded flex items-center justify-center text-[10px] font-bold">
                 -
@@ -447,17 +458,17 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
             )}
             <span>
               {selectedReviewIds.length > 0 
-                ? `Selected ${selectedReviewIds.length} finding(s)` 
-                : 'Select all visible'}
+                ? (lang === 'vi' ? `Đã chọn ${selectedReviewIds.length} phát hiện` : `${selectedReviewIds.length} findings selected`)
+                : (lang === 'vi' ? 'Chọn tất cả hiển thị' : 'Select all visible')}
             </span>
           </button>
 
           {selectedReviewIds.length > 0 && (
             <button
               onClick={() => setSelectedReviewIds([])}
-              className="text-[11px] text-neutral-500 hover:text-neutral-800 underline cursor-pointer"
+              className="text-[11px] text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-white underline cursor-pointer"
             >
-              Clear selection
+              {t.reviews.batchClearSelection}
             </button>
           )}
         </div>
@@ -467,10 +478,10 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
           {selectedReviewIds.length > 0 && (
             <input
               type="text"
-              placeholder="Bulk note (optional)..."
+              placeholder={t.reviews.batchNotePlaceholder}
               value={batchNote}
               onChange={e => setBatchNote(e.target.value)}
-              className="px-2.5 py-1.5 text-xs border border-neutral-300 rounded-lg bg-white min-w-[170px]"
+              className="px-2.5 py-1.5 text-xs border border-neutral-300 dark:border-neutral-700 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white min-w-[170px]"
             />
           )}
 
@@ -481,7 +492,7 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
             className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
           >
             <CheckCircle2 className="w-3.5 h-3.5" />
-            <span>Approve Selected ({selectedReviewIds.length})</span>
+            <span>{lang === 'vi' ? `Duyệt hàng loạt (${selectedReviewIds.length})` : `Batch Approve (${selectedReviewIds.length})`}</span>
           </button>
 
           <button
@@ -491,29 +502,31 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
             className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
           >
             <XCircle className="w-3.5 h-3.5" />
-            <span>Reject Selected ({selectedReviewIds.length})</span>
+            <span>{lang === 'vi' ? `Bác bỏ hàng loạt (${selectedReviewIds.length})` : `Batch Reject (${selectedReviewIds.length})`}</span>
           </button>
 
           <button
             id="batch-resolve-btn"
             disabled={selectedReviewIds.length === 0 || batchActionLoading}
             onClick={() => handleBatchAction('resolve')}
-            className="px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-900 disabled:opacity-40 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+            className="px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-900 dark:bg-neutral-700 dark:hover:bg-neutral-600 disabled:opacity-40 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
           >
             <RotateCcw className="w-3.5 h-3.5" />
-            <span>Resolve</span>
+            <span>{lang === 'vi' ? 'Giải quyết' : 'Resolve'}</span>
           </button>
         </div>
       </div>
 
       {/* Findings List */}
       {loading ? (
-        <div className="p-12 text-center text-xs text-neutral-500">Loading audit findings...</div>
+        <div className="p-12 text-center text-xs text-neutral-500 dark:text-neutral-400">
+          {lang === 'vi' ? 'Đang tải danh sách bất thường...' : 'Loading discrepancy findings...'}
+        </div>
       ) : reviews.length === 0 ? (
-        <div className="p-12 text-center rounded-xl border border-dashed border-neutral-300 bg-white">
-          <h4 className="text-sm font-semibold text-neutral-800">No findings match this filter</h4>
-          <p className="text-xs text-neutral-500 mt-1">
-            Run an analysis on a case to populate this human verification queue.
+        <div className="p-12 text-center rounded-xl border border-dashed border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900">
+          <h4 className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">{t.reviews.noFindingsTitle}</h4>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+            {t.reviews.noFindingsDesc}
           </p>
         </div>
       ) : (
@@ -526,7 +539,9 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
               <div
                 key={item.review_id}
                 className={`p-5 rounded-xl border transition-all shadow-xs space-y-4 ${
-                  isSelected ? 'border-emerald-500 bg-emerald-50/20' : 'border-neutral-200 bg-white'
+                  isSelected 
+                    ? 'border-emerald-500 bg-emerald-50/20 dark:bg-emerald-950/30' 
+                    : 'border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900'
                 }`}
               >
                 {/* Finding Header */}
@@ -535,44 +550,44 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
                     {/* Checkbox for batch action */}
                     <button
                       onClick={() => toggleSelectOne(item.review_id)}
-                      className="cursor-pointer text-neutral-400 hover:text-neutral-700"
+                      className="cursor-pointer text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
                     >
                       {isSelected ? (
-                        <CheckSquare className="w-4 h-4 text-emerald-600" />
+                        <CheckSquare className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                       ) : (
-                        <Square className="w-4 h-4 text-neutral-300 hover:text-neutral-400" />
+                        <Square className="w-4 h-4 text-neutral-300 dark:text-neutral-600 hover:text-neutral-400" />
                       )}
                     </button>
 
                     <SeverityBadge severity={item.severity} />
                     <StatusChip status={item.status} />
-                    <span className="text-xs text-neutral-400 font-mono">Case: {item.case_id}</span>
+                    <span className="text-xs text-neutral-400 dark:text-neutral-500 font-mono">{lang === 'vi' ? 'Hồ sơ' : 'Case'}: {item.case_id}</span>
                   </div>
-                  <div className="text-[11px] text-neutral-400 font-mono">
+                  <div className="text-[11px] text-neutral-400 dark:text-neutral-500 font-mono">
                     {item.created_at ? item.created_at.slice(0, 16).replace('T', ' ') : ''}
                   </div>
                 </div>
 
                 <div>
-                  <h3 className="text-sm font-bold text-neutral-900">
+                  <h3 className="text-sm font-bold text-neutral-900 dark:text-white">
                     {disc.type ? disc.type.replace(/_/g, ' ').toUpperCase() : 'DISCREPANCY'}
                   </h3>
-                  <p className="text-xs text-neutral-700 mt-1 leading-relaxed">{disc.description}</p>
+                  <p className="text-xs text-neutral-700 dark:text-neutral-300 mt-1 leading-relaxed">{disc.description}</p>
                 </div>
 
                 {/* Calculation / Comparison values */}
                 {(disc.expected_value !== undefined || disc.calculation) && (
-                  <div className="p-3 rounded-lg bg-neutral-50 border border-neutral-200 text-xs font-mono space-y-1">
+                  <div className="p-3 rounded-lg bg-neutral-50 dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-xs font-mono space-y-1">
                     {disc.expected_value !== undefined && (
-                      <div className="flex items-center gap-4 text-neutral-700">
-                        <span>Expected: <strong>{disc.expected_value}</strong></span>
-                        <span>Observed: <strong>{disc.observed_value}</strong></span>
-                        {disc.difference !== undefined && <span>Diff: <strong>{disc.difference}</strong></span>}
+                      <div className="flex items-center gap-4 text-neutral-700 dark:text-neutral-300">
+                        <span>{lang === 'vi' ? 'Kỳ vọng' : 'Expected'}: <strong>{disc.expected_value}</strong></span>
+                        <span>{lang === 'vi' ? 'Thực tế' : 'Observed'}: <strong>{disc.observed_value}</strong></span>
+                        {disc.difference !== undefined && <span>{lang === 'vi' ? 'Chênh lệch' : 'Diff'}: <strong>{disc.difference}</strong></span>}
                       </div>
                     )}
                     {disc.calculation && (
-                      <div className="text-neutral-500 text-[11px]">
-                        Formula: {disc.calculation.formula}
+                      <div className="text-neutral-500 dark:text-neutral-400 text-[11px]">
+                        {lang === 'vi' ? 'Công thức' : 'Formula'}: {disc.calculation.formula}
                       </div>
                     )}
                   </div>
@@ -582,22 +597,22 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
                 {disc.evidence && disc.evidence.length > 0 && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">
-                        Audit Evidence ({disc.evidence.length})
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
+                        {t.reviews.evidenceSection} ({disc.evidence.length})
                       </span>
                       <button
                         onClick={() => handleOpenSplitForFinding(item, idx)}
-                        className="px-2.5 py-1 rounded-md bg-neutral-900 hover:bg-neutral-800 text-white text-[11px] font-semibold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+                        className="px-2.5 py-1 rounded-md bg-neutral-900 dark:bg-neutral-100 hover:bg-neutral-800 dark:hover:bg-white text-white dark:text-neutral-900 text-[11px] font-semibold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
                       >
-                        <Columns className="w-3 h-3 text-emerald-400" />
-                        <span>Split Compare Documents</span>
+                        <Columns className="w-3 h-3 text-emerald-400 dark:text-emerald-600" />
+                        <span>{t.reviews.splitViewerBtn}</span>
                       </button>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                       {disc.evidence.map((ev: any, ei: number) => (
-                        <div key={ei} className="p-2.5 rounded-lg bg-neutral-50 border border-neutral-100 text-[11px]">
-                          <span className="font-semibold text-neutral-800">{ev.filename}</span>
-                          {ev.snippet && <p className="text-neutral-600 mt-0.5 italic">"{ev.snippet}"</p>}
+                        <div key={ei} className="p-2.5 rounded-lg bg-neutral-50 dark:bg-neutral-850 border border-neutral-100 dark:border-neutral-800 text-[11px]">
+                          <span className="font-semibold text-neutral-800 dark:text-neutral-200">{ev.filename}</span>
+                          {ev.snippet && <p className="text-neutral-600 dark:text-neutral-400 mt-0.5 italic">"{ev.snippet}"</p>}
                         </div>
                       ))}
                     </div>
@@ -606,9 +621,9 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
 
                 {/* Audit trail / note if decided */}
                 {item.reviewer && (
-                  <div className="p-2.5 rounded-lg bg-neutral-50 border border-neutral-200 text-xs text-neutral-600 flex items-center justify-between">
+                  <div className="p-2.5 rounded-lg bg-neutral-50 dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-xs text-neutral-600 dark:text-neutral-400 flex items-center justify-between">
                     <div>
-                      Decided by: <strong>{item.reviewer}</strong>
+                      {lang === 'vi' ? 'Quyết định bởi:' : 'Decided by:'} <strong>{item.reviewer}</strong>
                       {item.note && <span className="italic ml-2">"{item.note}"</span>}
                     </div>
                     {item.decided_at && (
@@ -622,14 +637,14 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
                 {/* Quick Note Preset Chips */}
                 {item.status === 'OPEN' && (
                   <div className="flex items-center gap-1.5 flex-wrap pt-1">
-                    <span className="text-[10px] text-neutral-400 font-semibold flex items-center gap-1">
-                      <Tag className="w-2.5 h-2.5" /> Presets:
+                    <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-semibold flex items-center gap-1">
+                      <Tag className="w-2.5 h-2.5" /> {t.reviews.quickPresetsTitle}:
                     </span>
-                    {QUICK_NOTE_PRESETS.map((preset, pIdx) => (
+                    {quickNotePresets.map((preset, pIdx) => (
                       <button
                         key={pIdx}
                         onClick={() => applyQuickNote(item.review_id, preset)}
-                        className="px-2 py-0.5 rounded-md bg-neutral-100 hover:bg-neutral-200 text-neutral-600 hover:text-neutral-900 text-[10px] font-medium transition-colors cursor-pointer border border-neutral-200/60"
+                        className="px-2 py-0.5 rounded-md bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white text-[10px] font-medium transition-colors cursor-pointer border border-neutral-200/60 dark:border-neutral-700"
                       >
                         {preset}
                       </button>
@@ -638,13 +653,13 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
                 )}
 
                 {/* Action controls */}
-                <div className="pt-3 border-t border-neutral-100 flex flex-wrap items-center justify-between gap-3">
+                <div className="pt-3 border-t border-neutral-100 dark:border-neutral-800 flex flex-wrap items-center justify-between gap-3">
                   <input
                     type="text"
-                    placeholder="Optional reviewer note / justification..."
+                    placeholder={t.reviews.auditorNotesPlaceholder}
                     value={notes[item.review_id] || ''}
                     onChange={e => setNotes({ ...notes, [item.review_id]: e.target.value })}
-                    className="flex-1 min-w-[200px] px-3 py-1.5 text-xs border border-neutral-200 rounded-lg bg-neutral-50 focus:bg-white"
+                    className="flex-1 min-w-[200px] px-3 py-1.5 text-xs border border-neutral-200 dark:border-neutral-700 rounded-lg bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-white focus:bg-white dark:focus:bg-neutral-750"
                   />
 
                   <div className="flex items-center gap-2">
@@ -655,31 +670,31 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
                           className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors"
                         >
                           <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>Approve</span>
+                          <span>{t.reviews.approveBtn}</span>
                         </button>
                         <button
                           onClick={() => handleAction(item.review_id, 'reject')}
                           className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors"
                         >
                           <XCircle className="w-3.5 h-3.5" />
-                          <span>Reject</span>
+                          <span>{t.reviews.rejectBtn}</span>
                         </button>
                       </>
                     )}
                     {item.status === 'APPROVED' && (
                       <button
                         onClick={() => handleAction(item.review_id, 'resolve')}
-                        className="px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-900 text-white text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                        className="px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-900 dark:bg-neutral-700 dark:hover:bg-neutral-600 text-white text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors"
                       >
                         <RotateCcw className="w-3.5 h-3.5" />
-                        <span>Resolve follow-up</span>
+                        <span>{lang === 'vi' ? 'Giải quyết tiếp' : 'Resolve Follow-Up'}</span>
                       </button>
                     )}
                     {item.status === 'REJECTED' && (
-                      <span className="text-xs text-neutral-400 italic">Dismissed by auditor</span>
+                      <span className="text-xs text-neutral-400 dark:text-neutral-500 italic">{lang === 'vi' ? 'Bị bác bỏ bởi Kiểm toán viên' : 'Dismissed by Auditor'}</span>
                     )}
                     {item.status === 'RESOLVED' && (
-                      <span className="text-xs text-emerald-600 font-semibold">Resolved</span>
+                      <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold">{lang === 'vi' ? 'Đã giải quyết hoàn tất' : 'Resolved'}</span>
                     )}
                   </div>
                 </div>
@@ -689,27 +704,27 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
 
           {/* Pagination */}
           <div className="flex items-center justify-between pt-2">
-            <span className="text-xs text-neutral-500">
-              Showing {reviews.length} of {totalReviews} finding(s)
+            <span className="text-xs text-neutral-500 dark:text-neutral-400">
+              {lang === 'vi' ? `Hiển thị ${reviews.length} trên ${totalReviews} phát hiện` : `Showing ${reviews.length} of ${totalReviews} findings`}
             </span>
             <div className="flex items-center gap-2">
               <button
                 disabled={page <= 1}
                 onClick={() => setPage(p => p - 1)}
-                className="px-3 py-1 text-xs rounded border border-neutral-300 disabled:opacity-40 hover:bg-neutral-50 cursor-pointer flex items-center gap-1"
+                className="px-3 py-1 text-xs rounded border border-neutral-300 dark:border-neutral-700 disabled:opacity-40 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 cursor-pointer flex items-center gap-1"
               >
                 <ChevronLeft className="w-3.5 h-3.5" />
-                <span>Previous</span>
+                <span>{lang === 'vi' ? 'Trước' : 'Previous'}</span>
               </button>
-              <span className="text-xs font-mono text-neutral-700">
-                Page {page} of {totalPages}
+              <span className="text-xs font-mono text-neutral-700 dark:text-neutral-300">
+                {lang === 'vi' ? `Trang ${page} / ${totalPages || 1}` : `Page ${page} of ${totalPages || 1}`}
               </span>
               <button
                 disabled={page >= totalPages}
                 onClick={() => setPage(p => p + 1)}
-                className="px-3 py-1 text-xs rounded border border-neutral-300 disabled:opacity-40 hover:bg-neutral-50 cursor-pointer flex items-center gap-1"
+                className="px-3 py-1 text-xs rounded border border-neutral-300 dark:border-neutral-700 disabled:opacity-40 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 cursor-pointer flex items-center gap-1"
               >
-                <span>Next</span>
+                <span>{lang === 'vi' ? 'Sau' : 'Next'}</span>
                 <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -753,3 +768,4 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
     </div>
   );
 }
+

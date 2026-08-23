@@ -31,6 +31,7 @@ import {
   Tag,
   FileCheck
 } from 'lucide-react';
+import { useThemeLanguage } from '../context/ThemeLanguageContext';
 
 interface CasesViewProps {
   cases: CaseItem[];
@@ -40,36 +41,39 @@ interface CasesViewProps {
   onNavigateToReviews: (caseId: string) => void;
 }
 
-const DOCUMENT_LABELS: Record<string, string> = {
-  contract: 'Contract',
-  invoice: 'Invoice',
-  purchase_order: 'Purchase Order',
-  policy: 'Payment Policy',
-  other: 'Other Document',
-};
-
-function inferDocTypeWithConfidence(filename: string): { type: DocumentType; confidence: number; reason: string } {
+function inferDocTypeWithConfidence(filename: string, lang: 'en' | 'vi'): { type: DocumentType; confidence: number; reason: string } {
   const f = filename.toLowerCase();
-  if (f.includes('contract') || f.includes('msa') || f.includes('agreement')) {
-    return { type: 'contract', confidence: 95, reason: 'Matched agreement/contract naming' };
+  const isVi = lang === 'vi';
+  if (f.includes('contract') || f.includes('msa') || f.includes('agreement') || f.includes('hop_dong') || f.includes('hopdong')) {
+    return { type: 'contract', confidence: 95, reason: isVi ? 'Nhận diện theo tên Hợp đồng/Thỏa thuận' : 'Matched agreement/contract naming' };
   }
-  if (f.includes('invoice') || f.includes('inv') || f.includes('bill')) {
-    return { type: 'invoice', confidence: 96, reason: 'Matched invoice/bill naming' };
+  if (f.includes('invoice') || f.includes('inv') || f.includes('bill') || f.includes('hoa_don') || f.includes('hoadon')) {
+    return { type: 'invoice', confidence: 96, reason: isVi ? 'Nhận diện theo tên Hóa đơn/Chứng từ' : 'Matched invoice/bill naming' };
   }
-  if (f.includes('po') || f.includes('purchase') || f.includes('order')) {
-    return { type: 'purchase_order', confidence: 92, reason: 'Matched purchase order naming' };
+  if (f.includes('po') || f.includes('purchase') || f.includes('order') || f.includes('don_dat_hang')) {
+    return { type: 'purchase_order', confidence: 92, reason: isVi ? 'Nhận diện theo tên Đơn đặt hàng PO' : 'Matched purchase order naming' };
   }
-  if (f.includes('policy') || f.includes('terms') || f.includes('guideline')) {
-    return { type: 'policy', confidence: 90, reason: 'Matched policy/terms naming' };
+  if (f.includes('policy') || f.includes('terms') || f.includes('guideline') || f.includes('chinh_sach') || f.includes('quy_dinh')) {
+    return { type: 'policy', confidence: 90, reason: isVi ? 'Nhận diện theo tên Chính sách thanh toán' : 'Matched policy/terms naming' };
   }
-  return { type: 'other', confidence: 50, reason: 'General business document' };
+  return { type: 'other', confidence: 50, reason: isVi ? 'Tài liệu nghiệp vụ bổ trợ' : 'General business document' };
 }
 
 function inferDocType(filename: string): DocumentType {
-  return inferDocTypeWithConfidence(filename).type;
+  return inferDocTypeWithConfidence(filename, 'en').type;
 }
 
 export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, onNavigateToReviews }: CasesViewProps) {
+  const { lang, t } = useThemeLanguage();
+
+  const docLabels: Record<string, string> = {
+    contract: t.cases.docTypeContract,
+    invoice: t.cases.docTypeInvoice,
+    purchase_order: t.cases.docTypePO,
+    policy: t.cases.docTypePolicy,
+    other: t.cases.docTypeOther,
+  };
+
   // Search & Filter state for Cases list
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | CaseReadiness>('ALL');
@@ -233,7 +237,7 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
         body: formData,
       });
       const data = await res.json();
-      setUploadMessage(`Successfully ingested ${data.success_count} document(s).`);
+      setUploadMessage(lang === 'vi' ? `Đã nạp & mã hóa thành công ${data.success_count} tài liệu.` : `Successfully ingested ${data.success_count} document(s).`);
       setSelectedFiles([]);
       // Refresh case details
       const refreshed = await fetch(`/api/cases/${caseDetail.case_id}`).then(r => r.json());
@@ -241,7 +245,7 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
       onRefreshCases();
     } catch (err) {
       console.error(err);
-      setUploadMessage('Upload failed. Please try again.');
+      setUploadMessage(lang === 'vi' ? 'Nạp tài liệu thất bại. Vui lòng thử lại.' : 'Upload failed. Please try again.');
     } finally {
       setUploading(false);
     }
@@ -282,11 +286,11 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
         case_id: caseDetail.case_id,
         status: 'running',
         progress_percent: 15,
-        current_step: 'Starting analysis...',
+        current_step: lang === 'vi' ? 'Khởi động quy trình thẩm định...' : 'Starting analysis...',
         steps: [
-          { step: 'extract', label: 'Extract document schema fields', status: 'running' },
-          { step: 'rules', label: 'Run deterministic cross-document rules', status: 'pending' },
-          { step: 'review_tasks', label: 'Generate human audit tasks', status: 'pending' },
+          { step: 'extract', label: lang === 'vi' ? 'Trích xuất cấu trúc trường dữ liệu tài liệu' : 'Extract document schema fields', status: 'running' },
+          { step: 'rules', label: lang === 'vi' ? 'Chạy các quy tắc đối soát số học tất định' : 'Run deterministic cross-document rules', status: 'pending' },
+          { step: 'review_tasks', label: lang === 'vi' ? 'Khởi tạo các hạng mục thẩm định cho con người' : 'Generate human audit tasks', status: 'pending' },
         ],
         requires_review: false,
         started_at: new Date().toISOString(),
@@ -325,7 +329,6 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
       });
     } catch (err) {
       console.error('Failed to export audit dossier', err);
-      // Fallback
       printOrExportAuditDossier({
         caseDetail,
         analysisResult: activeWorkflow?.result,
@@ -360,45 +363,45 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
       <div className="max-w-5xl mx-auto py-8 px-6 space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-neutral-900 tracking-tight">Cases</h1>
-            <p className="text-sm text-neutral-500 mt-0.5">
-              Each case keeps its document pack, analysis history, and human decisions together.
+            <h1 className="text-2xl font-bold text-neutral-900 dark:text-white tracking-tight">{t.cases.title}</h1>
+            <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-0.5">
+              {t.cases.subtitle}
             </p>
           </div>
           <button
             id="create-case-toggle-btn"
             onClick={() => setCreateFormOpen(!createFormOpen)}
-            className="px-4 py-2 rounded-lg bg-neutral-900 text-white font-semibold text-sm hover:bg-neutral-800 transition-colors shadow-xs cursor-pointer"
+            className="px-4 py-2 rounded-lg bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 font-semibold text-sm hover:bg-neutral-800 dark:hover:bg-white transition-colors shadow-xs cursor-pointer"
           >
-            {createFormOpen ? 'Cancel' : '+ New case'}
+            {createFormOpen ? t.common.cancel : `+ ${t.cases.newCaseBtn}`}
           </button>
         </div>
 
         {/* Search & Filter Bar */}
-        <div className="flex flex-col sm:flex-row gap-3 items-center justify-between bg-white p-3 rounded-xl border border-neutral-200 shadow-2xs">
+        <div className="flex flex-col sm:flex-row gap-3 items-center justify-between bg-white dark:bg-neutral-900 p-3 rounded-xl border border-neutral-200 dark:border-neutral-800 shadow-2xs">
           <div className="relative flex-1 w-full">
-            <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-neutral-400 dark:text-neutral-500 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              placeholder="Search cases by name or ID..."
-              className="w-full pl-9 pr-3.5 py-1.5 text-xs border border-neutral-200 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-neutral-900 bg-neutral-50 focus:bg-white"
+              placeholder={t.cases.searchPlaceholder}
+              className="w-full pl-9 pr-3.5 py-1.5 text-xs border border-neutral-200 dark:border-neutral-700 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-neutral-900 dark:focus:ring-neutral-400 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-white"
             />
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <Filter className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
-            <span className="text-xs font-semibold text-neutral-600 shrink-0">Status:</span>
+            <span className="text-xs font-semibold text-neutral-600 dark:text-neutral-400 shrink-0">{lang === 'vi' ? 'Trạng thái' : 'Status'}:</span>
             <select
               value={statusFilter}
               onChange={e => setStatusFilter(e.target.value as any)}
-              className="px-2.5 py-1.5 text-xs border border-neutral-200 rounded-lg bg-neutral-50 focus:bg-white focus:outline-hidden font-medium text-neutral-800 w-full sm:w-auto"
+              className="px-2.5 py-1.5 text-xs border border-neutral-200 dark:border-neutral-700 rounded-lg bg-neutral-50 dark:bg-neutral-800 focus:bg-white dark:focus:bg-neutral-700 focus:outline-hidden font-medium text-neutral-800 dark:text-neutral-200 w-full sm:w-auto"
             >
-              <option value="ALL">All Statuses ({cases.length})</option>
-              <option value="ready">Ready for Audit ({cases.filter(c => c.readiness === 'ready').length})</option>
-              <option value="limited">Limited ({cases.filter(c => c.readiness === 'limited').length})</option>
-              <option value="blocked">Blocked ({cases.filter(c => c.readiness === 'blocked').length})</option>
+              <option value="ALL">{t.cases.filterAll} ({cases.length})</option>
+              <option value="ready">{t.cases.filterReady} ({cases.filter(c => c.readiness === 'ready').length})</option>
+              <option value="limited">{lang === 'vi' ? 'Thiếu tài liệu' : 'Limited (Partial Pack)'} ({cases.filter(c => c.readiness === 'limited').length})</option>
+              <option value="blocked">{lang === 'vi' ? 'Bị khóa (Chưa đủ điều kiện)' : 'Blocked (Missing Docs)'} ({cases.filter(c => c.readiness === 'blocked').length})</option>
             </select>
           </div>
         </div>
@@ -407,17 +410,19 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
         {createFormOpen && (
           <form
             onSubmit={handleCreateCase}
-            className="p-5 rounded-xl border border-neutral-200 bg-white shadow-xs space-y-4"
+            className="p-5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-xs space-y-4"
           >
-            <h3 className="text-sm font-bold text-neutral-900">Create a new case</h3>
+            <h3 className="text-sm font-bold text-neutral-900 dark:text-white">{t.cases.newCaseModalTitle}</h3>
             <div>
-              <label className="block text-xs font-semibold text-neutral-700 mb-1">Case name</label>
+              <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
+                {lang === 'vi' ? 'Tên hồ sơ đối soát' : 'Case Name'}
+              </label>
               <input
                 type="text"
                 value={newCaseName}
                 onChange={e => setNewCaseName(e.target.value)}
-                placeholder="e.g. Acme March 2026 invoice review"
-                className="w-full px-3.5 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-neutral-900 bg-neutral-50 focus:bg-white"
+                placeholder={t.cases.caseNameInputPlaceholder}
+                className="w-full px-3.5 py-2 text-sm border border-neutral-300 dark:border-neutral-700 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-neutral-900 dark:focus:ring-neutral-400 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-white"
                 required
               />
             </div>
@@ -425,16 +430,16 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
               <button
                 type="button"
                 onClick={() => setCreateFormOpen(false)}
-                className="px-3.5 py-1.5 rounded-lg border border-neutral-300 text-xs font-semibold text-neutral-700 hover:bg-neutral-50 cursor-pointer"
+                className="px-3.5 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 text-xs font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 cursor-pointer"
               >
-                Cancel
+                {t.common.cancel}
               </button>
               <button
                 type="submit"
                 disabled={creating || !newCaseName.trim()}
-                className="px-4 py-1.5 rounded-lg bg-neutral-900 text-white text-xs font-semibold hover:bg-neutral-800 disabled:opacity-50 cursor-pointer"
+                className="px-4 py-1.5 rounded-lg bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 text-xs font-semibold hover:bg-neutral-800 dark:hover:bg-white disabled:opacity-50 cursor-pointer"
               >
-                {creating ? 'Creating...' : 'Create case'}
+                {creating ? t.common.loading : t.cases.createAndUploadBtn}
               </button>
             </div>
           </form>
@@ -442,14 +447,14 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
 
         {/* Cases List */}
         {filteredCases.length === 0 ? (
-          <div className="p-12 text-center rounded-xl border border-dashed border-neutral-300 bg-white">
-            <h4 className="text-base font-semibold text-neutral-800">
-              {cases.length === 0 ? 'Your workspace is empty' : 'No matching cases found'}
+          <div className="p-12 text-center rounded-xl border border-dashed border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900">
+            <h4 className="text-base font-semibold text-neutral-800 dark:text-neutral-200">
+              {cases.length === 0 ? t.cases.noCasesFound : (lang === 'vi' ? 'Không tìm thấy hồ sơ phù hợp' : 'No matching audit cases found')}
             </h4>
-            <p className="text-xs text-neutral-500 mt-1">
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
               {cases.length === 0
-                ? 'Create a case above or try the sample pack on the Home page.'
-                : 'Try adjusting your search query or status filter.'}
+                ? t.cases.createFirstCase
+                : (lang === 'vi' ? 'Thử thay đổi từ khóa tìm kiếm hoặc bộ lọc trạng thái.' : 'Try adjusting your search query or status filter.')}
             </p>
           </div>
         ) : (
@@ -457,28 +462,28 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
             {filteredCases.map(c => (
               <div
                 key={c.case_id}
-                className="p-5 rounded-xl border border-neutral-200 bg-white shadow-2xs hover:border-neutral-300 transition-all flex items-center justify-between"
+                className="p-5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-2xs hover:border-neutral-300 dark:hover:border-neutral-700 transition-all flex items-center justify-between"
               >
                 <div className="space-y-1">
-                  <h3 className="text-base font-bold text-neutral-900">{c.name}</h3>
-                  <p className="text-xs text-neutral-500 font-mono">
-                    {c.document_count} documents · updated {c.updated_at ? c.updated_at.slice(0, 10) : 'recent'}
+                  <h3 className="text-base font-bold text-neutral-900 dark:text-white">{c.name}</h3>
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400 font-mono">
+                    {c.document_count} {lang === 'vi' ? 'tài liệu' : 'documents'} · {lang === 'vi' ? 'cập nhật' : 'updated'} {c.updated_at ? c.updated_at.slice(0, 10) : 'recent'}
                   </p>
                 </div>
 
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-2">
                     <ReadinessChip readiness={c.readiness} />
-                    <span className="text-xs text-neutral-600 font-medium">
-                      {c.open_review_count} open finding(s)
+                    <span className="text-xs text-neutral-600 dark:text-neutral-400 font-medium">
+                      {c.open_review_count} {lang === 'vi' ? 'sai lệch' : 'open finding(s)'}
                     </span>
                   </div>
                   <button
                     id={`open-case-btn-${c.case_id}`}
                     onClick={() => onSelectCase(c.case_id)}
-                    className="px-4 py-2 rounded-lg bg-neutral-900 text-white text-xs font-semibold hover:bg-neutral-800 transition-colors cursor-pointer"
+                    className="px-4 py-2 rounded-lg bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 text-xs font-semibold hover:bg-neutral-800 dark:hover:bg-white transition-colors cursor-pointer shadow-xs"
                   >
-                    Open
+                    {lang === 'vi' ? 'Mở hồ sơ' : 'Open Case'}
                   </button>
                 </div>
               </div>
@@ -501,16 +506,16 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
       <div>
         <button
           onClick={() => onSelectCase(null)}
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-neutral-600 hover:text-neutral-900 mb-3 cursor-pointer"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white mb-3 cursor-pointer"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>Back to Cases</span>
+          <span>{lang === 'vi' ? 'Quay lại danh sách hồ sơ' : 'Back to Cases'}</span>
         </button>
 
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-neutral-900 tracking-tight">{caseDetail.name}</h1>
-            <p className="text-xs text-neutral-500 font-mono mt-0.5">Case ID: {caseDetail.case_id}</p>
+            <h1 className="text-2xl font-bold text-neutral-900 dark:text-white tracking-tight">{caseDetail.name}</h1>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 font-mono mt-0.5">{lang === 'vi' ? 'Mã hồ sơ' : 'Case ID'}: {caseDetail.case_id}</p>
           </div>
           <ReadinessChip readiness={caseDetail.readiness} />
         </div>
@@ -525,16 +530,16 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
               key={docType}
               className={`p-3.5 rounded-lg border flex items-center gap-2.5 text-sm font-semibold transition-colors ${
                 complete
-                  ? 'bg-emerald-50/70 border-emerald-200 text-emerald-800'
-                  : 'bg-neutral-50 border-neutral-200 text-neutral-400'
+                  ? 'bg-emerald-50/70 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300'
+                  : 'bg-neutral-50 dark:bg-neutral-850 border-neutral-200 dark:border-neutral-800 text-neutral-400 dark:text-neutral-500'
               }`}
             >
               {complete ? (
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
               ) : (
-                <Circle className="w-4 h-4 text-neutral-300 shrink-0" />
+                <Circle className="w-4 h-4 text-neutral-300 dark:text-neutral-600 shrink-0" />
               )}
-              <span>{DOCUMENT_LABELS[docType]}</span>
+              <span>{docLabels[docType]}</span>
             </div>
           );
         })}
@@ -542,45 +547,59 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
 
       {/* Readiness Banner */}
       {caseDetail.readiness === 'blocked' ? (
-        <div className="p-3.5 rounded-lg bg-red-50 border border-red-200 text-red-800 text-xs flex items-center gap-2 font-medium">
+        <div className="p-3.5 rounded-lg bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-300 text-xs flex items-center gap-2 font-medium">
           <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
-          <span>Add both a Contract and an Invoice before analysis can start.</span>
+          <span>
+            {lang === 'vi' 
+              ? 'Hồ sơ chưa đủ điều kiện đối soát: Cần tải lên tối thiểu 1 Hợp đồng và 1 Hóa đơn hoặc Đơn đặt hàng để kích hoạt.' 
+              : 'Blocked: Pack requires at least Contract + Invoice or PO to perform cross-reconciliation.'}
+          </span>
         </div>
       ) : caseDetail.readiness === 'limited' ? (
-        <div className="p-3.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-center gap-2 font-medium">
+        <div className="p-3.5 rounded-lg bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-xs flex items-center gap-2 font-medium">
           <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
           <span>
-            Limited analysis: {caseDetail.missing_document_types.map(t => DOCUMENT_LABELS[t]).join(', ')} missing, so related checks will be skipped.
+            {lang === 'vi' 
+              ? `Hồ sơ có thể đối soát một phần. Còn thiếu các loại chứng từ: ${caseDetail.missing_document_types.map(t => docLabels[t]).join(', ')}` 
+              : `Partial pack ready. Missing recommended documents: ${caseDetail.missing_document_types.map(t => docLabels[t]).join(', ')}`}
           </span>
         </div>
       ) : (
-        <div className="p-3.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2 font-medium">
+        <div className="p-3.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs flex items-center gap-2 font-medium">
           <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-          <span>Document pack is complete and ready for deterministic cross-document analysis.</span>
+          <span>
+            {lang === 'vi' 
+              ? 'Bộ 4 chứng từ hoàn chỉnh! Đầy đủ điều kiện để thực hiện thẩm tra 100% các quy tắc đối soát.' 
+              : 'Complete 4-document pack ready! Fully qualified for deep cross-reconciliation and SOX compliance.'}
+          </span>
         </div>
       )}
 
       {/* STEP 1: Add Document Pack with Drag & Drop Dropzone */}
       <div className="space-y-4">
-        <h2 className="text-base font-bold text-neutral-900">1. Add document pack</h2>
+        <h2 className="text-base font-bold text-neutral-900 dark:text-white">
+          {lang === 'vi' ? 'Bước 1: Tải lên hồ sơ chứng từ' : 'Step 1: Ingest Document Pack'}
+        </h2>
         <div 
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           className={`p-8 rounded-xl border-2 border-dashed text-center space-y-3 transition-all ${
             isDragging 
-              ? 'border-blue-500 bg-blue-50/80 scale-[1.01] shadow-md' 
-              : 'border-neutral-300 bg-white hover:border-neutral-400'
+              ? 'border-blue-500 bg-blue-50/80 dark:bg-blue-950/40 scale-[1.01] shadow-md' 
+              : 'border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 hover:border-neutral-400 dark:hover:border-neutral-600'
           }`}
         >
-          <UploadCloud className={`w-10 h-10 mx-auto transition-colors ${isDragging ? 'text-blue-600 scale-110' : 'text-neutral-400'}`} />
+          <UploadCloud className={`w-10 h-10 mx-auto transition-colors ${isDragging ? 'text-blue-600 scale-110' : 'text-neutral-400 dark:text-neutral-500'}`} />
           <div>
-            <p className="text-sm font-bold text-neutral-900">
-              {isDragging ? 'Drop files here to upload...' : 'Drag & drop business files here, or browse'}
+            <p className="text-sm font-bold text-neutral-900 dark:text-white">
+              {isDragging 
+                ? (lang === 'vi' ? 'Thả tệp vào đây để tải lên...' : 'Drop files here to upload...') 
+                : (lang === 'vi' ? 'Kéo thả tệp chứng từ vào đây hoặc duyệt tệp từ máy tính' : 'Drag & drop audit documents here, or click to browse')}
             </p>
             <div className="mt-2">
-              <label className="cursor-pointer inline-block px-4 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white font-semibold text-xs transition-colors shadow-xs">
-                Choose files to upload
+              <label className="cursor-pointer inline-block px-4 py-2 rounded-lg bg-neutral-900 dark:bg-neutral-100 hover:bg-neutral-800 dark:hover:bg-white text-white dark:text-neutral-900 font-semibold text-xs transition-colors shadow-xs">
+                {t.cases.browseFilesBtn}
                 <input
                   type="file"
                   multiple
@@ -590,42 +609,42 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
                 />
               </label>
             </div>
-            <p className="text-[11px] text-neutral-500 mt-2">
-              Supports PDF, DOCX, TXT, MD, CSV (Contracts, Invoices, Purchase Orders, Policies)
+            <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-2">
+              {lang === 'vi' ? 'Hỗ trợ định dạng PDF, DOCX, TXT, Markdown, CSV (Tự động bóc tách & phân loại chứng từ)' : 'Supported: PDF, DOCX, TXT, Markdown, CSV (with auto-classification)'}
             </p>
           </div>
         </div>
 
         {/* Selected files preview table */}
         {selectedFiles.length > 0 && (
-          <div className="rounded-xl border border-neutral-200 bg-white overflow-hidden shadow-xs">
-            <div className="p-3 bg-neutral-50 border-b border-neutral-200 text-xs font-bold text-neutral-700 flex items-center justify-between">
+          <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 overflow-hidden shadow-xs">
+            <div className="p-3 bg-neutral-50 dark:bg-neutral-850 border-b border-neutral-200 dark:border-neutral-800 text-xs font-bold text-neutral-700 dark:text-neutral-300 flex items-center justify-between">
               <span className="flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                <span>Selected Files &amp; Smart Type Ingestion ({selectedFiles.length})</span>
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                <span>{lang === 'vi' ? `Tệp đã chọn & Tự động gán nhãn (${selectedFiles.length})` : `Selected Files & Smart Type Ingestion (${selectedFiles.length})`}</span>
               </span>
               <button 
                 onClick={() => setSelectedFiles([])}
                 className="text-[11px] font-semibold text-red-600 hover:underline cursor-pointer"
               >
-                Clear all
+                {t.cases.clearSelectedFiles}
               </button>
             </div>
-            <div className="divide-y divide-neutral-200">
+            <div className="divide-y divide-neutral-200 dark:divide-neutral-800">
               {selectedFiles.map((item, idx) => {
-                const inferred = inferDocTypeWithConfidence(item.file.name);
+                const inferred = inferDocTypeWithConfidence(item.file.name, lang);
                 return (
                   <div key={idx} className="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm">
                     <div className="flex items-center gap-2 min-w-0">
                       <FileText className="w-4 h-4 text-neutral-400 shrink-0" />
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="font-semibold text-neutral-900 truncate">{item.file.name}</span>
-                          <span className="text-[10px] px-1.5 py-0.2 rounded font-semibold bg-emerald-100 text-emerald-800">
-                            {inferred.confidence}% Auto-Detected
+                          <span className="font-semibold text-neutral-900 dark:text-white truncate">{item.file.name}</span>
+                          <span className="text-[10px] px-1.5 py-0.2 rounded font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300">
+                            {inferred.confidence}% {lang === 'vi' ? 'Tự động' : 'Auto-Detected'}
                           </span>
                         </div>
-                        <div className="text-[11px] text-neutral-400">
+                        <div className="text-[11px] text-neutral-400 dark:text-neutral-500">
                           {(item.file.size / 1024).toFixed(1)} KB · {inferred.reason}
                         </div>
                       </div>
@@ -633,22 +652,22 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
 
                     <div className="flex items-center gap-2 shrink-0 flex-wrap">
                       <div className="flex items-center gap-1">
-                        {(['contract', 'invoice', 'purchase_order', 'policy'] as DocumentType[]).map(t => (
+                        {(['contract', 'invoice', 'purchase_order', 'policy'] as DocumentType[]).map(tType => (
                           <button
-                            key={t}
+                            key={tType}
                             type="button"
                             onClick={() => {
                               const next = [...selectedFiles];
-                              next[idx].type = t;
+                              next[idx].type = tType;
                               setSelectedFiles(next);
                             }}
                             className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-colors cursor-pointer ${
-                              item.type === t
-                                ? 'bg-neutral-900 text-white'
-                                : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                              item.type === tType
+                                ? 'bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900'
+                                : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700'
                             }`}
                           >
-                            {DOCUMENT_LABELS[t]}
+                            {docLabels[tType]}
                           </button>
                         ))}
                       </div>
@@ -660,20 +679,20 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
                           next[idx].type = e.target.value as DocumentType;
                           setSelectedFiles(next);
                         }}
-                        className="text-xs border border-neutral-300 rounded px-2 py-1 bg-white font-medium"
+                        className="text-xs border border-neutral-300 dark:border-neutral-700 rounded px-2 py-1 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white font-medium"
                       >
-                        <option value="contract">Contract</option>
-                        <option value="invoice">Invoice</option>
-                        <option value="purchase_order">Purchase Order</option>
-                        <option value="policy">Payment Policy</option>
-                        <option value="other">Other</option>
+                        <option value="contract">{docLabels.contract}</option>
+                        <option value="invoice">{docLabels.invoice}</option>
+                        <option value="purchase_order">{docLabels.purchase_order}</option>
+                        <option value="policy">{docLabels.policy}</option>
+                        <option value="other">{docLabels.other}</option>
                       </select>
                       <button
                         onClick={() => {
                           setSelectedFiles(selectedFiles.filter((_, i) => i !== idx));
                         }}
                         className="p-1 text-neutral-400 hover:text-red-600 rounded cursor-pointer"
-                        title="Remove file"
+                        title={lang === 'vi' ? 'Xóa tệp' : 'Remove file'}
                       >
                         <X className="w-4 h-4" />
                       </button>
@@ -682,21 +701,21 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
                 );
               })}
             </div>
-            <div className="p-3 bg-neutral-50 border-t border-neutral-200 flex justify-end">
+            <div className="p-3 bg-neutral-50 dark:bg-neutral-850 border-t border-neutral-200 dark:border-neutral-800 flex justify-end">
               <button
                 id="upload-pack-btn"
                 onClick={handleUploadPack}
                 disabled={uploading}
-                className="px-4 py-2 rounded-lg bg-neutral-900 text-white text-xs font-semibold hover:bg-neutral-800 disabled:opacity-50 cursor-pointer shadow-xs"
+                className="px-4 py-2 rounded-lg bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 text-xs font-semibold hover:bg-neutral-800 dark:hover:bg-white disabled:opacity-50 cursor-pointer shadow-xs"
               >
-                {uploading ? 'Parsing & Indexing...' : `Upload and Index ${selectedFiles.length} file(s)`}
+                {uploading ? t.cases.runningAuditBtn : (lang === 'vi' ? `Tải lên ${selectedFiles.length} tài liệu` : `Upload ${selectedFiles.length} File(s)`)}
               </button>
             </div>
           </div>
         )}
 
         {uploadMessage && (
-          <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium flex items-center gap-2">
+          <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs font-medium flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
             <span>{uploadMessage}</span>
           </div>
@@ -704,13 +723,15 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
 
         {/* Existing documents with Quick Peek */}
         {caseDetail.documents && caseDetail.documents.length > 0 && (
-          <div className="rounded-xl border border-neutral-200 bg-white p-4 space-y-3">
+          <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-500">
-                  Documents in this case ({caseDetail.documents.length})
+                <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+                  {lang === 'vi' ? `Tài liệu trong hồ sơ (${caseDetail.documents.length})` : `Documents in Pack (${caseDetail.documents.length})`}
                 </h3>
-                <span className="text-[11px] text-neutral-400">Click any document to inspect content &amp; metadata</span>
+                <span className="text-[11px] text-neutral-400 dark:text-neutral-500">
+                  {lang === 'vi' ? 'Bấm vào tài liệu để xem nhanh chi tiết hoặc mở chế độ so khớp đối chiếu' : 'Click any document to inspect details or launch split reconciliation'}
+                </span>
               </div>
               {caseDetail.documents.length >= 2 && (
                 <button
@@ -720,34 +741,34 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
                     leftDocId: caseDetail.documents![0]?.document_id,
                     rightDocId: caseDetail.documents![1]?.document_id,
                   })}
-                  className="px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+                  className="px-3 py-1.5 rounded-lg bg-neutral-900 dark:bg-neutral-100 hover:bg-neutral-800 dark:hover:bg-white text-white dark:text-neutral-900 text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
                 >
-                  <Columns className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Compare Documents (Split View)</span>
+                  <Columns className="w-3.5 h-3.5 text-emerald-400 dark:text-emerald-600" />
+                  <span>{lang === 'vi' ? 'So khớp song song' : 'Side-by-Side Split'}</span>
                 </button>
               )}
             </div>
-            <div className="divide-y divide-neutral-100">
+            <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
               {caseDetail.documents.map(d => (
                 <div 
                   key={d.document_id} 
-                  className="py-2.5 px-2 -mx-2 rounded-lg hover:bg-neutral-50 transition-colors flex items-center justify-between text-xs group"
+                  className="py-2.5 px-2 -mx-2 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-800/60 transition-colors flex items-center justify-between text-xs group"
                 >
                   <div 
                     onClick={() => handleOpenPeek(d.document_id)}
                     className="flex items-center gap-2.5 cursor-pointer flex-1 min-w-0"
                   >
-                    <div className="w-7 h-7 rounded-md bg-neutral-100 text-neutral-600 flex items-center justify-center group-hover:bg-blue-100 group-hover:text-blue-700 transition-colors shrink-0">
+                    <div className="w-7 h-7 rounded-md bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 flex items-center justify-center group-hover:bg-blue-100 dark:group-hover:bg-blue-950 group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors shrink-0">
                       <FileText className="w-4 h-4" />
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="font-semibold text-neutral-900 group-hover:text-blue-700 transition-colors truncate">{d.filename}</span>
-                        <span className="px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-600 font-mono text-[10px] shrink-0">
-                          {DOCUMENT_LABELS[d.document_type] || d.document_type}
+                        <span className="font-semibold text-neutral-900 dark:text-white group-hover:text-blue-700 dark:group-hover:text-blue-400 transition-colors truncate">{d.filename}</span>
+                        <span className="px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 font-mono text-[10px] shrink-0 border border-neutral-200 dark:border-neutral-700">
+                          {docLabels[d.document_type] || d.document_type}
                         </span>
                       </div>
-                      <div className="text-neutral-400 font-mono text-[10px] mt-0.5">
+                      <div className="text-neutral-400 dark:text-neutral-500 font-mono text-[10px] mt-0.5">
                         SHA-256: {d.sha256.slice(0, 10)}... · {(d.size_bytes / 1024).toFixed(1)} KB
                       </div>
                     </div>
@@ -764,19 +785,19 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
                             rightDocId: otherDoc?.document_id,
                           });
                         }}
-                        className="px-2 py-1 rounded-md bg-neutral-100 hover:bg-neutral-200 text-neutral-700 text-[11px] font-medium flex items-center gap-1 cursor-pointer"
+                        className="px-2 py-1 rounded-md bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 text-[11px] font-medium flex items-center gap-1 cursor-pointer"
                         title="Compare this document side-by-side"
                       >
                         <Columns className="w-3 h-3 text-neutral-500" />
-                        <span className="hidden sm:inline">Compare</span>
+                        <span className="hidden sm:inline">{lang === 'vi' ? 'So sánh' : 'Compare'}</span>
                       </button>
                     )}
                     <button
                       onClick={() => handleOpenPeek(d.document_id)}
-                      className="px-2 py-1 rounded-md hover:bg-neutral-100 text-neutral-600 text-[11px] font-medium flex items-center gap-1 cursor-pointer"
+                      className="px-2 py-1 rounded-md hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-300 text-[11px] font-medium flex items-center gap-1 cursor-pointer"
                     >
                       <Eye className="w-3.5 h-3.5" />
-                      <span className="hidden sm:inline">Inspect</span>
+                      <span className="hidden sm:inline">{lang === 'vi' ? 'Xem nhanh' : 'Inspect'}</span>
                     </button>
                   </div>
                 </div>
@@ -788,28 +809,28 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
 
       {/* Quick Peek Modal */}
       {peekDoc && (
-        <div className="fixed inset-0 bg-neutral-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-neutral-200 shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 bg-neutral-950/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800 shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             {/* Modal Header */}
-            <div className="p-4 border-b border-neutral-200 bg-neutral-50 flex items-center justify-between">
+            <div className="p-4 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-850 flex items-center justify-between">
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
+                <div className="w-8 h-8 rounded-lg bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 flex items-center justify-center shrink-0">
                   <FileText className="w-4 h-4" />
                 </div>
                 <div className="min-w-0">
-                  <h3 className="text-sm font-bold text-neutral-900 truncate">{peekDoc.filename}</h3>
-                  <div className="flex items-center gap-2 text-[11px] text-neutral-500">
-                    <span className="capitalize font-semibold text-neutral-700">{DOCUMENT_LABELS[peekDoc.document_type] || peekDoc.document_type}</span>
+                  <h3 className="text-sm font-bold text-neutral-900 dark:text-white truncate">{peekDoc.filename}</h3>
+                  <div className="flex items-center gap-2 text-[11px] text-neutral-500 dark:text-neutral-400">
+                    <span className="capitalize font-semibold text-neutral-700 dark:text-neutral-300">{docLabels[peekDoc.document_type] || peekDoc.document_type}</span>
                     <span>·</span>
                     <span>{(peekDoc.size_bytes / 1024).toFixed(1)} KB</span>
                     <span>·</span>
-                    <span className="text-emerald-700 font-medium">Indexed (v1.4)</span>
+                    <span className="text-emerald-700 dark:text-emerald-400 font-medium">SOX/ISO Hash Verified</span>
                   </div>
                 </div>
               </div>
               <button
                 onClick={() => setPeekDoc(null)}
-                className="p-1.5 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-200/60 rounded-lg transition-colors cursor-pointer"
+                className="p-1.5 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-200/60 dark:hover:bg-neutral-800 rounded-lg transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -818,32 +839,32 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
             {/* Modal Body */}
             <div className="p-6 overflow-y-auto space-y-5">
               {/* Metadata Bar */}
-              <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-200 text-xs flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2 font-mono text-[11px] text-neutral-600">
+              <div className="p-3 bg-neutral-50 dark:bg-neutral-850 rounded-xl border border-neutral-200 dark:border-neutral-800 text-xs flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2 font-mono text-[11px] text-neutral-600 dark:text-neutral-400">
                   <Hash className="w-3.5 h-3.5 text-neutral-400" />
-                  <span className="font-semibold text-neutral-700">SHA-256:</span>
+                  <span className="font-semibold text-neutral-700 dark:text-neutral-300">SHA-256:</span>
                   <span className="select-all">{peekDoc.sha256}</span>
                 </div>
                 <button
                   onClick={handleCopySha256}
-                  className="px-2.5 py-1 bg-white hover:bg-neutral-100 border border-neutral-200 rounded-md font-semibold text-[11px] text-neutral-700 flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                  className="px-2.5 py-1 bg-white dark:bg-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-700 border border-neutral-200 dark:border-neutral-700 rounded-md font-semibold text-[11px] text-neutral-700 dark:text-neutral-300 flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
                 >
                   <Copy className="w-3 h-3" />
-                  <span>{copiedHash ? 'Copied!' : 'Copy Hash'}</span>
+                  <span>{copiedHash ? (lang === 'vi' ? 'Đã sao chép!' : 'Copied!') : (lang === 'vi' ? 'Sao chép mã băm' : 'Copy Hash')}</span>
                 </button>
               </div>
 
               {/* Extracted Structured Schema if present */}
               {peekDoc.extracted_data && Object.keys(peekDoc.extracted_data).length > 0 && (
                 <div>
-                  <h4 className="text-xs font-bold text-neutral-500 uppercase tracking-wider mb-2">
-                    Normalized Schema Fields
+                  <h4 className="text-xs font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mb-2">
+                    {lang === 'vi' ? 'Dữ liệu bóc tách chuẩn hóa' : 'Normalized Extracted Schema'}
                   </h4>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
                     {Object.entries(peekDoc.extracted_data).map(([k, v]) => (
-                      <div key={k} className="p-2.5 rounded-lg bg-neutral-50 border border-neutral-200">
-                        <span className="text-[10px] uppercase font-bold text-neutral-400 block">{k.replace(/_/g, ' ')}</span>
-                        <span className="font-mono font-semibold text-neutral-900 mt-0.5 block truncate">
+                      <div key={k} className="p-2.5 rounded-lg bg-neutral-50 dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800">
+                        <span className="text-[10px] uppercase font-bold text-neutral-400 dark:text-neutral-500 block">{k.replace(/_/g, ' ')}</span>
+                        <span className="font-mono font-semibold text-neutral-900 dark:text-white mt-0.5 block truncate">
                           {typeof v === 'object' ? JSON.stringify(v) : String(v || 'N/A')}
                         </span>
                       </div>
@@ -854,17 +875,17 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
 
               {/* Raw Document Content */}
               <div>
-                <h4 className="text-xs font-bold text-neutral-500 uppercase tracking-wider mb-2">
-                  Document Text Content
+                <h4 className="text-xs font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mb-2">
+                  {lang === 'vi' ? 'Toàn văn chứng từ thô' : 'Raw Document Text'}
                 </h4>
-                <div className="p-4 rounded-xl bg-neutral-900 text-neutral-100 font-mono text-xs leading-relaxed max-h-80 overflow-y-auto whitespace-pre-wrap select-text">
-                  {peekDoc.text_content || 'No text content available.'}
+                <div className="p-4 rounded-xl bg-neutral-900 dark:bg-neutral-950 text-neutral-100 border border-neutral-800 font-mono text-xs leading-relaxed max-h-80 overflow-y-auto whitespace-pre-wrap select-text">
+                  {peekDoc.text_content || (lang === 'vi' ? 'Không có nội dung văn bản khả dụng.' : 'No text content available.')}
                 </div>
               </div>
             </div>
 
             {/* Modal Footer */}
-            <div className="p-4 border-t border-neutral-200 bg-neutral-50 flex items-center justify-between gap-3">
+            <div className="p-4 border-t border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-850 flex items-center justify-between gap-3">
               {caseDetail.documents && caseDetail.documents.length >= 2 ? (
                 <button
                   onClick={() => {
@@ -876,17 +897,17 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
                     });
                     setPeekDoc(null);
                   }}
-                  className="px-3.5 py-1.5 rounded-lg border border-neutral-300 bg-white hover:bg-neutral-100 text-neutral-800 font-semibold text-xs transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  className="px-3.5 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 font-semibold text-xs transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
                 >
-                  <Columns className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Open in Side-by-Side Split Viewer</span>
+                  <Columns className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span>{lang === 'vi' ? 'Mở cửa sổ so khớp đối chiếu' : 'Open in Split Reconciliation Viewer'}</span>
                 </button>
               ) : <div />}
               <button
                 onClick={() => setPeekDoc(null)}
-                className="px-4 py-2 rounded-lg bg-neutral-900 text-white font-semibold text-xs hover:bg-neutral-800 transition-colors cursor-pointer"
+                className="px-4 py-2 rounded-lg bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 font-semibold text-xs hover:bg-neutral-800 dark:hover:bg-white transition-colors cursor-pointer"
               >
-                Close Preview
+                {lang === 'vi' ? 'Đóng xem nhanh' : 'Close Preview'}
               </button>
             </div>
           </div>
@@ -894,46 +915,48 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
       )}
 
       {/* STEP 2: Analyze Case */}
-      <div className="space-y-4 pt-4 border-t border-neutral-200">
-        <h2 className="text-base font-bold text-neutral-900">2. Analyze case</h2>
+      <div className="space-y-4 pt-4 border-t border-neutral-200 dark:border-neutral-800">
+        <h2 className="text-base font-bold text-neutral-900 dark:text-white">
+          {lang === 'vi' ? 'Bước 2: Thẩm tra tự động & Phát hiện sai lệch' : 'Step 2: Automated Multi-Doc Cross-Audit'}
+        </h2>
 
         <div className="flex items-center gap-3">
           <button
             id="analyze-case-btn"
             onClick={handleRunAnalysis}
             disabled={caseDetail.readiness === 'blocked' || activeWorkflow?.status === 'running'}
-            className="px-6 py-2.5 rounded-lg bg-neutral-900 text-white font-semibold text-sm hover:bg-neutral-800 disabled:opacity-50 transition-colors shadow-xs flex items-center gap-2 cursor-pointer"
+            className="px-6 py-2.5 rounded-lg bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 font-semibold text-sm hover:bg-neutral-800 dark:hover:bg-white disabled:opacity-50 transition-colors shadow-xs flex items-center gap-2 cursor-pointer"
           >
-            <Play className="w-4 h-4 fill-white" />
-            <span>Analyze case</span>
+            <Play className="w-4 h-4 fill-current" />
+            <span>{t.cases.runDeepAuditBtn}</span>
           </button>
-          <span className="text-xs text-neutral-500">
-            Runs deterministic arithmetic and cross-document validation rules.
+          <span className="text-xs text-neutral-500 dark:text-neutral-400">
+            {lang === 'vi' ? 'Quy trình đối soát liên tài liệu: bóc tách số liệu, đối chiếu bảng giá, kiểm tra thuế VAT và băm chứng cứ.' : 'Deterministic multi-doc pipeline: extraction, rate-card reconciliation, VAT validation, and SHA-256 integrity.'}
           </span>
         </div>
 
         {/* Active Analysis Progress */}
         {activeWorkflow && activeWorkflow.status === 'running' && (
-          <div className="p-5 rounded-xl border border-neutral-200 bg-white space-y-4 shadow-xs">
-            <div className="flex items-center justify-between text-xs font-bold text-neutral-800">
+          <div className="p-5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 space-y-4 shadow-xs">
+            <div className="flex items-center justify-between text-xs font-bold text-neutral-800 dark:text-neutral-200">
               <span>{activeWorkflow.current_step}</span>
               <span>{activeWorkflow.progress_percent}%</span>
             </div>
-            <div className="w-full h-2 bg-neutral-100 rounded-full overflow-hidden">
+            <div className="w-full h-2 bg-neutral-100 dark:bg-neutral-800 rounded-full overflow-hidden">
               <div
-                className="h-full bg-neutral-900 transition-all duration-300"
+                className="h-full bg-neutral-900 dark:bg-neutral-100 transition-all duration-300"
                 style={{ width: `${activeWorkflow.progress_percent}%` }}
               />
             </div>
             <div className="space-y-1.5 pt-2">
               {activeWorkflow.steps.map(s => (
-                <div key={s.step} className="flex items-center gap-2 text-xs text-neutral-600">
+                <div key={s.step} className="flex items-center gap-2 text-xs text-neutral-600 dark:text-neutral-400">
                   {s.status === 'completed' ? (
-                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                    <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                   ) : s.status === 'running' ? (
-                    <span className="w-2 h-2 rounded-full bg-neutral-900 animate-ping" />
+                    <span className="w-2 h-2 rounded-full bg-neutral-900 dark:bg-neutral-100 animate-ping" />
                   ) : (
-                    <Circle className="w-3 h-3 text-neutral-300" />
+                    <Circle className="w-3 h-3 text-neutral-300 dark:text-neutral-600" />
                   )}
                   <span>{s.label}</span>
                 </div>
@@ -944,75 +967,77 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
 
         {/* Completed Analysis Report */}
         {activeWorkflow && activeWorkflow.status === 'completed' && activeWorkflow.result && (
-          <div className="p-6 rounded-xl border border-neutral-200 bg-white space-y-6 shadow-xs">
+          <div className="p-6 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 space-y-6 shadow-xs">
             {/* 4 Metric Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div className="p-3.5 rounded-lg bg-neutral-50 border border-neutral-200">
-                <div className="text-xs text-neutral-500">Documents analyzed</div>
-                <div className="text-xl font-bold text-neutral-900 mt-1">
+              <div className="p-3.5 rounded-lg bg-neutral-50 dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800">
+                <div className="text-xs text-neutral-500 dark:text-neutral-400">{lang === 'vi' ? 'Tài liệu đã thẩm tra' : 'Docs Analyzed'}</div>
+                <div className="text-xl font-bold text-neutral-900 dark:text-white mt-1">
                   {activeWorkflow.result.documents_analyzed?.length || 0}
                 </div>
               </div>
-              <div className="p-3.5 rounded-lg bg-neutral-50 border border-neutral-200">
-                <div className="text-xs text-neutral-500">High severity</div>
-                <div className="text-xl font-bold text-red-600 mt-1">
+              <div className="p-3.5 rounded-lg bg-neutral-50 dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800">
+                <div className="text-xs text-neutral-500 dark:text-neutral-400">{lang === 'vi' ? 'Sai lệch nghiêm trọng' : 'High Severity'}</div>
+                <div className="text-xl font-bold text-red-600 dark:text-red-400 mt-1">
                   {activeWorkflow.result.issues?.filter((i: any) => i.severity === 'high').length || 0}
                 </div>
               </div>
-              <div className="p-3.5 rounded-lg bg-neutral-50 border border-neutral-200">
-                <div className="text-xs text-neutral-500">Extraction failures</div>
-                <div className="text-xl font-bold text-neutral-900 mt-1">
+              <div className="p-3.5 rounded-lg bg-neutral-50 dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800">
+                <div className="text-xs text-neutral-500 dark:text-neutral-400">{lang === 'vi' ? 'Lỗi trích xuất' : 'Extraction Failures'}</div>
+                <div className="text-xl font-bold text-neutral-900 dark:text-white mt-1">
                   {activeWorkflow.result.extraction_failures?.length || 0}
                 </div>
               </div>
-              <div className="p-3.5 rounded-lg bg-neutral-50 border border-neutral-200">
-                <div className="text-xs text-neutral-500">Human review</div>
-                <div className={`text-xl font-bold mt-1 ${activeWorkflow.requires_review ? 'text-amber-600' : 'text-emerald-600'}`}>
-                  {activeWorkflow.requires_review ? 'Required' : 'Not required'}
+              <div className="p-3.5 rounded-lg bg-neutral-50 dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800">
+                <div className="text-xs text-neutral-500 dark:text-neutral-400">{lang === 'vi' ? 'Kiểm toán viên duyệt' : 'Human Review'}</div>
+                <div className={`text-xl font-bold mt-1 ${activeWorkflow.requires_review ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                  {activeWorkflow.requires_review ? (lang === 'vi' ? 'Yêu cầu duyệt' : 'Required') : (lang === 'vi' ? 'Tự động duyệt' : 'Passed')}
                 </div>
               </div>
             </div>
 
             {/* Summary narrative */}
-            <div className="p-4 rounded-lg bg-neutral-50 border border-neutral-200 text-sm text-neutral-800 leading-relaxed">
+            <div className="p-4 rounded-lg bg-neutral-50 dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-sm text-neutral-800 dark:text-neutral-200 leading-relaxed">
               {activeWorkflow.result.summary}
             </div>
 
             {/* Discrepancy Findings by Severity */}
             {activeWorkflow.result.issues && activeWorkflow.result.issues.length > 0 && (
               <div className="space-y-4">
-                <h3 className="text-sm font-bold text-neutral-900">Findings & Evidence Breakdown</h3>
+                <h3 className="text-sm font-bold text-neutral-900 dark:text-white">
+                  {lang === 'vi' ? 'Phát hiện sai lệch & Chứng cứ đối chiếu' : 'Discrepancy Findings & Evidence'}
+                </h3>
                 <div className="space-y-3">
                   {activeWorkflow.result.issues.map((issue: Discrepancy, index: number) => (
                     <div
                       key={index}
-                      className="p-4 rounded-lg border border-neutral-200 bg-white space-y-2.5 shadow-2xs"
+                      className="p-4 rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 space-y-2.5 shadow-2xs"
                     >
                       <div className="flex items-center gap-2">
                         <SeverityBadge severity={issue.severity} />
-                        <h4 className="text-sm font-bold text-neutral-900">
+                        <h4 className="text-sm font-bold text-neutral-900 dark:text-white">
                           {issue.type.replace(/_/g, ' ').toUpperCase()}
                         </h4>
                       </div>
-                      <p className="text-xs text-neutral-700 leading-relaxed">{issue.description}</p>
+                      <p className="text-xs text-neutral-700 dark:text-neutral-300 leading-relaxed">{issue.description}</p>
 
                       {/* Calculation Box if present */}
                       {issue.calculation && (
-                        <div className="p-2.5 rounded bg-neutral-100 text-neutral-800 text-xs font-mono flex items-start gap-2">
+                        <div className="p-2.5 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 text-xs font-mono flex items-start gap-2 border border-neutral-200 dark:border-neutral-700">
                           <Calculator className="w-4 h-4 text-neutral-500 shrink-0 mt-0.5" />
                           <div>
-                            <div>Formula: {issue.calculation.formula}</div>
-                            <div className="text-neutral-500">Difference: {issue.calculation.result}</div>
+                            <div>{lang === 'vi' ? 'Công thức' : 'Formula'}: {issue.calculation.formula}</div>
+                            <div className="text-neutral-500 dark:text-neutral-400">{lang === 'vi' ? 'Chênh lệch' : 'Difference'}: {issue.calculation.result}</div>
                           </div>
                         </div>
                       )}
 
                       {/* Evidence snippets */}
                       {issue.evidence && issue.evidence.length > 0 && (
-                        <div className="pt-2 border-t border-neutral-100 space-y-2">
+                        <div className="pt-2 border-t border-neutral-100 dark:border-neutral-800 space-y-2">
                           <div className="flex items-center justify-between">
-                            <div className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">
-                              Evidence ({issue.evidence.length})
+                            <div className="text-[11px] font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+                              {lang === 'vi' ? 'Chứng cứ trích dẫn' : 'Evidence Sources'} ({issue.evidence.length})
                             </div>
                             <button
                               onClick={() => {
@@ -1026,17 +1051,17 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
                                   finding: issue,
                                 });
                               }}
-                              className="px-2.5 py-1 rounded-md bg-neutral-900 hover:bg-neutral-800 text-white text-[11px] font-semibold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+                              className="px-2.5 py-1 rounded-md bg-neutral-900 dark:bg-neutral-100 hover:bg-neutral-800 dark:hover:bg-white text-white dark:text-neutral-900 text-[11px] font-semibold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
                             >
-                              <Columns className="w-3 h-3 text-emerald-400" />
-                              <span>Compare Evidence in Split View</span>
+                              <Columns className="w-3 h-3 text-emerald-400 dark:text-emerald-600" />
+                              <span>{lang === 'vi' ? 'Mở so khớp chứng cứ' : 'Compare in Split Viewer'}</span>
                             </button>
                           </div>
                           {issue.evidence.map((ev, ei) => (
-                            <div key={ei} className="text-xs bg-neutral-50 p-2 rounded border border-neutral-100">
-                              <span className="font-semibold text-neutral-800">{ev.filename}</span>
-                              {ev.page_number && <span className="text-neutral-500"> · p. {ev.page_number}</span>}
-                              {ev.snippet && <p className="text-neutral-600 mt-0.5 italic">"{ev.snippet}"</p>}
+                            <div key={ei} className="text-xs bg-neutral-50 dark:bg-neutral-850 p-2 rounded border border-neutral-100 dark:border-neutral-800">
+                              <span className="font-semibold text-neutral-800 dark:text-neutral-200">{ev.filename}</span>
+                              {ev.page_number && <span className="text-neutral-500 dark:text-neutral-400"> · {lang === 'vi' ? 'trang' : 'p.'} {ev.page_number}</span>}
+                              {ev.snippet && <p className="text-neutral-600 dark:text-neutral-400 mt-0.5 italic">"{ev.snippet}"</p>}
                             </div>
                           ))}
                         </div>
@@ -1048,34 +1073,34 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
             )}
 
             {/* Action Bar */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-neutral-200">
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-neutral-200 dark:border-neutral-800">
               <div className="flex items-center gap-2">
                 <button
                   id="review-findings-btn"
                   onClick={() => onNavigateToReviews(caseDetail.case_id)}
-                  className="px-5 py-2 rounded-lg bg-neutral-900 text-white font-semibold text-xs hover:bg-neutral-800 transition-colors cursor-pointer"
+                  className="px-5 py-2 rounded-lg bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 font-semibold text-xs hover:bg-neutral-800 dark:hover:bg-white transition-colors cursor-pointer shadow-xs"
                 >
-                  Review findings ({activeWorkflow.result.issues?.length || 0})
+                  {lang === 'vi' ? `Xem & Xử lý ${activeWorkflow.result.issues?.length || 0} sai lệch` : `Review ${activeWorkflow.result.issues?.length || 0} Finding(s)`}
                 </button>
 
                 <button
                   id="export-dossier-btn"
                   onClick={handleExportAuditDossier}
-                  title="Print or export full official SOX/ISO Audit Dossier"
-                  className="px-4 py-2 rounded-lg bg-emerald-700 text-white font-semibold text-xs hover:bg-emerald-800 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  title={lang === 'vi' ? 'In hoặc xuất Hồ sơ Kiểm toán SOX/ISO' : 'Print or export full official SOX/ISO Audit Dossier'}
+                  className="px-4 py-2 rounded-lg bg-emerald-700 dark:bg-emerald-800 text-white font-semibold text-xs hover:bg-emerald-800 dark:hover:bg-emerald-700 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
                 >
                   <Printer className="w-3.5 h-3.5 text-emerald-200" />
-                  <span>Export Audit Dossier (Print / PDF)</span>
+                  <span>{t.cases.exportDossierBtn}</span>
                 </button>
               </div>
 
               <button
                 id="download-report-btn"
                 onClick={downloadMarkdownReport}
-                className="px-4 py-2 rounded-lg border border-neutral-300 text-neutral-800 font-semibold text-xs hover:bg-neutral-50 transition-colors flex items-center gap-1.5 cursor-pointer"
+                className="px-4 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 font-semibold text-xs hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors flex items-center gap-1.5 cursor-pointer"
               >
                 <Download className="w-3.5 h-3.5" />
-                <span>Download Markdown report</span>
+                <span>{t.cases.downloadMarkdownBtn}</span>
               </button>
             </div>
           </div>
@@ -1083,17 +1108,19 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
       </div>
 
       {/* Case Settings / Delete */}
-      <div className="pt-6 border-t border-neutral-200">
-        <div className="p-4 rounded-xl border border-neutral-200 bg-white space-y-3">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-500">Case settings</h3>
-          <label className="flex items-center gap-2 text-xs text-neutral-700 cursor-pointer">
+      <div className="pt-6 border-t border-neutral-200 dark:border-neutral-800">
+        <div className="p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 space-y-3">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+            {lang === 'vi' ? 'Quản lý & Thiết lập Hồ sơ' : 'Case Settings & Danger Zone'}
+          </h3>
+          <label className="flex items-center gap-2 text-xs text-neutral-700 dark:text-neutral-300 cursor-pointer">
             <input
               type="checkbox"
               checked={deleteConfirm}
               onChange={e => setDeleteConfirm(e.target.checked)}
-              className="rounded border-neutral-300"
+              className="rounded border-neutral-300 dark:border-neutral-700"
             />
-            <span>I understand this permanently deletes the case and its audit data.</span>
+            <span>{t.cases.confirmDeletePrompt}</span>
           </label>
           <button
             onClick={handleDeleteCase}
@@ -1101,7 +1128,7 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
             className="px-3.5 py-1.5 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700 disabled:opacity-40 transition-colors flex items-center gap-1.5 cursor-pointer"
           >
             <Trash2 className="w-3.5 h-3.5" />
-            <span>Delete case</span>
+            <span>{t.cases.deleteCaseBtn}</span>
           </button>
         </div>
       </div>
@@ -1116,7 +1143,6 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
           caseId={caseDetail.case_id}
           onClose={() => setSplitViewerConfig({ open: false })}
           onApproveFinding={async (finding) => {
-            // Find review finding id if any or trigger workflow review update
             onNavigateToReviews(caseDetail.case_id);
           }}
         />
@@ -1124,3 +1150,4 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
     </div>
   );
 }
+

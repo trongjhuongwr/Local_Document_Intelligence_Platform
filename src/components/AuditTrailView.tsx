@@ -26,6 +26,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { AuditTrailEntry, CaseItem, AuditAction } from '../types';
+import { useThemeLanguage } from '../context/ThemeLanguageContext';
 
 interface AuditTrailViewProps {
   cases: CaseItem[];
@@ -40,6 +41,7 @@ export function AuditTrailView({
   onSelectCase,
   onNavigateToCase
 }: AuditTrailViewProps) {
+  const { lang, t } = useThemeLanguage();
   const [entries, setEntries] = useState<AuditTrailEntry[]>([]);
   const [totalRecords, setTotalRecords] = useState(0);
   const [chainValid, setChainValid] = useState(true);
@@ -51,7 +53,7 @@ export function AuditTrailView({
   
   // Attestation modal
   const [attestationModalOpen, setAttestationModalOpen] = useState(false);
-  const [attestActor, setAttestActor] = useState('Senior Lead Auditor (SOX Compliance)');
+  const [attestActor, setAttestActor] = useState(lang === 'vi' ? 'Trưởng nhóm Kiểm toán viên (Tuân thủ SOX)' : 'Senior Lead Auditor (SOX Compliance)');
   const [attestCaseId, setAttestCaseId] = useState(selectedCaseId || (cases[0]?.case_id || ''));
   const [attestDetails, setAttestDetails] = useState('');
   const [submittingAttest, setSubmittingAttest] = useState(false);
@@ -129,14 +131,14 @@ export function AuditTrailView({
       });
 
       if (res.ok) {
-        showToast('Compliance attestation cryptographically recorded to ledger');
+        showToast(lang === 'vi' ? 'Đã ghi nhận chứng thực tuân thủ vào sổ cái mã hóa' : 'Compliance attestation cryptographically recorded to ledger');
         setAttestDetails('');
         setAttestationModalOpen(false);
         fetchAuditTrail();
       }
     } catch (err) {
       console.error(err);
-      showToast('Error recording attestation');
+      showToast(lang === 'vi' ? 'Lỗi khi ghi nhận chứng thực' : 'Error recording attestation');
     } finally {
       setSubmittingAttest(false);
     }
@@ -150,56 +152,56 @@ export function AuditTrailView({
   const getActionBadge = (action: AuditAction) => {
     switch (action) {
       case 'DOCUMENT_INGESTED':
-        return { label: 'Doc Ingested', bg: 'bg-blue-50 text-blue-700 border-blue-200', icon: FileText };
+        return { label: lang === 'vi' ? 'Nạp tài liệu' : 'Doc Ingested', bg: 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800', icon: FileText };
       case 'WORKFLOW_STARTED':
-        return { label: 'Audit Started', bg: 'bg-indigo-50 text-indigo-700 border-indigo-200', icon: Play };
+        return { label: lang === 'vi' ? 'Bắt đầu kiểm toán' : 'Audit Started', bg: 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800', icon: Play };
       case 'WORKFLOW_COMPLETED':
-        return { label: 'Audit Completed', bg: 'bg-purple-50 text-purple-700 border-purple-200', icon: CheckCircle2 };
+        return { label: lang === 'vi' ? 'Hoàn tất kiểm toán' : 'Audit Completed', bg: 'bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800', icon: CheckCircle2 };
       case 'FINDING_APPROVED':
-        return { label: 'Approved', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: CheckCircle2 };
+        return { label: lang === 'vi' ? 'Đã phê duyệt' : 'Approved', bg: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800', icon: CheckCircle2 };
       case 'FINDING_REJECTED':
-        return { label: 'Rejected / Exception', bg: 'bg-rose-50 text-rose-700 border-rose-200', icon: XCircle };
+        return { label: lang === 'vi' ? 'Bác bỏ / Ngoại lệ' : 'Rejected / Exception', bg: 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800', icon: XCircle };
       case 'FINDING_RESOLVED':
-        return { label: 'Resolved', bg: 'bg-teal-50 text-teal-700 border-teal-200', icon: CheckCircle2 };
+        return { label: lang === 'vi' ? 'Đã giải quyết' : 'Resolved', bg: 'bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-800', icon: CheckCircle2 };
       case 'FINDING_BATCH_ACTION':
-        return { label: 'Batch Action', bg: 'bg-amber-50 text-amber-700 border-amber-200', icon: Layers };
+        return { label: lang === 'vi' ? 'Xử lý hàng loạt' : 'Batch Action', bg: 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800', icon: Layers };
       case 'CASE_CREATED':
-        return { label: 'Case Created', bg: 'bg-neutral-100 text-neutral-800 border-neutral-200', icon: FolderOpen };
+        return { label: lang === 'vi' ? 'Tạo hồ sơ' : 'Case Created', bg: 'bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 border-neutral-200 dark:border-neutral-700', icon: FolderOpen };
       case 'MANUAL_ATTESTATION':
-        return { label: 'Auditor Sign-off', bg: 'bg-emerald-100 text-emerald-900 border-emerald-300 font-bold', icon: ShieldCheck };
+        return { label: lang === 'vi' ? 'Xác nhận kiểm toán' : 'Auditor Sign-off', bg: 'bg-emerald-100 dark:bg-emerald-900/60 text-emerald-900 dark:text-emerald-200 border-emerald-300 dark:border-emerald-700 font-bold', icon: ShieldCheck };
       default:
-        return { label: action, bg: 'bg-neutral-100 text-neutral-700 border-neutral-200', icon: History };
+        return { label: action, bg: 'bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border-neutral-200 dark:border-neutral-700', icon: History };
     }
   };
 
   return (
-    <div className="h-full flex flex-col bg-neutral-50/50">
+    <div className="h-full flex flex-col bg-neutral-50/50 dark:bg-neutral-950">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-60 bg-neutral-900 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-2xl border border-neutral-700 flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2">
-          <Check className="w-4 h-4 text-emerald-400" />
+        <div className="fixed bottom-6 right-6 z-60 bg-neutral-900/95 dark:bg-neutral-100/95 text-white dark:text-neutral-900 text-xs font-semibold px-4 py-3 rounded-xl shadow-2xl border border-neutral-700 dark:border-neutral-200 flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2">
+          <Check className="w-4 h-4 text-emerald-400 dark:text-emerald-600" />
           <span>{toastMessage}</span>
         </div>
       )}
 
       {/* Header Banner */}
-      <header className="bg-white border-b border-neutral-200 px-6 py-5 shrink-0">
+      <header className="bg-white dark:bg-neutral-900 border-b border-neutral-200 dark:border-neutral-800 px-6 py-5 shrink-0">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-xl bg-neutral-900 text-white">
+              <div className="p-2 rounded-xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900">
                 <History className="w-5 h-5" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-neutral-900 flex items-center gap-2">
-                  Audit Trail & Compliance Ledger
-                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
-                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                <h1 className="text-xl font-bold text-neutral-900 dark:text-white flex items-center gap-2">
+                  {t.audit.title}
+                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                     SOX 404 & ISO 27001
                   </span>
                 </h1>
-                <p className="text-xs text-neutral-500 mt-0.5">
-                  Immutable, cryptographically chained record of all document ingestions, automated rule evaluations, and auditor decisions.
+                <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+                  {t.audit.subtitle}
                 </p>
               </div>
             </div>
@@ -209,23 +211,23 @@ export function AuditTrailView({
           <div className="flex items-center gap-2.5 flex-wrap">
             <button
               onClick={() => setAttestationModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-neutral-900 text-white text-xs font-semibold hover:bg-neutral-800 transition-colors shadow-2xs cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-xs font-semibold hover:bg-neutral-800 dark:hover:bg-neutral-100 transition-colors shadow-2xs cursor-pointer"
             >
               <Plus className="w-4 h-4" />
-              <span>Record Auditor Sign-Off</span>
+              <span>{t.audit.recordSignOff}</span>
             </button>
 
-            <div className="flex items-center rounded-xl bg-neutral-100 p-0.5 border border-neutral-200">
+            <div className="flex items-center rounded-xl bg-neutral-100 dark:bg-neutral-800 p-0.5 border border-neutral-200 dark:border-neutral-700">
               <button
                 onClick={() => handleExport('csv')}
-                className="px-2.5 py-1.5 text-xs font-medium text-neutral-700 hover:text-neutral-900 hover:bg-white rounded-lg transition-colors cursor-pointer"
+                className="px-2.5 py-1.5 text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white hover:bg-white dark:hover:bg-neutral-700 rounded-lg transition-colors cursor-pointer"
                 title="Export as CSV spreadsheet"
               >
                 CSV
               </button>
               <button
                 onClick={() => handleExport('json')}
-                className="px-2.5 py-1.5 text-xs font-medium text-neutral-700 hover:text-neutral-900 hover:bg-white rounded-lg transition-colors cursor-pointer"
+                className="px-2.5 py-1.5 text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white hover:bg-white dark:hover:bg-neutral-700 rounded-lg transition-colors cursor-pointer"
                 title="Export as JSON audit ledger"
               >
                 JSON
@@ -234,60 +236,60 @@ export function AuditTrailView({
 
             <button
               onClick={fetchAuditTrail}
-              className="p-2 text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-xl border border-neutral-200 transition-colors cursor-pointer"
+              className="p-2 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-xl border border-neutral-200 dark:border-neutral-700 transition-colors cursor-pointer"
               title="Refresh ledger records"
             >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-neutral-900' : ''}`} />
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-neutral-900 dark:text-white' : ''}`} />
             </button>
           </div>
         </div>
 
         {/* Cryptographic Ledger Summary Status */}
         <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div className="flex items-center justify-between p-3 rounded-xl bg-neutral-50 border border-neutral-200">
+          <div className="flex items-center justify-between p-3 rounded-xl bg-neutral-50 dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800">
             <div className="flex items-center gap-2.5">
-              <div className={`p-1.5 rounded-lg ${chainValid ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+              <div className={`p-1.5 rounded-lg ${chainValid ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300' : 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300'}`}>
                 {chainValid ? <ShieldCheck className="w-4 h-4" /> : <ShieldAlert className="w-4 h-4" />}
               </div>
               <div>
-                <p className="text-[11px] font-medium text-neutral-500">Cryptographic Integrity</p>
-                <p className="text-xs font-bold text-neutral-900">
-                  {chainValid ? 'Tamper-Proof Chain Intact' : 'Chain Inconsistency Detected'}
+                <p className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">{t.audit.cryptoIntegrity}</p>
+                <p className="text-xs font-bold text-neutral-900 dark:text-white">
+                  {chainValid ? t.audit.chainValid : t.audit.chainInvalid}
                 </p>
               </div>
             </div>
-            <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-white border border-neutral-200 text-neutral-600">
+            <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-300">
               SHA-256
             </span>
           </div>
 
-          <div className="flex items-center justify-between p-3 rounded-xl bg-neutral-50 border border-neutral-200">
+          <div className="flex items-center justify-between p-3 rounded-xl bg-neutral-50 dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800">
             <div className="flex items-center gap-2.5">
-              <div className="p-1.5 rounded-lg bg-blue-100 text-blue-700">
+              <div className="p-1.5 rounded-lg bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300">
                 <Hash className="w-4 h-4" />
               </div>
               <div>
-                <p className="text-[11px] font-medium text-neutral-500">Total Audit Events</p>
-                <p className="text-xs font-bold text-neutral-900">{totalRecords} Immutable Records</p>
+                <p className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">{t.audit.totalEvents}</p>
+                <p className="text-xs font-bold text-neutral-900 dark:text-white">{totalRecords} {lang === 'vi' ? 'Bản ghi bất biến' : 'Immutable Records'}</p>
               </div>
             </div>
-            <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
-              Ledger Active
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+              {lang === 'vi' ? 'Sổ cái đang ghi' : 'Ledger Active'}
             </span>
           </div>
 
-          <div className="flex items-center justify-between p-3 rounded-xl bg-neutral-50 border border-neutral-200">
+          <div className="flex items-center justify-between p-3 rounded-xl bg-neutral-50 dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800">
             <div className="flex items-center gap-2.5">
-              <div className="p-1.5 rounded-lg bg-purple-100 text-purple-700">
+              <div className="p-1.5 rounded-lg bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300">
                 <KeyRound className="w-4 h-4" />
               </div>
               <div>
-                <p className="text-[11px] font-medium text-neutral-500">Compliance Standard</p>
-                <p className="text-xs font-bold text-neutral-900">SOX 404 & ISO/IEC 27001</p>
+                <p className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">{t.audit.complianceStandard}</p>
+                <p className="text-xs font-bold text-neutral-900 dark:text-white">SOX 404 & ISO/IEC 27001</p>
               </div>
             </div>
-            <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200">
-              Auditable
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+              {lang === 'vi' ? 'Được kiểm toán' : 'Auditable'}
             </span>
           </div>
         </div>
@@ -301,13 +303,13 @@ export function AuditTrailView({
               type="text"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Search event details, actor, SHA-256 hash or case..."
-              className="w-full pl-9 pr-3 py-1.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-900"
+              placeholder={lang === 'vi' ? 'Tìm kiếm chi tiết sự kiện, người thực hiện, mã băm SHA-256 hoặc hồ sơ...' : 'Search event details, actor, SHA-256 hash or case...'}
+              className="w-full pl-9 pr-3 py-1.5 bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl text-xs text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-900 dark:focus:border-neutral-500"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 text-xs font-bold"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 text-xs font-bold"
               >
                 ✕
               </button>
@@ -316,13 +318,13 @@ export function AuditTrailView({
 
           {/* Case filter */}
           <div className="flex items-center gap-1.5">
-            <span className="text-[11px] font-semibold text-neutral-500 whitespace-nowrap">Case:</span>
+            <span className="text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 whitespace-nowrap">{t.cases.case}:</span>
             <select
               value={activeCaseFilter}
               onChange={e => setActiveCaseFilter(e.target.value)}
-              className="bg-neutral-50 border border-neutral-200 rounded-xl px-2.5 py-1.5 text-xs text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900/10"
+              className="bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl px-2.5 py-1.5 text-xs text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-neutral-900/10"
             >
-              <option value="ALL">All Cases ({cases.length})</option>
+              <option value="ALL">{lang === 'vi' ? `Tất cả hồ sơ (${cases.length})` : `All Cases (${cases.length})`}</option>
               {cases.map(c => (
                 <option key={c.case_id} value={c.case_id}>
                   {c.name}
@@ -333,19 +335,19 @@ export function AuditTrailView({
 
           {/* Action filter */}
           <div className="flex items-center gap-1.5">
-            <span className="text-[11px] font-semibold text-neutral-500 whitespace-nowrap">Action:</span>
+            <span className="text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 whitespace-nowrap">{t.audit.action}:</span>
             <select
               value={filterAction}
               onChange={e => setFilterAction(e.target.value)}
-              className="bg-neutral-50 border border-neutral-200 rounded-xl px-2.5 py-1.5 text-xs text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900/10"
+              className="bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl px-2.5 py-1.5 text-xs text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-neutral-900/10"
             >
-              <option value="ALL">All Actions</option>
-              <option value="DOCUMENT_INGESTED">Document Ingested</option>
-              <option value="WORKFLOW_COMPLETED">Workflow Completed</option>
-              <option value="FINDING_APPROVED">Finding Approved</option>
-              <option value="FINDING_REJECTED">Finding Rejected</option>
-              <option value="MANUAL_ATTESTATION">Auditor Sign-off</option>
-              <option value="CASE_CREATED">Case Created</option>
+              <option value="ALL">{t.audit.allActions}</option>
+              <option value="DOCUMENT_INGESTED">{lang === 'vi' ? 'Nạp tài liệu' : 'Document Ingested'}</option>
+              <option value="WORKFLOW_COMPLETED">{lang === 'vi' ? 'Hoàn tất kiểm toán' : 'Workflow Completed'}</option>
+              <option value="FINDING_APPROVED">{lang === 'vi' ? 'Phê duyệt bất thường' : 'Finding Approved'}</option>
+              <option value="FINDING_REJECTED">{lang === 'vi' ? 'Bác bỏ bất thường' : 'Finding Rejected'}</option>
+              <option value="MANUAL_ATTESTATION">{lang === 'vi' ? 'Xác nhận kiểm toán viên' : 'Auditor Sign-off'}</option>
+              <option value="CASE_CREATED">{lang === 'vi' ? 'Tạo mới hồ sơ' : 'Case Created'}</option>
             </select>
           </div>
         </div>
@@ -355,15 +357,15 @@ export function AuditTrailView({
       <div className="flex-1 overflow-y-auto p-6">
         {loading ? (
           <div className="flex flex-col items-center justify-center h-64 text-neutral-400 gap-3">
-            <RefreshCw className="w-6 h-6 animate-spin text-neutral-900" />
-            <p className="text-xs font-medium">Verifying cryptographic hash chain & loading ledger...</p>
+            <RefreshCw className="w-6 h-6 animate-spin text-neutral-900 dark:text-white" />
+            <p className="text-xs font-medium">{lang === 'vi' ? 'Đang xác minh chuỗi băm mã hóa & tải dữ liệu sổ cái...' : 'Verifying cryptographic hash chain & loading ledger...'}</p>
           </div>
         ) : entries.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-neutral-200 p-12 text-center max-w-lg mx-auto mt-8">
-            <History className="w-10 h-10 text-neutral-300 mx-auto mb-3" />
-            <h3 className="text-sm font-bold text-neutral-900">No Audit Events Found</h3>
-            <p className="text-xs text-neutral-500 mt-1">
-              No ledger events matched your filter criteria. Try clearing filters or recording a new auditor sign-off.
+          <div className="bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800 p-12 text-center max-w-lg mx-auto mt-8">
+            <History className="w-10 h-10 text-neutral-300 dark:text-neutral-600 mx-auto mb-3" />
+            <h3 className="text-sm font-bold text-neutral-900 dark:text-white">{t.audit.noEvents}</h3>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+              {lang === 'vi' ? 'Không có sự kiện sổ cái nào khớp với tiêu chí lọc. Thử xóa bộ lọc hoặc tạo xác nhận kiểm toán mới.' : 'No ledger events matched your filter criteria. Try clearing filters or recording a new auditor sign-off.'}
             </p>
             <button
               onClick={() => {
@@ -371,17 +373,17 @@ export function AuditTrailView({
                 setFilterAction('ALL');
                 setSearchQuery('');
               }}
-              className="mt-4 px-3.5 py-2 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-xs font-semibold transition-colors cursor-pointer"
+              className="mt-4 px-3.5 py-2 rounded-xl bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 text-xs font-semibold transition-colors cursor-pointer"
             >
-              Clear All Filters
+              {lang === 'vi' ? 'Xóa tất cả bộ lọc' : 'Clear All Filters'}
             </button>
           </div>
         ) : (
           <div className="space-y-3 max-w-6xl mx-auto">
-            {entries.map((entry, idx) => {
+            {entries.map((entry) => {
               const badge = getActionBadge(entry.action);
               const IconComp = badge.icon;
-              const formattedTime = new Date(entry.timestamp).toLocaleString(undefined, {
+              const formattedTime = new Date(entry.timestamp).toLocaleString(lang === 'vi' ? 'vi-VN' : undefined, {
                 year: 'numeric',
                 month: 'short',
                 day: 'numeric',
@@ -394,7 +396,7 @@ export function AuditTrailView({
                 <div
                   key={entry.log_id}
                   onClick={() => setSelectedEntry(entry)}
-                  className="bg-white rounded-xl border border-neutral-200 hover:border-neutral-300 hover:shadow-xs transition-all p-4 cursor-pointer"
+                  className="bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 hover:shadow-xs transition-all p-4 cursor-pointer"
                 >
                   <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
                     {/* Event Type & Description */}
@@ -414,37 +416,37 @@ export function AuditTrailView({
                                 e.stopPropagation();
                                 if (entry.case_id) onNavigateToCase(entry.case_id);
                               }}
-                              className="text-[11px] font-semibold text-neutral-700 hover:text-neutral-900 bg-neutral-100 hover:bg-neutral-200 px-2 py-0.5 rounded flex items-center gap-1 transition-colors"
+                              className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 px-2 py-0.5 rounded flex items-center gap-1 transition-colors"
                             >
                               <FolderOpen className="w-3 h-3 text-neutral-500" />
                               <span className="truncate max-w-[200px]">{entry.case_name}</span>
                             </span>
                           )}
 
-                          <span className="text-[11px] text-neutral-400 font-mono">
+                          <span className="text-[11px] text-neutral-400 dark:text-neutral-500 font-mono">
                             {entry.log_id}
                           </span>
                         </div>
 
-                        <p className="text-xs font-semibold text-neutral-900 mt-1.5 leading-snug">
+                        <p className="text-xs font-semibold text-neutral-900 dark:text-white mt-1.5 leading-snug">
                           {entry.details}
                         </p>
 
                         {/* Metadata Snippet */}
                         {entry.metadata && Object.keys(entry.metadata).length > 0 && (
-                          <div className="mt-2 flex items-center gap-2 flex-wrap text-[11px] text-neutral-600">
+                          <div className="mt-2 flex items-center gap-2 flex-wrap text-[11px] text-neutral-600 dark:text-neutral-400">
                             {entry.metadata.filename && (
-                              <span className="bg-neutral-50 border border-neutral-200 px-1.5 py-0.5 rounded font-mono text-[10px]">
+                              <span className="bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 px-1.5 py-0.5 rounded font-mono text-[10px] text-neutral-700 dark:text-neutral-300">
                                 📄 {entry.metadata.filename}
                               </span>
                             )}
                             {entry.metadata.findings_count !== undefined && (
-                              <span className="bg-amber-50 border border-amber-200 text-amber-800 px-1.5 py-0.5 rounded font-semibold text-[10px]">
-                                ⚠️ {entry.metadata.findings_count} finding(s)
+                              <span className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 px-1.5 py-0.5 rounded font-semibold text-[10px]">
+                                ⚠️ {entry.metadata.findings_count} {lang === 'vi' ? 'phát hiện' : 'finding(s)'}
                               </span>
                             )}
                             {entry.metadata.sha256 && (
-                              <span className="bg-neutral-50 border border-neutral-200 px-1.5 py-0.5 rounded font-mono text-[10px] text-neutral-500">
+                              <span className="bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 px-1.5 py-0.5 rounded font-mono text-[10px] text-neutral-500 dark:text-neutral-400">
                                 SHA: {entry.metadata.sha256.substring(0, 10)}...
                               </span>
                             )}
@@ -454,13 +456,13 @@ export function AuditTrailView({
                     </div>
 
                     {/* Actor, Timestamp & Cryptographic Hash */}
-                    <div className="flex flex-row lg:flex-col lg:items-end justify-between items-center shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-neutral-100 text-right gap-1">
-                      <div className="flex items-center gap-1.5 text-neutral-600 text-xs font-medium">
+                    <div className="flex flex-row lg:flex-col lg:items-end justify-between items-center shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-neutral-100 dark:border-neutral-800 text-right gap-1">
+                      <div className="flex items-center gap-1.5 text-neutral-600 dark:text-neutral-300 text-xs font-medium">
                         <User className="w-3.5 h-3.5 text-neutral-400" />
                         <span className="font-semibold">{entry.actor}</span>
                       </div>
 
-                      <div className="flex items-center gap-1 text-[11px] text-neutral-400">
+                      <div className="flex items-center gap-1 text-[11px] text-neutral-400 dark:text-neutral-500">
                         <Calendar className="w-3 h-3" />
                         <span>{formattedTime}</span>
                       </div>
@@ -470,13 +472,13 @@ export function AuditTrailView({
                           e.stopPropagation();
                           handleCopy(entry.integrity_hash, entry.log_id);
                         }}
-                        className="flex items-center gap-1 text-[10px] font-mono text-neutral-400 hover:text-neutral-700 bg-neutral-50 hover:bg-neutral-100 px-1.5 py-0.5 rounded border border-neutral-200 transition-colors"
+                        className="flex items-center gap-1 text-[10px] font-mono text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 bg-neutral-50 dark:bg-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-700 px-1.5 py-0.5 rounded border border-neutral-200 dark:border-neutral-700 transition-colors"
                         title="Click to copy full SHA-256 block hash"
                       >
                         <KeyRound className="w-3 h-3 text-neutral-400" />
                         <span>{entry.integrity_hash.substring(0, 12)}...</span>
                         {copiedHash === entry.log_id ? (
-                          <Check className="w-3 h-3 text-emerald-600" />
+                          <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
                         ) : (
                           <Copy className="w-3 h-3" />
                         )}
@@ -493,22 +495,22 @@ export function AuditTrailView({
       {/* Entry Details Inspection Modal */}
       {selectedEntry && (
         <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-neutral-900/60 backdrop-blur-xs animate-in fade-in duration-100"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-neutral-900/60 dark:bg-black/75 backdrop-blur-xs animate-in fade-in duration-100"
           onClick={() => setSelectedEntry(null)}
         >
           <div 
-            className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-neutral-200 overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-150"
+            className="w-full max-w-2xl bg-white dark:bg-neutral-900 rounded-2xl shadow-2xl border border-neutral-200 dark:border-neutral-800 overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-150"
             onClick={e => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-neutral-200 flex items-center justify-between bg-neutral-50/50">
+            <div className="px-6 py-4 border-b border-neutral-200 dark:border-neutral-800 flex items-center justify-between bg-neutral-50/50 dark:bg-neutral-850">
               <div className="flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-emerald-600" />
-                <h3 className="text-sm font-bold text-neutral-900">Audit Record Cryptographic Proof</h3>
+                <ShieldCheck className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                <h3 className="text-sm font-bold text-neutral-900 dark:text-white">{lang === 'vi' ? 'Bằng chứng Mã hóa Bản ghi Kiểm toán' : 'Audit Record Cryptographic Proof'}</h3>
               </div>
               <button
                 onClick={() => setSelectedEntry(null)}
-                className="p-1 text-neutral-400 hover:text-neutral-600 rounded-md cursor-pointer"
+                className="p-1 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 rounded-md cursor-pointer"
               >
                 ✕
               </button>
@@ -516,47 +518,47 @@ export function AuditTrailView({
 
             {/* Modal Body */}
             <div className="p-6 overflow-y-auto space-y-4 text-xs">
-              <div className="bg-neutral-50 rounded-xl p-4 border border-neutral-200 space-y-3">
+              <div className="bg-neutral-50 dark:bg-neutral-850 rounded-xl p-4 border border-neutral-200 dark:border-neutral-800 space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-neutral-500 font-medium">Log Record ID:</span>
-                  <span className="font-mono font-bold text-neutral-800">{selectedEntry.log_id}</span>
+                  <span className="text-neutral-500 dark:text-neutral-400 font-medium">Log Record ID:</span>
+                  <span className="font-mono font-bold text-neutral-800 dark:text-neutral-200">{selectedEntry.log_id}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-neutral-500 font-medium">Timestamp (ISO 8601):</span>
-                  <span className="font-mono text-neutral-800">{selectedEntry.timestamp}</span>
+                  <span className="text-neutral-500 dark:text-neutral-400 font-medium">Timestamp (ISO 8601):</span>
+                  <span className="font-mono text-neutral-800 dark:text-neutral-200">{selectedEntry.timestamp}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-neutral-500 font-medium">Action:</span>
-                  <span className="font-semibold text-neutral-900">{selectedEntry.action}</span>
+                  <span className="text-neutral-500 dark:text-neutral-400 font-medium">{t.audit.action}:</span>
+                  <span className="font-semibold text-neutral-900 dark:text-white">{selectedEntry.action}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-neutral-500 font-medium">Recorded By (Actor):</span>
-                  <span className="font-bold text-neutral-900">{selectedEntry.actor}</span>
+                  <span className="text-neutral-500 dark:text-neutral-400 font-medium">{t.audit.actor}:</span>
+                  <span className="font-bold text-neutral-900 dark:text-white">{selectedEntry.actor}</span>
                 </div>
                 {selectedEntry.case_name && (
                   <div className="flex items-center justify-between">
-                    <span className="text-neutral-500 font-medium">Case:</span>
-                    <span className="font-semibold text-neutral-900">{selectedEntry.case_name}</span>
+                    <span className="text-neutral-500 dark:text-neutral-400 font-medium">{t.cases.case}:</span>
+                    <span className="font-semibold text-neutral-900 dark:text-white">{selectedEntry.case_name}</span>
                   </div>
                 )}
               </div>
 
               {/* Details text */}
               <div>
-                <label className="block text-[11px] font-bold uppercase text-neutral-500 tracking-wider mb-1">
-                  Event Statement & Audit Trail
+                <label className="block text-[11px] font-bold uppercase text-neutral-500 dark:text-neutral-400 tracking-wider mb-1">
+                  {lang === 'vi' ? 'Bản tường trình Sự kiện & Dấu vết Kiểm toán' : 'Event Statement & Audit Trail'}
                 </label>
-                <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-200 text-neutral-800 font-medium leading-relaxed">
+                <div className="p-3 bg-neutral-50 dark:bg-neutral-850 rounded-xl border border-neutral-200 dark:border-neutral-800 text-neutral-800 dark:text-neutral-200 font-medium leading-relaxed">
                   {selectedEntry.details}
                 </div>
               </div>
 
               {/* Cryptographic Ledger Hashes */}
               <div>
-                <label className="block text-[11px] font-bold uppercase text-neutral-500 tracking-wider mb-1">
-                  Cryptographic Integrity (SOX 404 Immutable Blockchain Chain)
+                <label className="block text-[11px] font-bold uppercase text-neutral-500 dark:text-neutral-400 tracking-wider mb-1">
+                  {lang === 'vi' ? 'Tính toàn vẹn Mã hóa (Chuỗi Khối Bất biến SOX 404)' : 'Cryptographic Integrity (SOX 404 Immutable Blockchain Chain)'}
                 </label>
-                <div className="p-3 bg-neutral-900 text-neutral-200 rounded-xl font-mono text-[11px] space-y-2">
+                <div className="p-3 bg-neutral-900 dark:bg-neutral-950 text-neutral-200 rounded-xl font-mono text-[11px] space-y-2 border border-neutral-800">
                   <div>
                     <span className="text-neutral-400 block text-[10px]">CURRENT BLOCK SHA-256 SIGNATURE:</span>
                     <span className="text-emerald-400 break-all">{selectedEntry.integrity_hash}</span>
@@ -571,10 +573,10 @@ export function AuditTrailView({
               {/* Raw JSON Payload */}
               {selectedEntry.metadata && (
                 <div>
-                  <label className="block text-[11px] font-bold uppercase text-neutral-500 tracking-wider mb-1">
-                    Attached Record Metadata
+                  <label className="block text-[11px] font-bold uppercase text-neutral-500 dark:text-neutral-400 tracking-wider mb-1">
+                    {lang === 'vi' ? 'Metadata Bản ghi Đính kèm' : 'Attached Record Metadata'}
                   </label>
-                  <pre className="p-3 bg-neutral-50 rounded-xl border border-neutral-200 font-mono text-[10px] text-neutral-800 overflow-x-auto max-h-36">
+                  <pre className="p-3 bg-neutral-50 dark:bg-neutral-850 rounded-xl border border-neutral-200 dark:border-neutral-800 font-mono text-[10px] text-neutral-800 dark:text-neutral-200 overflow-x-auto max-h-36">
                     {JSON.stringify(selectedEntry.metadata, null, 2)}
                   </pre>
                 </div>
@@ -582,15 +584,15 @@ export function AuditTrailView({
             </div>
 
             {/* Modal Footer */}
-            <div className="px-6 py-3 bg-neutral-50 border-t border-neutral-200 flex items-center justify-between">
-              <span className="text-[11px] text-neutral-500 flex items-center gap-1">
-                <Check className="w-3.5 h-3.5 text-emerald-600" /> Tamper-evident ledger entry
+            <div className="px-6 py-3 bg-neutral-50 dark:bg-neutral-850 border-t border-neutral-200 dark:border-neutral-800 flex items-center justify-between">
+              <span className="text-[11px] text-neutral-500 dark:text-neutral-400 flex items-center gap-1">
+                <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> {lang === 'vi' ? 'Bản ghi chống can thiệp đã được xác thực' : 'Tamper-evident ledger entry'}
               </span>
               <button
                 onClick={() => setSelectedEntry(null)}
-                className="px-4 py-1.5 bg-neutral-900 text-white rounded-xl text-xs font-semibold hover:bg-neutral-800 cursor-pointer"
+                className="px-4 py-1.5 bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 rounded-xl text-xs font-semibold hover:bg-neutral-800 dark:hover:bg-neutral-100 cursor-pointer"
               >
-                Done
+                {lang === 'vi' ? 'Đóng' : 'Done'}
               </button>
             </div>
           </div>
@@ -600,24 +602,24 @@ export function AuditTrailView({
       {/* Record Manual Attestation Modal */}
       {attestationModalOpen && (
         <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-neutral-900/60 backdrop-blur-xs animate-in fade-in duration-100"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-neutral-900/60 dark:bg-black/75 backdrop-blur-xs animate-in fade-in duration-100"
           onClick={() => setAttestationModalOpen(false)}
         >
           <div 
-            className="w-full max-w-xl bg-white rounded-2xl shadow-2xl border border-neutral-200 overflow-hidden flex flex-col animate-in zoom-in-95 duration-150"
+            className="w-full max-w-xl bg-white dark:bg-neutral-900 rounded-2xl shadow-2xl border border-neutral-200 dark:border-neutral-800 overflow-hidden flex flex-col animate-in zoom-in-95 duration-150"
             onClick={e => e.stopPropagation()}
           >
             <form onSubmit={handleCreateAttestation}>
               {/* Header */}
-              <div className="px-6 py-4 border-b border-neutral-200 flex items-center justify-between bg-neutral-50/50">
+              <div className="px-6 py-4 border-b border-neutral-200 dark:border-neutral-800 flex items-center justify-between bg-neutral-50/50 dark:bg-neutral-850">
                 <div className="flex items-center gap-2">
-                  <ShieldCheck className="w-5 h-5 text-emerald-600" />
-                  <h3 className="text-sm font-bold text-neutral-900">Record Auditor Sign-Off & Attestation</h3>
+                  <ShieldCheck className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                  <h3 className="text-sm font-bold text-neutral-900 dark:text-white">{lang === 'vi' ? 'Ghi nhận Ký duyệt & Chứng thực Kiểm toán' : 'Record Auditor Sign-Off & Attestation'}</h3>
                 </div>
                 <button
                   type="button"
                   onClick={() => setAttestationModalOpen(false)}
-                  className="p-1 text-neutral-400 hover:text-neutral-600 rounded-md cursor-pointer"
+                  className="p-1 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 rounded-md cursor-pointer"
                 >
                   ✕
                 </button>
@@ -626,28 +628,28 @@ export function AuditTrailView({
               {/* Body */}
               <div className="p-6 space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold text-neutral-700 mb-1">
-                    Auditor Name / Authority Title
+                  <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
+                    {lang === 'vi' ? 'Tên Kiểm toán viên / Chức danh Thẩm quyền' : 'Auditor Name / Authority Title'}
                   </label>
                   <input
                     type="text"
                     value={attestActor}
                     onChange={e => setAttestActor(e.target.value)}
                     required
-                    className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-xs text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-900"
+                    className="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl text-xs text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-900"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-neutral-700 mb-1">
-                    Target Case Reference
+                  <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
+                    {lang === 'vi' ? 'Hồ sơ Mục tiêu' : 'Target Case Reference'}
                   </label>
                   <select
                     value={attestCaseId}
                     onChange={e => setAttestCaseId(e.target.value)}
-                    className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-xs text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-900"
+                    className="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl text-xs text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-900"
                   >
-                    <option value="">Global / Multi-Case Attestation</option>
+                    <option value="">{lang === 'vi' ? 'Chứng thực Chung / Đa hồ sơ' : 'Global / Multi-Case Attestation'}</option>
                     {cases.map(c => (
                       <option key={c.case_id} value={c.case_id}>
                         {c.name} ({c.case_id})
@@ -657,43 +659,45 @@ export function AuditTrailView({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-neutral-700 mb-1">
-                    Attestation Finding & Compliance Sign-Off Statement
+                  <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
+                    {lang === 'vi' ? 'Ý kiến Chứng thực & Tuyên bố Phê duyệt Tuân thủ' : 'Attestation Finding & Compliance Sign-Off Statement'}
                   </label>
                   <textarea
                     value={attestDetails}
                     onChange={e => setAttestDetails(e.target.value)}
                     required
                     rows={4}
-                    placeholder="E.g., All Q1 invoice variances have been reconciled against the master service contract amendment and approved under policy authorization."
-                    className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-xs text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-900 resize-none"
+                    placeholder={lang === 'vi' ? 'VD: Mọi chênh lệch hóa đơn Q1 đã được đối chiếu so với phụ lục hợp đồng chính và được phê duyệt theo hạn mức ủy quyền.' : 'E.g., All Q1 invoice variances have been reconciled against the master service contract amendment and approved under policy authorization.'}
+                    className="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl text-xs text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-900 resize-none"
                   />
                 </div>
 
-                <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-[11px] flex items-start gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-600" />
+                <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-[11px] flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
                   <p>
-                    Once submitted, this attestation will be hashed with SHA-256 and immutably appended to the SOX compliance audit trail. It cannot be altered or deleted.
+                    {lang === 'vi'
+                      ? 'Sau khi gửi, chứng thực này sẽ được băm SHA-256 và gắn vĩnh viễn vào nhật ký tuân thủ SOX. Bản ghi không thể bị thay đổi hoặc xóa bỏ.'
+                      : 'Once submitted, this attestation will be hashed with SHA-256 and immutably appended to the SOX compliance audit trail. It cannot be altered or deleted.'}
                   </p>
                 </div>
               </div>
 
               {/* Footer */}
-              <div className="px-6 py-3.5 bg-neutral-50 border-t border-neutral-200 flex items-center justify-end gap-2">
+              <div className="px-6 py-3.5 bg-neutral-50 dark:bg-neutral-850 border-t border-neutral-200 dark:border-neutral-800 flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setAttestationModalOpen(false)}
-                  className="px-4 py-2 text-xs font-semibold text-neutral-700 hover:bg-neutral-100 rounded-xl transition-colors cursor-pointer"
+                  className="px-4 py-2 text-xs font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-xl transition-colors cursor-pointer"
                 >
-                  Cancel
+                  {t.common.cancel}
                 </button>
                 <button
                   type="submit"
                   disabled={submittingAttest || !attestDetails.trim()}
-                  className="px-4 py-2 text-xs font-semibold text-white bg-neutral-900 hover:bg-neutral-800 disabled:opacity-50 rounded-xl transition-colors shadow-2xs cursor-pointer flex items-center gap-1.5"
+                  className="px-4 py-2 text-xs font-semibold text-white dark:text-neutral-900 bg-neutral-900 dark:bg-white hover:bg-neutral-800 dark:hover:bg-neutral-100 disabled:opacity-50 rounded-xl transition-colors shadow-2xs cursor-pointer flex items-center gap-1.5"
                 >
                   {submittingAttest ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
-                  <span>Sign & Append to Ledger</span>
+                  <span>{lang === 'vi' ? 'Ký duyệt & Gắn vào Sổ cái' : 'Sign & Append to Ledger'}</span>
                 </button>
               </div>
             </form>
@@ -703,3 +707,4 @@ export function AuditTrailView({
     </div>
   );
 }
+

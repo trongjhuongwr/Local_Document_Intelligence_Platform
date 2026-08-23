@@ -8,9 +8,11 @@ import { EvaluationView } from './components/EvaluationView';
 import { AuditTrailView } from './components/AuditTrailView';
 import { CommandPalette } from './components/CommandPalette';
 import { CaseItem } from './types';
-import { Menu, ShieldCheck, Search } from 'lucide-react';
+import { Menu, ShieldCheck, Search, Sun, Moon } from 'lucide-react';
+import { useThemeLanguage } from './context/ThemeLanguageContext';
 
 export function App() {
+  const { theme, toggleTheme, lang, setLang, t } = useThemeLanguage();
   const [currentTab, setCurrentTab] = useState<string>('home');
   const [activeCaseId, setActiveCaseId] = useState<string | null>(null);
   const [cases, setCases] = useState<CaseItem[]>([]);
@@ -86,7 +88,7 @@ export function App() {
   };
 
   return (
-    <div className="flex flex-col lg:flex-row min-h-screen bg-neutral-50/60 font-sans text-neutral-900">
+    <div className="flex flex-col lg:flex-row min-h-screen bg-neutral-50/60 dark:bg-neutral-950 font-sans text-neutral-900 dark:text-neutral-100 transition-colors duration-150">
       {/* Global Command Palette (Ctrl + K) */}
       <CommandPalette
         isOpen={commandPaletteOpen}
@@ -98,27 +100,44 @@ export function App() {
       />
 
       {/* Mobile Top App Bar with Hamburger Toggle */}
-      <header className="lg:hidden bg-white border-b border-neutral-200 px-4 py-3 flex items-center justify-between sticky top-0 z-30 shadow-2xs">
+      <header className="lg:hidden bg-white dark:bg-neutral-900 border-b border-neutral-200 dark:border-neutral-800 px-4 py-3 flex items-center justify-between sticky top-0 z-30 shadow-2xs">
         <div className="flex items-center gap-2.5">
           <button
             onClick={() => setMobileMenuOpen(true)}
-            className="p-1.5 -ml-1.5 text-neutral-700 hover:bg-neutral-100 rounded-lg cursor-pointer transition-colors"
+            className="p-1.5 -ml-1.5 text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg cursor-pointer transition-colors"
             title="Open navigation menu"
           >
             <Menu className="w-5 h-5" />
           </button>
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded bg-neutral-900 text-white flex items-center justify-center font-bold text-xs">
+            <div className="w-6 h-6 rounded bg-neutral-900 dark:bg-neutral-800 text-white flex items-center justify-center font-bold text-xs">
               <ShieldCheck className="w-4 h-4 text-emerald-400" />
             </div>
-            <span className="text-xs font-bold text-neutral-900">Document Intelligence</span>
+            <span className="text-xs font-bold text-neutral-900 dark:text-white">Doc Intelligence</span>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Quick Lang Switch on Mobile */}
+          <button
+            onClick={() => setLang(lang === 'en' ? 'vi' : 'en')}
+            className="px-2 py-1 text-[10px] font-bold rounded-lg border border-neutral-200 dark:border-neutral-700 bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300"
+          >
+            {lang.toUpperCase()}
+          </button>
+
+          {/* Theme Switch on Mobile */}
+          <button
+            onClick={toggleTheme}
+            className="p-1.5 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg cursor-pointer transition-colors border border-neutral-200 dark:border-neutral-700"
+            title="Toggle theme"
+          >
+            {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-neutral-600" />}
+          </button>
+
           <button
             onClick={() => setCommandPaletteOpen(true)}
-            className="p-1.5 text-neutral-600 hover:bg-neutral-100 rounded-lg cursor-pointer transition-colors border border-neutral-200"
+            className="p-1.5 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg cursor-pointer transition-colors border border-neutral-200 dark:border-neutral-700"
             title="Search (Ctrl + K)"
           >
             <Search className="w-4 h-4" />
@@ -127,7 +146,7 @@ export function App() {
           {totalOpenFindings > 0 && (
             <button
               onClick={() => setCurrentTab('reviews')}
-              className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-bold flex items-center gap-1"
+              className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 text-[11px] font-bold flex items-center gap-1 border border-amber-300 dark:border-amber-700"
             >
               <span>{totalOpenFindings}</span>
             </button>
@@ -151,7 +170,7 @@ export function App() {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-hidden h-[calc(100vh-53px)] lg:h-screen">
+      <main className="flex-1 overflow-hidden h-[calc(100vh-53px)] lg:h-screen bg-neutral-50/60 dark:bg-neutral-950">
         {currentTab === 'home' && (
           <div className="h-full overflow-y-auto pb-12">
             <HomeView
@@ -219,4 +238,5 @@ export function App() {
 }
 
 export default App;
+
 
