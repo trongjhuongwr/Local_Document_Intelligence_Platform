@@ -8,11 +8,11 @@ import { EvaluationView } from './components/EvaluationView';
 import { AuditTrailView } from './components/AuditTrailView';
 import { CommandPalette } from './components/CommandPalette';
 import { CaseItem } from './types';
-import { Menu, ShieldCheck, Search, Sun, Moon } from 'lucide-react';
+import { Menu, ShieldCheck, Search } from 'lucide-react';
 import { useThemeLanguage } from './context/ThemeLanguageContext';
 
 export function App() {
-  const { theme, toggleTheme, lang, setLang, t } = useThemeLanguage();
+  const { t } = useThemeLanguage();
   const [currentTab, setCurrentTab] = useState<string>('home');
   const [activeCaseId, setActiveCaseId] = useState<string | null>(null);
   const [cases, setCases] = useState<CaseItem[]>([]);
@@ -118,23 +118,6 @@ export function App() {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Quick Lang Switch on Mobile */}
-          <button
-            onClick={() => setLang(lang === 'en' ? 'vi' : 'en')}
-            className="px-2 py-1 text-[10px] font-bold rounded-lg border border-neutral-200 dark:border-neutral-700 bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300"
-          >
-            {lang.toUpperCase()}
-          </button>
-
-          {/* Theme Switch on Mobile */}
-          <button
-            onClick={toggleTheme}
-            className="p-1.5 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg cursor-pointer transition-colors border border-neutral-200 dark:border-neutral-700"
-            title="Toggle theme"
-          >
-            {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-neutral-600" />}
-          </button>
-
           <button
             onClick={() => setCommandPaletteOpen(true)}
             className="p-1.5 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg cursor-pointer transition-colors border border-neutral-200 dark:border-neutral-700"

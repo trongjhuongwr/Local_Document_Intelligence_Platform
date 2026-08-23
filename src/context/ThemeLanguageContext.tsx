@@ -305,6 +305,34 @@ export interface Translations {
     closeBtn: string;
     shortcutHint: string;
   };
+  settings: {
+    title: string;
+    subtitle: string;
+    tabAppearance: string;
+    tabAuditRules: string;
+    tabDiagnostics: string;
+    themeLabel: string;
+    themeDesc: string;
+    themeLight: string;
+    themeLightDesc: string;
+    themeDark: string;
+    themeDarkDesc: string;
+    languageLabel: string;
+    languageDesc: string;
+    langVietnamese: string;
+    langVietnameseDesc: string;
+    langEnglish: string;
+    langEnglishDesc: string;
+    sensitivityLabel: string;
+    strictMode: string;
+    strictModeDesc: string;
+    standardMode: string;
+    standardModeDesc: string;
+    currencyLabel: string;
+    currencyDesc: string;
+    saveBtn: string;
+    appliedSuccess: string;
+  };
 }
 
 const enTranslations: Translations = {
@@ -609,6 +637,34 @@ const enTranslations: Translations = {
     closeBtn: 'Close Viewer (Esc)',
     shortcutHint: 'Use Arrow Keys [←] [→] to cycle findings, [Esc] to exit',
   },
+  settings: {
+    title: 'System Settings & Preferences',
+    subtitle: 'Customize display theme, interface language, and deterministic audit parameters.',
+    tabAppearance: 'Appearance & Language',
+    tabAuditRules: 'Audit Rules & Currency',
+    tabDiagnostics: 'AI Engine Diagnostics',
+    themeLabel: 'Display Theme Mode',
+    themeDesc: 'Select your preferred visual atmosphere.',
+    themeLight: 'Light Mode',
+    themeLightDesc: 'Crisp high-contrast light interface optimized for documents',
+    themeDark: 'Dark Mode',
+    themeDarkDesc: 'Deep slate dark theme reducing glare and eye strain',
+    languageLabel: 'Display Language',
+    languageDesc: 'Choose language for UI, prompts, and analytical reports.',
+    langVietnamese: 'Tiếng Việt (Vietnamese)',
+    langVietnameseDesc: 'Vietnamese accounting & audit terminology',
+    langEnglish: 'English (US)',
+    langEnglishDesc: 'International standard English terminology',
+    sensitivityLabel: 'Audit Verification Sensitivity',
+    strictMode: 'Strict (100% Match)',
+    strictModeDesc: 'Flags even ±$1 discrepancies & exact net terms',
+    standardMode: 'Standard Tolerance',
+    standardModeDesc: 'Permits minor rounding differences < 0.1%',
+    currencyLabel: 'Primary Reporting Currency',
+    currencyDesc: 'Default currency symbol used across summaries and exports',
+    saveBtn: 'Save Settings',
+    appliedSuccess: 'Settings applied successfully',
+  },
 };
 
 const viTranslations: Translations = {
@@ -912,6 +968,34 @@ const viTranslations: Translations = {
     formulaReconciliation: 'Chênh lệch Tính toán Số học',
     closeBtn: 'Đóng (Esc)',
     shortcutHint: 'Dùng phím mũi tên [←] [→] để chuyển sai lệch, [Esc] để thoát',
+  },
+  settings: {
+    title: 'Cài đặt & Tùy chọn Hệ thống',
+    subtitle: 'Tùy chỉnh giao diện hiển thị, ngôn ngữ làm việc và các tham số đối soát kiểm toán xác định.',
+    tabAppearance: 'Giao diện & Ngôn ngữ',
+    tabAuditRules: 'Quy tắc Kiểm toán & Tiền tệ',
+    tabDiagnostics: 'Chẩn đoán Động cơ AI',
+    themeLabel: 'Chế độ Giao diện Hiển thị',
+    themeDesc: 'Lựa chọn tông màu và môi trường ánh sáng phù hợp.',
+    themeLight: 'Giao diện Sáng (Light Mode)',
+    themeLightDesc: 'Độ tương phản cao, tối ưu khi đọc và đối soát văn bản ban ngày',
+    themeDark: 'Giao diện Tối (Dark Mode)',
+    themeDarkDesc: 'Tông xám than chì sâu thẳm, giảm chói và chống mỏi mắt làm việc đêm',
+    languageLabel: 'Ngôn ngữ Làm việc',
+    languageDesc: 'Chọn ngôn ngữ cho giao diện, lời nhắc AI và báo cáo kiểm toán.',
+    langVietnamese: 'Tiếng Việt (Vietnamese)',
+    langVietnameseDesc: 'Thuật ngữ kế toán & kiểm toán chuẩn Việt Nam',
+    langEnglish: 'English (Tiếng Anh)',
+    langEnglishDesc: 'Thuật ngữ kiểm toán & tài chính chuẩn quốc tế',
+    sensitivityLabel: 'Độ Nhạy Đối Soát Kiểm Toán',
+    strictMode: 'Nghiêm ngặt (Khớp 100%)',
+    strictModeDesc: 'Báo động mọi chênh lệch dù chỉ 1 đồng hoặc lệch điều khoản thanh toán',
+    standardMode: 'Dung sai Chuẩn (<0.1%)',
+    standardModeDesc: 'Chấp nhận sai số làm tròn số học nhỏ dưới 0.1%',
+    currencyLabel: 'Đơn Vị Tiền Tệ Báo Cáo Chính',
+    currencyDesc: 'Ký hiệu tiền tệ mặc định hiển thị trên báo cáo và xuất dữ liệu',
+    saveBtn: 'Lưu Cài đặt',
+    appliedSuccess: 'Đã cập nhật cài đặt thành công',
   },
 };
 
