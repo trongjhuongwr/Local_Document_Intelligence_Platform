@@ -34,29 +34,29 @@ Enterprise finance and procurement teams handle document packs across multiple v
 ```mermaid
 flowchart TD
     subgraph UI ["Modern React + Tailwind Frontend"]
-        CasesView[📁 Cases & Packs Manager]
-        AskView[💬 Interactive Copilot + Citation Inspector]
-        ReviewView[⚖️ Human Review & Audit Queue]
-        EvalView[📊 Benchmark Evaluation Dashboard]
+        CasesView["📁 Cases & Packs Manager"]
+        AskView["💬 Interactive Copilot + Citation Inspector"]
+        ReviewView["⚖️ Human Review & Audit Queue"]
+        EvalView["📊 Benchmark Evaluation Dashboard"]
     end
 
     subgraph Backend ["Express + Node.js Engine"]
-        API[REST API Layer]
-        Router[Deterministic Query Router]
-        Ingest[Document Ingestion & Chunking]
-        DiscrepancyEngine[Deterministic Discrepancy Engine (12 Rules)]
+        API["REST API Layer"]
+        Router["Deterministic Query Router"]
+        Ingest["Document Ingestion & Chunking"]
+        DiscrepancyEngine["Deterministic Discrepancy Engine (12 Rules)"]
     end
 
     subgraph Retrieval ["Hybrid Retrieval Pipeline"]
-        BM25[BM25 Lexical Search]
-        Dense[Dense Vector Search]
-        RRF[Reciprocal Rank Fusion - Hybrid]
+        BM25["BM25 Lexical Search"]
+        Dense["Dense Vector Search"]
+        RRF["Reciprocal Rank Fusion - Hybrid"]
     end
 
     subgraph AI ["AI & Extraction Engine"]
-        Gemini[Gemini 3.7 Flash with Multi-Model Fallback]
-        LocalLLM[Local Ollama / Deterministic Fallback Engine]
-        CitationVerifier[Evidence Citation Verifier]
+        Gemini["Gemini 3.7 Flash with Multi-Model Fallback"]
+        LocalLLM["Local Ollama / Deterministic Fallback Engine"]
+        CitationVerifier["Evidence Citation Verifier"]
     end
 
     UI --> API
