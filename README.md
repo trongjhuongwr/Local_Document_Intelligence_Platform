@@ -29,44 +29,110 @@ Enterprise finance and procurement teams handle document packs across multiple v
 
 ---
 
-## 🛠️ System Architecture
+## 🛠️ End-to-End System Architecture
 
 ```mermaid
-flowchart TD
-    subgraph UI ["Modern React + Tailwind Frontend"]
-        CasesView["📁 Cases & Packs Manager"]
-        AskView["💬 Interactive Copilot + Citation Inspector"]
-        ReviewView["⚖️ Human Review & Audit Queue"]
-        EvalView["📊 Benchmark Evaluation Dashboard"]
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'ui-sans-serif, system-ui, sans-serif', 'fontSize': '13px', 'primaryColor': '#ffffff', 'primaryBorderColor': '#cbd5e1', 'lineColor': '#64748b', 'textColor': '#0f172a' }}}%%
+flowchart LR
+    %% INPUT PACKS
+    subgraph Inputs ["📦 Document Ingestion Pack"]
+        direction TB
+        DOC_MSA["📄 Master Services Agreement (MSA)"]
+        DOC_PO["📑 Purchase Order (PO)"]
+        DOC_INV["🧾 Vendor Invoice Pack"]
+        DOC_POL["📜 Corporate AP Policy"]
     end
 
-    subgraph Backend ["Express + Node.js Engine"]
-        API["REST API Layer"]
-        Router["Deterministic Query Router"]
-        Ingest["Document Ingestion & Chunking"]
-        DiscrepancyEngine["Deterministic Discrepancy Engine (12 Rules)"]
+    %% PROCESSING PIPELINE
+    subgraph Pipeline ["⚙️ Intelligence & Extraction Core"]
+        direction TB
+        PARSER["🔍 Text Parser & Chunking Engine\n(Chunk Size: 500 tokens | Overlap: 50)"]
+        SCHEMA["🛡️ Schema Validator & Normalizer\n(Dates, Currencies, Tax Rates)"]
+        PARSER --> SCHEMA
     end
 
-    subgraph Retrieval ["Hybrid Retrieval Pipeline"]
-        BM25["BM25 Lexical Search"]
-        Dense["Dense Vector Search"]
-        RRF["Reciprocal Rank Fusion - Hybrid"]
+    %% DUAL ENGINES: DETERMINISTIC vs RAG
+    subgraph AuditEngine ["⚖️ 12-Rule Deterministic Engine"]
+        direction TB
+        R_CAP["💰 Price Cap & Budget Ceiling Check"]
+        R_TERM["⏱️ Payment Terms (Net 30 vs 60)"]
+        R_TAX["🧮 Subtotal, VAT & Math Reconciliation"]
+        R_DATE["📅 Contract Validity Window Check"]
+        R_PO["🏢 Missing / Unapproved PO Verification"]
     end
 
-    subgraph AI ["AI & Extraction Engine"]
-        Gemini["Gemini 3.7 Flash with Multi-Model Fallback"]
-        LocalLLM["Local Ollama / Deterministic Fallback Engine"]
-        CitationVerifier["Evidence Citation Verifier"]
+    subgraph RAGEngine ["💬 Grounded Copilot & RAG Pipeline"]
+        direction TB
+        ROUTER["🧭 Deterministic Query Router (92.5% Acc)"]
+        RETRIEVAL["⚡ Hybrid Search (BM25 + Dense + RRF)"]
+        GEMINI["✨ Gemini 3.7 Flash + Multi-Model Fallback"]
+        CITATION["🎯 Evidence Verifier & Citation Binder [1][2]"]
+        ROUTER --> RETRIEVAL --> GEMINI --> CITATION
     end
 
-    UI --> API
-    API --> Ingest
-    API --> Router
-    Router --> Retrieval
-    Retrieval --> CitationVerifier
-    CitationVerifier --> AI
-    API --> DiscrepancyEngine
-    DiscrepancyEngine --> ReviewView
+    %% HUMAN IN THE LOOP & OUTPUTS
+    subgraph Outcomes ["📊 Actionable Audit Outcomes"]
+        direction TB
+        REVIEW_QUEUE["📋 Human-in-the-Loop Review Queue\n(Approve / Reject / Flag Anomaly)"]
+        INSPECTOR["🔎 Side Evidence Inspector\n(Page-level Snippets & Chunk Provenance)"]
+        AUDIT_REPORT["📑 Exception Report & Markdown Export"]
+    end
+
+    %% CONNECTIONS
+    Inputs --> PARSER
+    SCHEMA --> AuditEngine
+    SCHEMA --> RAGEngine
+
+    AuditEngine --> REVIEW_QUEUE
+    AuditEngine --> AUDIT_REPORT
+    CITATION --> INSPECTOR
+    CITATION --> REVIEW_QUEUE
+
+    %% STYLING
+    classDef inputStyle fill:#f8fafc,stroke:#94a3b8,stroke-width:1.5px,color:#1e293b;
+    classDef pipelineStyle fill:#eff6ff,stroke:#3b82f6,stroke-width:1.5px,color:#1e3a8a;
+    classDef auditStyle fill:#fef2f2,stroke:#ef4444,stroke-width:1.5px,color:#7f1d1d;
+    classDef ragStyle fill:#faf5ff,stroke:#a855f7,stroke-width:1.5px,color:#581c87;
+    classDef outcomeStyle fill:#ecfdf5,stroke:#10b981,stroke-width:1.5px,color:#064e3b;
+
+    class DOC_MSA,DOC_PO,DOC_INV,DOC_POL inputStyle;
+    class PARSER,SCHEMA pipelineStyle;
+    class R_CAP,R_TERM,R_TAX,R_DATE,R_PO auditStyle;
+    class ROUTER,RETRIEVAL,GEMINI,CITATION ragStyle;
+    class REVIEW_QUEUE,INSPECTOR,AUDIT_REPORT outcomeStyle;
+```
+
+### 🔄 Data & Execution Flow Breakdown
+
+```text
+┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                   BUSINESS DOCUMENT PACKS                                        │
+│             [Contracts / MSA]        [Purchase Orders]        [Invoices]        [AP Policies]    │
+└───────────────────────────────────────────────┬──────────────────────────────────────────────────┘
+                                                │
+                                                ▼
+┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ 1. INGESTION & NORMALIZATION                                                                     │
+│    • Structural Chunking (Token bounds, header hierarchy, metadata binding)                      │
+│    • Strict schema extraction (Amounts, Currencies, Tax rates, Payment terms, Vendor IDs)       │
+└───────────────────────┬──────────────────────────────────────────────────┬───────────────────────┘
+                        │                                                  │
+                        ▼                                                  ▼
+┌───────────────────────────────────────────────┐  ┌───────────────────────────────────────────────┐
+│ 2A. DETERMINISTIC AUDIT ENGINE (12 RULES)     │  │ 2B. GROUNDED RAG COPILOT & CITATION ENGINE    │
+│    • Total > Contract Maximum Cap             │  │    • Deterministic Query Router (92.5% Acc)   │
+│    • Invoiced Net 15 vs Contract Net 45 Drift │  │    • BM25 + Dense + Reciprocal Rank Fusion    │
+│    • Mathematical & VAT Rate Recalculation    │  │    • Gemini 3.7 Flash Resilient Fallback      │
+│    • Invoice Date Outside Contract Term       │  │    • Physical Chunk & Page Citation Validator │
+└───────────────────────┬───────────────────────┘  └───────────────────────┬───────────────────────┘
+                        │                                                  │
+                        ▼                                                  ▼
+┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ 3. HUMAN-IN-THE-LOOP CONTROLLER WORKSPACE                                                        │
+│    • Discrepancy Matrix with exact calculation proof (e.g. $82,500 - $75,000 = $7,500 Overage)    │
+│    • Side Evidence Inspector with document text highlight and confidence scoring                 │
+│    • Controller Decision Log: [Approve Finding] [Reject Finding] [Flag for CFO Review]           │
+└──────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
