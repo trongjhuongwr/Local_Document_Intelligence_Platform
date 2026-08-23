@@ -75,8 +75,8 @@ export function App() {
     }
   };
 
-  const handleNavigateToReviews = (caseId: string) => {
-    setActiveCaseId(caseId);
+  const handleNavigateToReviews = (caseId?: string) => {
+    if (caseId) setActiveCaseId(caseId);
     setCurrentTab('reviews');
   };
 
@@ -159,6 +159,8 @@ export function App() {
               onCreateCase={handleCreateCaseFromHome}
               onTrySampleCase={handleTrySampleCase}
               onOpenCase={handleOpenCase}
+              onNavigateToReviews={handleNavigateToReviews}
+              onNavigateToAuditTrail={handleNavigateToAuditTrail}
               loadingSample={loadingSample}
             />
           </div>

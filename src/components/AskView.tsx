@@ -490,6 +490,44 @@ export function AskView({ cases, selectedCaseId, onSelectCase }: AskViewProps) {
                   </p>
                 </div>
 
+                {/* Case-Aware Contextual Smart Prompts (if a specific case is selected) */}
+                {activeCase && !searchAllCases && (
+                  <div className="w-full p-3 rounded-xl bg-blue-50/70 border border-blue-200/80 text-left space-y-1.5 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-blue-900 flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                        <span>Smart Audit Prompts for "{activeCase.name}"</span>
+                      </span>
+                      <span className="text-[10px] text-blue-700 font-medium">
+                        {activeCase.document_count} file(s) loaded
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-0.5">
+                      <button
+                        onClick={() => handleSendMessage(`Check if invoice total and hourly rates match the contract agreement for ${activeCase.name}`)}
+                        className="p-2 rounded-lg bg-white border border-blue-200 text-left hover:border-blue-500 hover:shadow-2xs transition-all cursor-pointer text-xs"
+                      >
+                        <p className="font-semibold text-neutral-900 text-[11px] line-clamp-1">Rate & Cap Verification</p>
+                        <p className="text-[10px] text-neutral-500 line-clamp-1 mt-0.5">Compare invoice against contract cap</p>
+                      </button>
+                      <button
+                        onClick={() => handleSendMessage(`Are payment terms, VAT tax rates, and subtotal calculations mathematically valid in this case?`)}
+                        className="p-2 rounded-lg bg-white border border-blue-200 text-left hover:border-blue-500 hover:shadow-2xs transition-all cursor-pointer text-xs"
+                      >
+                        <p className="font-semibold text-neutral-900 text-[11px] line-clamp-1">Arithmetic & Tax Check</p>
+                        <p className="text-[10px] text-neutral-500 line-clamp-1 mt-0.5">Verify tax and subtotal arithmetic</p>
+                      </button>
+                      <button
+                        onClick={() => handleSendMessage(`Provide an executive audit summary of ${activeCase.name} with key obligations, deliverables, and discrepancies.`)}
+                        className="p-2 rounded-lg bg-white border border-blue-200 text-left hover:border-blue-500 hover:shadow-2xs transition-all cursor-pointer text-xs"
+                      >
+                        <p className="font-semibold text-neutral-900 text-[11px] line-clamp-1">Executive Summary Dossier</p>
+                        <p className="text-[10px] text-neutral-500 line-clamp-1 mt-0.5">List obligations, SLA, & discrepancies</p>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Categorized Prompt Suggestions (3x3 Grid, Compact Design) */}
                 <div className="w-full space-y-2 text-left">
                   {CATEGORIZED_PROMPTS.map((cat, catIdx) => {

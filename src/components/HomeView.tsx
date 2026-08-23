@@ -1,24 +1,51 @@
 import React from 'react';
 import { CaseItem } from '../types';
 import { ReadinessChip } from './StatusBadges';
-import { ArrowRight, Sparkles, FolderPlus, FileText, CheckCircle2, Search, Briefcase, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { 
+  ArrowRight, 
+  Sparkles, 
+  FolderPlus, 
+  FileText, 
+  CheckCircle2, 
+  Search, 
+  Briefcase, 
+  AlertTriangle, 
+  ShieldCheck,
+  History,
+  CheckSquare,
+  Layers
+} from 'lucide-react';
 
 interface HomeViewProps {
   cases: CaseItem[];
   onCreateCase: () => void;
   onTrySampleCase: () => void;
   onOpenCase: (caseId: string) => void;
+  onNavigateToReviews?: (caseId?: string) => void;
+  onNavigateToAuditTrail?: (caseId?: string) => void;
   loadingSample: boolean;
 }
 
-export function HomeView({ cases, onCreateCase, onTrySampleCase, onOpenCase, loadingSample }: HomeViewProps) {
+export function HomeView({ 
+  cases, 
+  onCreateCase, 
+  onTrySampleCase, 
+  onOpenCase, 
+  onNavigateToReviews,
+  onNavigateToAuditTrail,
+  loadingSample 
+}: HomeViewProps) {
   // Compute key summary metrics
   const totalCases = cases.length;
   const totalOpenFindings = cases.reduce((acc, c) => acc + (c.open_review_count || 0), 0);
+  const totalDocuments = cases.reduce((acc, c) => acc + (c.document_count || 0), 0);
   
   // Calculate average compliance rate (Cases with 0 open findings or 'ready' status vs total)
   const fullyCompliantCases = cases.filter(c => (c.open_review_count === 0 && c.readiness === 'ready')).length;
   const averageComplianceRate = totalCases > 0 ? Math.round((fullyCompliantCases / totalCases) * 100) : 100;
+
+  // Breakdown by readiness status
+  const readyCases = cases.filter(c => c.readiness === 'ready').length;
 
   const steps = [
     {
@@ -52,13 +79,13 @@ export function HomeView({ cases, onCreateCase, onTrySampleCase, onOpenCase, loa
       {/* Header section */}
       <div>
         <div className="text-xs font-semibold uppercase tracking-wider text-neutral-500 mb-2">
-          Document intelligence workspace
+          Enterprise Document Intelligence Workspace
         </div>
         <h1 className="text-3xl font-bold text-neutral-900 tracking-tight">
-          Review document packs with evidence, not guesswork
+          Review document packs with cryptographic evidence, not guesswork
         </h1>
-        <p className="mt-2 text-base text-neutral-600 max-w-3xl">
-          Create a case, add business documents, and run a traceable discrepancy review entirely on your machine.
+        <p className="mt-2 text-base text-neutral-600 max-w-3xl leading-relaxed">
+          Cross-examine contracts, invoices, purchase orders, and payment policies on a local runtime. Zero hallucinations, pure deterministic verification with SHA-256 audit trails.
         </p>
 
         {/* Action Buttons */}
@@ -79,17 +106,26 @@ export function HomeView({ cases, onCreateCase, onTrySampleCase, onOpenCase, loa
             <Sparkles className="w-4 h-4 text-amber-600" />
             <span>{loadingSample ? 'Preparing sample pack...' : 'Try a sample case'}</span>
           </button>
+          {onNavigateToReviews && totalOpenFindings > 0 && (
+            <button
+              onClick={() => onNavigateToReviews()}
+              className="px-4 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-semibold text-sm transition-colors flex items-center gap-2 cursor-pointer shadow-xs"
+            >
+              <CheckSquare className="w-4 h-4" />
+              <span>Review {totalOpenFindings} Open Finding(s)</span>
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Quick Metric Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/* Quick Metric Summary Cards & Risk Breakdown */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="p-5 rounded-xl border border-neutral-200 bg-white shadow-xs flex items-center justify-between">
           <div>
             <span className="text-xs font-bold text-neutral-500 uppercase tracking-wider">Active Cases</span>
             <div className="mt-1 flex items-baseline gap-2">
               <span className="text-2xl font-black text-neutral-900">{totalCases}</span>
-              <span className="text-xs font-medium text-neutral-500">managed</span>
+              <span className="text-xs font-medium text-neutral-500">{totalDocuments} docs</span>
             </div>
           </div>
           <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center">
@@ -102,7 +138,7 @@ export function HomeView({ cases, onCreateCase, onTrySampleCase, onOpenCase, loa
             <span className="text-xs font-bold text-neutral-500 uppercase tracking-wider">Open Findings</span>
             <div className="mt-1 flex items-baseline gap-2">
               <span className="text-2xl font-black text-amber-600">{totalOpenFindings}</span>
-              <span className="text-xs font-medium text-neutral-500">awaiting review</span>
+              <span className="text-xs font-medium text-neutral-500">pending</span>
             </div>
           </div>
           <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
@@ -112,14 +148,27 @@ export function HomeView({ cases, onCreateCase, onTrySampleCase, onOpenCase, loa
 
         <div className="p-5 rounded-xl border border-neutral-200 bg-white shadow-xs flex items-center justify-between">
           <div>
-            <span className="text-xs font-bold text-neutral-500 uppercase tracking-wider">Compliance Rate</span>
+            <span className="text-xs font-bold text-neutral-500 uppercase tracking-wider">Pack Readiness</span>
             <div className="mt-1 flex items-baseline gap-2">
-              <span className="text-2xl font-black text-emerald-600">{averageComplianceRate}%</span>
-              <span className="text-xs font-medium text-neutral-500">clean packs</span>
+              <span className="text-2xl font-black text-emerald-600">{readyCases}</span>
+              <span className="text-xs font-medium text-neutral-500">/ {totalCases} ready</span>
             </div>
           </div>
           <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
             <ShieldCheck className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className="p-5 rounded-xl border border-neutral-200 bg-white shadow-xs flex items-center justify-between">
+          <div>
+            <span className="text-xs font-bold text-neutral-500 uppercase tracking-wider">Clean Rate</span>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className="text-2xl font-black text-blue-600">{averageComplianceRate}%</span>
+              <span className="text-xs font-medium text-neutral-500">verified</span>
+            </div>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center">
+            <Layers className="w-5 h-5" />
           </div>
         </div>
       </div>
@@ -153,10 +202,11 @@ export function HomeView({ cases, onCreateCase, onTrySampleCase, onOpenCase, loa
         </div>
       </div>
 
-      {/* Recent cases */}
+      {/* Recent cases with direct quick action triggers */}
       <div>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold text-neutral-900">Recent cases</h2>
+          <span className="text-xs text-neutral-500">Showing top {Math.min(5, cases.length)} recent workspace(s)</span>
         </div>
 
         {cases.length === 0 ? (
@@ -171,27 +221,50 @@ export function HomeView({ cases, onCreateCase, onTrySampleCase, onOpenCase, loa
             {cases.slice(0, 5).map(c => (
               <div
                 key={c.case_id}
-                className="p-4 flex items-center justify-between hover:bg-neutral-50/70 transition-colors"
+                className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-neutral-50/70 transition-colors"
               >
                 <div className="flex flex-col">
-                  <span className="text-sm font-bold text-neutral-900">{c.name}</span>
-                  <span className="text-xs text-neutral-500 mt-0.5">
-                    Updated {c.updated_at ? c.updated_at.slice(0, 10) : 'recent'} · {c.document_count} documents
-                  </span>
-                </div>
-                <div className="flex items-center gap-4">
                   <div className="flex items-center gap-2">
-                    <ReadinessChip readiness={c.readiness} />
-                    <span className="text-xs text-neutral-600 font-medium">
-                      {c.open_review_count} open finding(s)
+                    <span className="text-sm font-bold text-neutral-900">{c.name}</span>
+                    <span className="text-[10px] font-mono bg-neutral-100 text-neutral-600 px-1.5 py-0.5 rounded border border-neutral-200">
+                      {c.case_id}
                     </span>
                   </div>
+                  <span className="text-xs text-neutral-500 mt-0.5">
+                    Updated {c.updated_at ? c.updated_at.slice(0, 10) : 'recent'} · {c.document_count} document(s) ingested
+                  </span>
+                </div>
+                
+                <div className="flex items-center gap-2 flex-wrap">
+                  <ReadinessChip readiness={c.readiness} />
+                  
+                  {c.open_review_count > 0 && onNavigateToReviews && (
+                    <button
+                      onClick={() => onNavigateToReviews(c.case_id)}
+                      className="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-semibold border border-amber-200 flex items-center gap-1 cursor-pointer transition-colors"
+                      title="Jump straight to open findings review for this case"
+                    >
+                      <AlertTriangle className="w-3 h-3 text-amber-600" />
+                      <span>{c.open_review_count} finding(s)</span>
+                    </button>
+                  )}
+
+                  {onNavigateToAuditTrail && (
+                    <button
+                      onClick={() => onNavigateToAuditTrail(c.case_id)}
+                      className="p-1.5 text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg cursor-pointer transition-colors border border-transparent hover:border-neutral-200"
+                      title="Inspect SHA-256 Audit Trail"
+                    >
+                      <History className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+
                   <button
                     id={`open-case-${c.case_id}`}
                     onClick={() => onOpenCase(c.case_id)}
-                    className="px-3.5 py-1.5 rounded-lg border border-neutral-300 text-xs font-semibold text-neutral-800 hover:bg-neutral-100 transition-colors flex items-center gap-1 cursor-pointer"
+                    className="px-3.5 py-1.5 rounded-lg bg-neutral-900 text-white text-xs font-semibold hover:bg-neutral-800 transition-colors flex items-center gap-1 cursor-pointer shadow-2xs"
                   >
-                    <span>Open</span>
+                    <span>Open Case</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                   </button>
                 </div>

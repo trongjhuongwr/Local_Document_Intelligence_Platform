@@ -24,7 +24,8 @@ import {
   Sparkles,
   Check,
   AlertCircle,
-  Columns
+  Columns,
+  Tag
 } from 'lucide-react';
 
 interface ReviewsViewProps {
@@ -33,6 +34,15 @@ interface ReviewsViewProps {
   onSelectCase: (caseId: string | null) => void;
   onRefreshCases: () => void;
 }
+
+const QUICK_NOTE_PRESETS = [
+  'Đã xác minh qua hợp đồng bổ sung',
+  'Chênh lệch làm tròn hợp lệ (Rounding Diff)',
+  'Đã liên hệ vendor đối soát lại hóa đơn',
+  'Vi phạm điều khoản thanh toán Net-30',
+  'Phạt chậm tiến độ theo phụ lục hợp đồng',
+  'Chứng từ chưa đủ chữ ký thẩm quyền'
+];
 
 export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCases }: ReviewsViewProps) {
   const [statusFilter, setStatusFilter] = useState<string>('OPEN');
@@ -51,22 +61,57 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
     caseId?: string;
     documents?: any[];
     finding?: any;
+    findingIndex?: number;
   }>({ open: false });
 
-  const handleOpenSplitForFinding = async (finding: ReviewFinding) => {
+  const handleOpenSplitForFinding = async (finding: ReviewFinding, index?: number) => {
     try {
       const res = await fetch(`/api/cases/${finding.case_id}`);
       if (res.ok) {
         const caseData = await res.json();
+        const currentIndex = index !== undefined ? index : reviews.findIndex(r => r.review_id === finding.review_id);
         setSplitViewerConfig({
           open: true,
           caseId: finding.case_id,
           documents: caseData.documents || [],
           finding: finding.discrepancy,
+          findingIndex: currentIndex >= 0 ? currentIndex : 0,
         });
       }
     } catch (err) {
       console.error('Failed to load case documents for split viewer', err);
+    }
+  };
+
+  const handleNavigateFinding = async (newIndex: number) => {
+    if (newIndex < 0 || newIndex >= reviews.length) return;
+    const targetFinding = reviews[newIndex];
+    if (!targetFinding) return;
+
+    try {
+      // If navigating across different case documents, load the new case docs
+      if (targetFinding.case_id !== splitViewerConfig.caseId) {
+        const res = await fetch(`/api/cases/${targetFinding.case_id}`);
+        if (res.ok) {
+          const caseData = await res.json();
+          setSplitViewerConfig({
+            open: true,
+            caseId: targetFinding.case_id,
+            documents: caseData.documents || [],
+            finding: targetFinding.discrepancy,
+            findingIndex: newIndex,
+          });
+          return;
+        }
+      }
+
+      setSplitViewerConfig(prev => ({
+        ...prev,
+        finding: targetFinding.discrepancy,
+        findingIndex: newIndex,
+      }));
+    } catch (err) {
+      console.error('Failed to navigate discrepancy', err);
     }
   };
 
@@ -115,7 +160,7 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
       });
       fetchReviews();
       onRefreshCases();
-      showToast(`Finding ${action.toUpperCase()} completed.`);
+      showToast(`Finding ${action.toUpperCase()} recorded.`);
     } catch (err) {
       console.error(err);
     }
@@ -165,6 +210,14 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
     } finally {
       setBatchActionLoading(false);
     }
+  };
+
+  // Quick note preset insertion
+  const applyQuickNote = (reviewId: string, text: string) => {
+    setNotes(prev => ({
+      ...prev,
+      [reviewId]: prev[reviewId] ? `${prev[reviewId]} - ${text}` : text
+    }));
   };
 
   // Fetch all findings for comprehensive export
@@ -465,7 +518,7 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
         </div>
       ) : (
         <div className="space-y-4">
-          {reviews.map(item => {
+          {reviews.map((item, idx) => {
             const disc = item.discrepancy || {};
             const isSelected = selectedReviewIds.includes(item.review_id);
 
@@ -533,7 +586,7 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
                         Audit Evidence ({disc.evidence.length})
                       </span>
                       <button
-                        onClick={() => handleOpenSplitForFinding(item)}
+                        onClick={() => handleOpenSplitForFinding(item, idx)}
                         className="px-2.5 py-1 rounded-md bg-neutral-900 hover:bg-neutral-800 text-white text-[11px] font-semibold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
                       >
                         <Columns className="w-3 h-3 text-emerald-400" />
@@ -563,6 +616,24 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
                         {item.decided_at.slice(0, 16).replace('T', ' ')}
                       </span>
                     )}
+                  </div>
+                )}
+
+                {/* Quick Note Preset Chips */}
+                {item.status === 'OPEN' && (
+                  <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                    <span className="text-[10px] text-neutral-400 font-semibold flex items-center gap-1">
+                      <Tag className="w-2.5 h-2.5" /> Presets:
+                    </span>
+                    {QUICK_NOTE_PRESETS.map((preset, pIdx) => (
+                      <button
+                        key={pIdx}
+                        onClick={() => applyQuickNote(item.review_id, preset)}
+                        className="px-2 py-0.5 rounded-md bg-neutral-100 hover:bg-neutral-200 text-neutral-600 hover:text-neutral-900 text-[10px] font-medium transition-colors cursor-pointer border border-neutral-200/60"
+                      >
+                        {preset}
+                      </button>
+                    ))}
                   </div>
                 )}
 
@@ -646,12 +717,24 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
         </div>
       )}
 
-      {/* Side-by-Side Split Document Viewer Modal */}
+      {/* Side-by-Side Split Document Viewer Modal with Continuous Finding Navigation */}
       {splitViewerConfig.open && splitViewerConfig.documents && splitViewerConfig.documents.length > 0 && (
         <DocumentSplitViewer
           documents={splitViewerConfig.documents}
           finding={splitViewerConfig.finding}
           caseId={splitViewerConfig.caseId}
+          currentFindingIndex={splitViewerConfig.findingIndex}
+          totalFindingsCount={reviews.length}
+          onPreviousFinding={() => {
+            if (splitViewerConfig.findingIndex !== undefined && splitViewerConfig.findingIndex > 0) {
+              handleNavigateFinding(splitViewerConfig.findingIndex - 1);
+            }
+          }}
+          onNextFinding={() => {
+            if (splitViewerConfig.findingIndex !== undefined && splitViewerConfig.findingIndex < reviews.length - 1) {
+              handleNavigateFinding(splitViewerConfig.findingIndex + 1);
+            }
+          }}
           onClose={() => setSplitViewerConfig({ open: false })}
           onApproveFinding={async (finding) => {
             const reviewItem = reviews.find(r => r.discrepancy?.description === finding.description);
@@ -670,4 +753,3 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
     </div>
   );
 }
-

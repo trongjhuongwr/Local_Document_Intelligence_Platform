@@ -20,7 +20,9 @@ import {
   Check,
   Eye,
   SlidersHorizontal,
-  ChevronDown
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 
 interface DocumentSplitViewerProps {
@@ -32,6 +34,10 @@ interface DocumentSplitViewerProps {
   onClose: () => void;
   onApproveFinding?: (finding: Discrepancy) => void;
   onRejectFinding?: (finding: Discrepancy) => void;
+  onPreviousFinding?: () => void;
+  onNextFinding?: () => void;
+  currentFindingIndex?: number;
+  totalFindingsCount?: number;
 }
 
 const DOCUMENT_LABELS: Record<string, string> = {
@@ -59,6 +65,10 @@ export function DocumentSplitViewer({
   onClose,
   onApproveFinding,
   onRejectFinding,
+  onPreviousFinding,
+  onNextFinding,
+  currentFindingIndex,
+  totalFindingsCount,
 }: DocumentSplitViewerProps) {
   // Document selection
   const [leftDocId, setLeftDocId] = useState<string>(() => {
@@ -78,6 +88,19 @@ export function DocumentSplitViewer({
     }
     return documents[1]?.document_id || documents[0]?.document_id || '';
   });
+
+  // Automatically update active documents when finding changes via Next/Prev navigation
+  useEffect(() => {
+    if (finding?.evidence && finding.evidence.length > 0) {
+      const matchLeft = documents.find(d => d.filename === finding.evidence![0].filename);
+      if (matchLeft) setLeftDocId(matchLeft.document_id);
+      
+      if (finding.evidence.length > 1) {
+        const matchRight = documents.find(d => d.filename === finding.evidence![1].filename);
+        if (matchRight) setRightDocId(matchRight.document_id);
+      }
+    }
+  }, [finding, documents]);
 
   // Loaded full document content state
   const [leftDocData, setLeftDocData] = useState<any>(null);
@@ -141,14 +164,20 @@ export function DocumentSplitViewer({
     setTimeout(() => { isSyncingRef.current = false; }, 50);
   };
 
-  // Keyboard shortcut: Esc to close
+  // Keyboard shortcut: Esc to close, Arrow keys for fast continuous audit review
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        onClose();
+      } else if (e.key === 'ArrowLeft' && onPreviousFinding) {
+        onPreviousFinding();
+      } else if (e.key === 'ArrowRight' && onNextFinding) {
+        onNextFinding();
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  }, [onClose, onPreviousFinding, onNextFinding]);
 
   // Swap Left & Right
   const handleSwap = () => {
@@ -385,35 +414,56 @@ export function DocumentSplitViewer({
               </div>
             </div>
 
-            {/* Direct Quick Decisions */}
-            {(onApproveFinding || onRejectFinding) && (
-              <div className="flex items-center gap-2 shrink-0 self-end md:self-auto">
-                {onApproveFinding && (
+            {/* Continuous Navigation Controls + Direct Quick Decisions */}
+            <div className="flex items-center gap-3 shrink-0 self-end md:self-auto flex-wrap">
+              {/* Finding Index & Next/Previous Navigator */}
+              {(onPreviousFinding || onNextFinding) && (
+                <div className="flex items-center bg-white px-2 py-1 rounded-lg border border-amber-300 shadow-2xs gap-1.5">
                   <button
-                    onClick={() => {
-                      onApproveFinding(finding);
-                      onClose();
-                    }}
-                    className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                    onClick={onPreviousFinding}
+                    disabled={!onPreviousFinding || currentFindingIndex === 0}
+                    className="p-1 text-neutral-600 hover:bg-neutral-100 disabled:opacity-30 disabled:cursor-not-allowed rounded cursor-pointer"
+                    title="Previous Discrepancy (← Arrow Left)"
                   >
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Approve Finding</span>
+                    <ChevronLeft className="w-3.5 h-3.5" />
                   </button>
-                )}
-                {onRejectFinding && (
+                  <span className="text-xs font-mono font-bold text-neutral-700">
+                    Finding {(currentFindingIndex !== undefined ? currentFindingIndex + 1 : 1)} / {totalFindingsCount || 1}
+                  </span>
                   <button
-                    onClick={() => {
-                      onRejectFinding(finding);
-                      onClose();
-                    }}
-                    className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                    onClick={onNextFinding}
+                    disabled={!onNextFinding || (totalFindingsCount !== undefined && currentFindingIndex !== undefined && currentFindingIndex >= totalFindingsCount - 1)}
+                    className="p-1 text-neutral-600 hover:bg-neutral-100 disabled:opacity-30 disabled:cursor-not-allowed rounded cursor-pointer"
+                    title="Next Discrepancy (→ Arrow Right)"
                   >
-                    <X className="w-3.5 h-3.5" />
-                    <span>Reject / Dismiss</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
                   </button>
-                )}
-              </div>
-            )}
+                </div>
+              )}
+
+              {(onApproveFinding || onRejectFinding) && (
+                <div className="flex items-center gap-2">
+                  {onApproveFinding && (
+                    <button
+                      onClick={() => onApproveFinding(finding)}
+                      className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Approve</span>
+                    </button>
+                  )}
+                  {onRejectFinding && (
+                    <button
+                      onClick={() => onRejectFinding(finding)}
+                      className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      <span>Reject</span>
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )}
 

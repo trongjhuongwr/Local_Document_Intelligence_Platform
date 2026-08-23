@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { CaseItem, DocumentType, WorkflowRun, Discrepancy, CaseReadiness } from '../types';
 import { SeverityBadge, ReadinessChip } from './StatusBadges';
 import { DocumentSplitViewer } from './DocumentSplitViewer';
+import { printOrExportAuditDossier } from '../utils/exportUtils';
 import { 
   ArrowLeft, 
   UploadCloud, 
@@ -14,17 +15,21 @@ import {
   Play, 
   Check, 
   ChevronDown, 
-  ChevronRight,
-  Calculator,
-  Search,
-  Filter,
-  Eye,
-  X,
-  Copy,
-  Hash,
-  FileSpreadsheet,
-  Columns,
-  ArrowLeftRight
+  ChevronRight, 
+  Calculator, 
+  Search, 
+  Filter, 
+  Eye, 
+  X, 
+  Copy, 
+  Hash, 
+  FileSpreadsheet, 
+  Columns, 
+  ArrowLeftRight,
+  Printer,
+  Sparkles,
+  Tag,
+  FileCheck
 } from 'lucide-react';
 
 interface CasesViewProps {
@@ -43,13 +48,25 @@ const DOCUMENT_LABELS: Record<string, string> = {
   other: 'Other Document',
 };
 
-function inferDocType(filename: string): DocumentType {
+function inferDocTypeWithConfidence(filename: string): { type: DocumentType; confidence: number; reason: string } {
   const f = filename.toLowerCase();
-  if (f.includes('contract') || f.includes('msa') || f.includes('agreement')) return 'contract';
-  if (f.includes('invoice') || f.includes('inv') || f.includes('bill')) return 'invoice';
-  if (f.includes('po') || f.includes('purchase') || f.includes('order')) return 'purchase_order';
-  if (f.includes('policy') || f.includes('terms') || f.includes('guideline')) return 'policy';
-  return 'other';
+  if (f.includes('contract') || f.includes('msa') || f.includes('agreement')) {
+    return { type: 'contract', confidence: 95, reason: 'Matched agreement/contract naming' };
+  }
+  if (f.includes('invoice') || f.includes('inv') || f.includes('bill')) {
+    return { type: 'invoice', confidence: 96, reason: 'Matched invoice/bill naming' };
+  }
+  if (f.includes('po') || f.includes('purchase') || f.includes('order')) {
+    return { type: 'purchase_order', confidence: 92, reason: 'Matched purchase order naming' };
+  }
+  if (f.includes('policy') || f.includes('terms') || f.includes('guideline')) {
+    return { type: 'policy', confidence: 90, reason: 'Matched policy/terms naming' };
+  }
+  return { type: 'other', confidence: 50, reason: 'General business document' };
+}
+
+function inferDocType(filename: string): DocumentType {
+  return inferDocTypeWithConfidence(filename).type;
 }
 
 export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, onNavigateToReviews }: CasesViewProps) {
@@ -289,6 +306,30 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
       onRefreshCases();
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleExportAuditDossier = async () => {
+    if (!caseDetail) return;
+    try {
+      const [reviewsRes, auditRes] = await Promise.all([
+        fetch(`/api/reviews?case_id=${caseDetail.case_id}&limit=500`).then(r => r.json()),
+        fetch(`/api/audit-trail?case_id=${caseDetail.case_id}&limit=100`).then(r => r.json())
+      ]);
+
+      printOrExportAuditDossier({
+        caseDetail,
+        analysisResult: activeWorkflow?.result,
+        reviews: reviewsRes.reviews || [],
+        auditLogs: auditRes.entries || [],
+      });
+    } catch (err) {
+      console.error('Failed to export audit dossier', err);
+      // Fallback
+      printOrExportAuditDossier({
+        caseDetail,
+        analysisResult: activeWorkflow?.result,
+      });
     }
   };
 
@@ -559,7 +600,10 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
         {selectedFiles.length > 0 && (
           <div className="rounded-xl border border-neutral-200 bg-white overflow-hidden shadow-xs">
             <div className="p-3 bg-neutral-50 border-b border-neutral-200 text-xs font-bold text-neutral-700 flex items-center justify-between">
-              <span>Selected Files ({selectedFiles.length})</span>
+              <span className="flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                <span>Selected Files &amp; Smart Type Ingestion ({selectedFiles.length})</span>
+              </span>
               <button 
                 onClick={() => setSelectedFiles([])}
                 className="text-[11px] font-semibold text-red-600 hover:underline cursor-pointer"
@@ -568,42 +612,75 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
               </button>
             </div>
             <div className="divide-y divide-neutral-200">
-              {selectedFiles.map((item, idx) => (
-                <div key={idx} className="p-3 flex items-center justify-between gap-4 text-sm">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <FileText className="w-4 h-4 text-neutral-400 shrink-0" />
-                    <span className="font-medium text-neutral-800 truncate">{item.file.name}</span>
-                    <span className="text-xs text-neutral-400 shrink-0">({(item.file.size / 1024).toFixed(1)} KB)</span>
+              {selectedFiles.map((item, idx) => {
+                const inferred = inferDocTypeWithConfidence(item.file.name);
+                return (
+                  <div key={idx} className="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <FileText className="w-4 h-4 text-neutral-400 shrink-0" />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-neutral-900 truncate">{item.file.name}</span>
+                          <span className="text-[10px] px-1.5 py-0.2 rounded font-semibold bg-emerald-100 text-emerald-800">
+                            {inferred.confidence}% Auto-Detected
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-neutral-400">
+                          {(item.file.size / 1024).toFixed(1)} KB · {inferred.reason}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                      <div className="flex items-center gap-1">
+                        {(['contract', 'invoice', 'purchase_order', 'policy'] as DocumentType[]).map(t => (
+                          <button
+                            key={t}
+                            type="button"
+                            onClick={() => {
+                              const next = [...selectedFiles];
+                              next[idx].type = t;
+                              setSelectedFiles(next);
+                            }}
+                            className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-colors cursor-pointer ${
+                              item.type === t
+                                ? 'bg-neutral-900 text-white'
+                                : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                            }`}
+                          >
+                            {DOCUMENT_LABELS[t]}
+                          </button>
+                        ))}
+                      </div>
+
+                      <select
+                        value={item.type}
+                        onChange={e => {
+                          const next = [...selectedFiles];
+                          next[idx].type = e.target.value as DocumentType;
+                          setSelectedFiles(next);
+                        }}
+                        className="text-xs border border-neutral-300 rounded px-2 py-1 bg-white font-medium"
+                      >
+                        <option value="contract">Contract</option>
+                        <option value="invoice">Invoice</option>
+                        <option value="purchase_order">Purchase Order</option>
+                        <option value="policy">Payment Policy</option>
+                        <option value="other">Other</option>
+                      </select>
+                      <button
+                        onClick={() => {
+                          setSelectedFiles(selectedFiles.filter((_, i) => i !== idx));
+                        }}
+                        className="p-1 text-neutral-400 hover:text-red-600 rounded cursor-pointer"
+                        title="Remove file"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <label className="text-xs text-neutral-500 font-medium">Type:</label>
-                    <select
-                      value={item.type}
-                      onChange={e => {
-                        const next = [...selectedFiles];
-                        next[idx].type = e.target.value as DocumentType;
-                        setSelectedFiles(next);
-                      }}
-                      className="text-xs border border-neutral-300 rounded px-2 py-1 bg-white font-medium"
-                    >
-                      <option value="contract">Contract</option>
-                      <option value="invoice">Invoice</option>
-                      <option value="purchase_order">Purchase Order</option>
-                      <option value="policy">Payment Policy</option>
-                      <option value="other">Other</option>
-                    </select>
-                    <button
-                      onClick={() => {
-                        setSelectedFiles(selectedFiles.filter((_, i) => i !== idx));
-                      }}
-                      className="p-1 text-neutral-400 hover:text-red-600 rounded cursor-pointer"
-                      title="Remove file"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
             <div className="p-3 bg-neutral-50 border-t border-neutral-200 flex justify-end">
               <button
@@ -972,13 +1049,25 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
 
             {/* Action Bar */}
             <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-neutral-200">
-              <button
-                id="review-findings-btn"
-                onClick={() => onNavigateToReviews(caseDetail.case_id)}
-                className="px-5 py-2 rounded-lg bg-neutral-900 text-white font-semibold text-xs hover:bg-neutral-800 transition-colors cursor-pointer"
-              >
-                Review findings ({activeWorkflow.result.issues?.length || 0})
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  id="review-findings-btn"
+                  onClick={() => onNavigateToReviews(caseDetail.case_id)}
+                  className="px-5 py-2 rounded-lg bg-neutral-900 text-white font-semibold text-xs hover:bg-neutral-800 transition-colors cursor-pointer"
+                >
+                  Review findings ({activeWorkflow.result.issues?.length || 0})
+                </button>
+
+                <button
+                  id="export-dossier-btn"
+                  onClick={handleExportAuditDossier}
+                  title="Print or export full official SOX/ISO Audit Dossier"
+                  className="px-4 py-2 rounded-lg bg-emerald-700 text-white font-semibold text-xs hover:bg-emerald-800 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                >
+                  <Printer className="w-3.5 h-3.5 text-emerald-200" />
+                  <span>Export Audit Dossier (Print / PDF)</span>
+                </button>
+              </div>
 
               <button
                 id="download-report-btn"
