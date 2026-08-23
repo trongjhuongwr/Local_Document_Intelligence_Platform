@@ -1620,6 +1620,49 @@ app.post('/api/reviews/:id/resolve', (req, res) => {
   res.json(review);
 });
 
+// Batch action endpoint for reviewing findings
+app.post('/api/reviews/batch', (req, res) => {
+  const { review_ids, action, reviewer = 'Auditor', note = '' } = req.body || {};
+  if (!Array.isArray(review_ids) || review_ids.length === 0) {
+    return res.status(400).json({ error: 'invalid_request', message: 'review_ids must be a non-empty array' });
+  }
+
+  const validActions = ['approve', 'reject', 'resolve'];
+  if (!validActions.includes(action)) {
+    return res.status(400).json({ error: 'invalid_request', message: 'Invalid action. Must be approve, reject, or resolve' });
+  }
+
+  const updated: any[] = [];
+  const now = new Date().toISOString();
+
+  review_ids.forEach(id => {
+    const review = reviewsStore.get(id);
+    if (review) {
+      if (action === 'approve') {
+        review.status = 'APPROVED';
+        review.reviewer = reviewer;
+        review.note = note || review.note || 'Batch approved by auditor';
+        review.decided_at = now;
+      } else if (action === 'reject') {
+        review.status = 'REJECTED';
+        review.reviewer = reviewer;
+        review.note = note || review.note || 'Batch rejected by auditor';
+        review.decided_at = now;
+      } else if (action === 'resolve') {
+        review.status = 'RESOLVED';
+        review.decided_at = now;
+      }
+      updated.push(review);
+    }
+  });
+
+  res.json({
+    status: 'success',
+    updated_count: updated.length,
+    reviews: updated,
+  });
+});
+
 // Evaluation benchmark data endpoint (DocFlowBench latest report)
 let dynamicEvalResults: any = null;
 

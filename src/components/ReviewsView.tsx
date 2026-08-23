@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CaseItem, ReviewFinding, Severity, ReviewStatus } from '../types';
 import { SeverityBadge, StatusChip } from './StatusBadges';
+import { exportReviewsToCSV, exportReviewsToMarkdown, printOrExportPDF } from '../utils/exportUtils';
 import { 
   CheckCircle2, 
   XCircle, 
@@ -11,7 +12,17 @@ import {
   Calculator, 
   ChevronLeft, 
   ChevronRight,
-  Clock
+  Clock,
+  Download,
+  FileSpreadsheet,
+  FileText,
+  Printer,
+  CheckSquare,
+  Square,
+  Layers,
+  Sparkles,
+  Check,
+  AlertCircle
 } from 'lucide-react';
 
 interface ReviewsViewProps {
@@ -24,9 +35,13 @@ interface ReviewsViewProps {
 export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCases }: ReviewsViewProps) {
   const [statusFilter, setStatusFilter] = useState<string>('OPEN');
   const [severityFilter, setSeverityFilter] = useState<string>('all');
-  const [reviewerName, setReviewerName] = useState<string>('Auditor');
+  const [reviewerName, setReviewerName] = useState<string>('Lead Auditor (Huong Nguyen)');
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [helpOpen, setHelpOpen] = useState(false);
+  const [selectedReviewIds, setSelectedReviewIds] = useState<string[]>([]);
+  const [batchActionLoading, setBatchActionLoading] = useState(false);
+  const [batchNote, setBatchNote] = useState('');
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const [reviews, setReviews] = useState<ReviewFinding[]>([]);
   const [totalReviews, setTotalReviews] = useState(0);
@@ -55,7 +70,13 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
 
   useEffect(() => {
     fetchReviews();
+    setSelectedReviewIds([]); // reset selection when filter changes
   }, [selectedCaseId, statusFilter, severityFilter, page]);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
 
   const handleAction = async (reviewId: string, action: 'approve' | 'reject' | 'resolve') => {
     const note = notes[reviewId] || '';
@@ -67,47 +88,187 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
       });
       fetchReviews();
       onRefreshCases();
+      showToast(`Finding ${action.toUpperCase()} completed.`);
     } catch (err) {
       console.error(err);
     }
   };
 
+  // Toggle single item selection
+  const toggleSelectOne = (id: string) => {
+    setSelectedReviewIds(prev => 
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+  // Toggle select all currently visible reviews
+  const toggleSelectAllVisible = () => {
+    const visibleIds = reviews.map(r => r.review_id);
+    const allSelected = visibleIds.every(id => selectedReviewIds.includes(id));
+    if (allSelected) {
+      setSelectedReviewIds(prev => prev.filter(id => !visibleIds.includes(id)));
+    } else {
+      setSelectedReviewIds(prev => Array.from(new Set([...prev, ...visibleIds])));
+    }
+  };
+
+  // Batch action handler
+  const handleBatchAction = async (action: 'approve' | 'reject' | 'resolve') => {
+    if (selectedReviewIds.length === 0) return;
+    setBatchActionLoading(true);
+    try {
+      const res = await fetch('/api/reviews/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          review_ids: selectedReviewIds,
+          action,
+          reviewer: reviewerName,
+          note: batchNote || `Bulk ${action} applied by ${reviewerName}`,
+        }),
+      });
+      const data = await res.json();
+      fetchReviews();
+      onRefreshCases();
+      showToast(`Batch ${action.toUpperCase()} applied to ${data.updated_count || selectedReviewIds.length} findings.`);
+      setSelectedReviewIds([]);
+      setBatchNote('');
+    } catch (err) {
+      console.error('Batch action failed', err);
+    } finally {
+      setBatchActionLoading(false);
+    }
+  };
+
+  // Fetch all findings for comprehensive export
+  const fetchAllFindingsForExport = async (): Promise<ReviewFinding[]> => {
+    const params = new URLSearchParams();
+    if (selectedCaseId) params.append('case_id', selectedCaseId);
+    if (statusFilter !== 'all') params.append('status', statusFilter);
+    if (severityFilter !== 'all') params.append('severity', severityFilter);
+    params.append('limit', '2000');
+    params.append('offset', '0');
+
+    try {
+      const res = await fetch(`/api/reviews?${params.toString()}`);
+      const data = await res.json();
+      return data.reviews || reviews;
+    } catch {
+      return reviews;
+    }
+  };
+
+  const handleExportCSV = async () => {
+    const list = selectedReviewIds.length > 0
+      ? reviews.filter(r => selectedReviewIds.includes(r.review_id))
+      : await fetchAllFindingsForExport();
+    exportReviewsToCSV(list, `audit_findings_${selectedCaseId || 'all'}_${Date.now()}.csv`);
+    showToast(`Exported ${list.length} findings to CSV/Excel format.`);
+  };
+
+  const handleExportMarkdown = async () => {
+    const list = selectedReviewIds.length > 0
+      ? reviews.filter(r => selectedReviewIds.includes(r.review_id))
+      : await fetchAllFindingsForExport();
+    exportReviewsToMarkdown(list, `Audit Findings & Review Report (${selectedCaseId || 'All Cases'})`);
+    showToast(`Exported ${list.length} findings to Markdown document.`);
+  };
+
+  const handlePrintPDF = async () => {
+    const list = selectedReviewIds.length > 0
+      ? reviews.filter(r => selectedReviewIds.includes(r.review_id))
+      : await fetchAllFindingsForExport();
+    printOrExportPDF(list, `Audit Findings Official Executive Report`);
+  };
+
   const totalPages = Math.max(1, Math.ceil(totalReviews / pageSize));
+  const allVisibleSelected = reviews.length > 0 && reviews.every(r => selectedReviewIds.includes(r.review_id));
 
   return (
     <div className="max-w-5xl mx-auto py-8 px-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-60 bg-neutral-900 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-2xl border border-neutral-700 animate-in fade-in slide-in-from-bottom-3 duration-200 flex items-center gap-2">
+          <Check className="w-4 h-4 text-emerald-400" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {/* Header & Export Toolbar */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
+          <div className="text-xs font-semibold uppercase tracking-wider text-neutral-500 mb-0.5">
+            Audit Human Verification Queue
+          </div>
           <h1 className="text-2xl font-bold text-neutral-900 tracking-tight">Review Findings</h1>
           <p className="text-sm text-neutral-500 mt-0.5">
-            Audit human queue: review, approve or reject automatically generated discrepancy exceptions.
+            Audit human queue: review, batch approve or reject automatically generated discrepancy exceptions.
           </p>
         </div>
-        <button
-          onClick={() => setHelpOpen(!helpOpen)}
-          className="text-xs text-neutral-600 hover:text-neutral-900 flex items-center gap-1 font-medium cursor-pointer"
-        >
-          <HelpCircle className="w-3.5 h-3.5" />
-          <span>What do these actions mean?</span>
-        </button>
+
+        {/* Export Buttons */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            id="export-csv-btn"
+            onClick={handleExportCSV}
+            title="Export full findings to CSV / Excel spreadsheet"
+            className="px-3 py-2 rounded-lg border border-neutral-300 bg-white hover:bg-neutral-50 text-neutral-800 text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+            <span>CSV / Excel</span>
+          </button>
+
+          <button
+            id="export-md-btn"
+            onClick={handleExportMarkdown}
+            title="Export findings report as Markdown document"
+            className="px-3 py-2 rounded-lg border border-neutral-300 bg-white hover:bg-neutral-50 text-neutral-800 text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+          >
+            <FileText className="w-3.5 h-3.5 text-blue-600" />
+            <span>Markdown</span>
+          </button>
+
+          <button
+            id="export-pdf-btn"
+            onClick={handlePrintPDF}
+            title="Print or export official audit findings report as PDF"
+            className="px-3 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+          >
+            <Printer className="w-3.5 h-3.5 text-amber-400" />
+            <span>Print / PDF</span>
+          </button>
+
+          <button
+            onClick={() => setHelpOpen(!helpOpen)}
+            className="text-xs text-neutral-500 hover:text-neutral-900 p-2 rounded-lg hover:bg-neutral-100 cursor-pointer"
+            title="Action Guidelines"
+          >
+            <HelpCircle className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* Guide dialog / expander */}
       {helpOpen && (
-        <div className="p-4 rounded-xl border border-neutral-200 bg-neutral-50 text-xs text-neutral-700 space-y-2">
-          <div className="font-bold text-neutral-900">Audit Action Guidelines</div>
+        <div className="p-4 rounded-xl border border-neutral-200 bg-neutral-50 text-xs text-neutral-700 space-y-2 animate-in fade-in duration-150">
+          <div className="font-bold text-neutral-900">Audit Action Guidelines &amp; Protocol</div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
-            <div className="bg-white p-3 rounded border border-neutral-200">
-              <span className="font-bold text-emerald-700">Approve</span>
-              <p className="mt-1 text-neutral-600">Confirms this discrepancy is a real business issue and blocks payment or triggers an inquiry.</p>
+            <div className="bg-white p-3 rounded-lg border border-neutral-200 shadow-2xs">
+              <span className="font-bold text-emerald-700 flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" /> Approve
+              </span>
+              <p className="mt-1 text-neutral-600">Confirms this discrepancy is a real business issue and blocks payment or triggers a vendor inquiry.</p>
             </div>
-            <div className="bg-white p-3 rounded border border-neutral-200">
-              <span className="font-bold text-rose-700">Reject</span>
+            <div className="bg-white p-3 rounded-lg border border-neutral-200 shadow-2xs">
+              <span className="font-bold text-rose-700 flex items-center gap-1">
+                <XCircle className="w-3.5 h-3.5" /> Reject
+              </span>
               <p className="mt-1 text-neutral-600">Dismisses the finding as an acceptable business exception or parsing false alarm.</p>
             </div>
-            <div className="bg-white p-3 rounded border border-neutral-200">
-              <span className="font-bold text-neutral-700">Resolve</span>
+            <div className="bg-white p-3 rounded-lg border border-neutral-200 shadow-2xs">
+              <span className="font-bold text-neutral-700 flex items-center gap-1">
+                <RotateCcw className="w-3.5 h-3.5" /> Resolve
+              </span>
               <p className="mt-1 text-neutral-600">Marks a previously approved finding as resolved following corrective invoice submission.</p>
             </div>
           </div>
@@ -116,7 +277,7 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
 
       {/* Filter Toolbar */}
       <div className="p-4 rounded-xl border border-neutral-200 bg-white space-y-3 shadow-xs">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
           <div>
             <label className="block text-xs font-semibold text-neutral-700 mb-1">Filter case</label>
             <select
@@ -187,6 +348,84 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
         </div>
       </div>
 
+      {/* Batch Actions Bar */}
+      <div className="p-3.5 rounded-xl border border-neutral-200 bg-neutral-50/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={toggleSelectAllVisible}
+            disabled={reviews.length === 0}
+            className="flex items-center gap-2 text-xs font-semibold text-neutral-800 hover:text-neutral-900 cursor-pointer disabled:opacity-50"
+          >
+            {allVisibleSelected ? (
+              <CheckSquare className="w-4 h-4 text-emerald-600" />
+            ) : selectedReviewIds.length > 0 ? (
+              <div className="w-4 h-4 bg-emerald-600 text-white rounded flex items-center justify-center text-[10px] font-bold">
+                -
+              </div>
+            ) : (
+              <Square className="w-4 h-4 text-neutral-400" />
+            )}
+            <span>
+              {selectedReviewIds.length > 0 
+                ? `Selected ${selectedReviewIds.length} finding(s)` 
+                : 'Select all visible'}
+            </span>
+          </button>
+
+          {selectedReviewIds.length > 0 && (
+            <button
+              onClick={() => setSelectedReviewIds([])}
+              className="text-[11px] text-neutral-500 hover:text-neutral-800 underline cursor-pointer"
+            >
+              Clear selection
+            </button>
+          )}
+        </div>
+
+        {/* Batch Decision Controls */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {selectedReviewIds.length > 0 && (
+            <input
+              type="text"
+              placeholder="Bulk note (optional)..."
+              value={batchNote}
+              onChange={e => setBatchNote(e.target.value)}
+              className="px-2.5 py-1.5 text-xs border border-neutral-300 rounded-lg bg-white min-w-[170px]"
+            />
+          )}
+
+          <button
+            id="batch-approve-btn"
+            disabled={selectedReviewIds.length === 0 || batchActionLoading}
+            onClick={() => handleBatchAction('approve')}
+            className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+          >
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            <span>Approve Selected ({selectedReviewIds.length})</span>
+          </button>
+
+          <button
+            id="batch-reject-btn"
+            disabled={selectedReviewIds.length === 0 || batchActionLoading}
+            onClick={() => handleBatchAction('reject')}
+            className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+          >
+            <XCircle className="w-3.5 h-3.5" />
+            <span>Reject Selected ({selectedReviewIds.length})</span>
+          </button>
+
+          <button
+            id="batch-resolve-btn"
+            disabled={selectedReviewIds.length === 0 || batchActionLoading}
+            onClick={() => handleBatchAction('resolve')}
+            className="px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-900 disabled:opacity-40 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Resolve</span>
+          </button>
+        </div>
+      </div>
+
       {/* Findings List */}
       {loading ? (
         <div className="p-12 text-center text-xs text-neutral-500">Loading audit findings...</div>
@@ -201,14 +440,30 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
         <div className="space-y-4">
           {reviews.map(item => {
             const disc = item.discrepancy || {};
+            const isSelected = selectedReviewIds.includes(item.review_id);
+
             return (
               <div
                 key={item.review_id}
-                className="p-5 rounded-xl border border-neutral-200 bg-white shadow-xs space-y-4"
+                className={`p-5 rounded-xl border transition-all shadow-xs space-y-4 ${
+                  isSelected ? 'border-emerald-500 bg-emerald-50/20' : 'border-neutral-200 bg-white'
+                }`}
               >
                 {/* Finding Header */}
                 <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2.5">
+                    {/* Checkbox for batch action */}
+                    <button
+                      onClick={() => toggleSelectOne(item.review_id)}
+                      className="cursor-pointer text-neutral-400 hover:text-neutral-700"
+                    >
+                      {isSelected ? (
+                        <CheckSquare className="w-4 h-4 text-emerald-600" />
+                      ) : (
+                        <Square className="w-4 h-4 text-neutral-300 hover:text-neutral-400" />
+                      )}
+                    </button>
+
                     <SeverityBadge severity={item.severity} />
                     <StatusChip status={item.status} />
                     <span className="text-xs text-neutral-400 font-mono">Case: {item.case_id}</span>
@@ -251,7 +506,7 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
                     </span>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                       {disc.evidence.map((ev: any, ei: number) => (
-                        <div key={ei} className="p-2 rounded bg-neutral-50 border border-neutral-100 text-[11px]">
+                        <div key={ei} className="p-2.5 rounded-lg bg-neutral-50 border border-neutral-100 text-[11px]">
                           <span className="font-semibold text-neutral-800">{ev.filename}</span>
                           {ev.snippet && <p className="text-neutral-600 mt-0.5 italic">"{ev.snippet}"</p>}
                         </div>
@@ -262,7 +517,7 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
 
                 {/* Audit trail / note if decided */}
                 {item.reviewer && (
-                  <div className="p-2.5 rounded bg-neutral-50 text-xs text-neutral-600 flex items-center justify-between">
+                  <div className="p-2.5 rounded-lg bg-neutral-50 border border-neutral-200 text-xs text-neutral-600 flex items-center justify-between">
                     <div>
                       Decided by: <strong>{item.reviewer}</strong>
                       {item.note && <span className="italic ml-2">"{item.note}"</span>}
@@ -357,3 +612,4 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
     </div>
   );
 }
+
