@@ -98,6 +98,7 @@ export function AskView({ cases, selectedCaseId, onSelectCase }: AskViewProps) {
 
   // Interaction feedback states
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [savedFeedbackId, setSavedFeedbackId] = useState<string | null>(null);
   const [expandedTechId, setExpandedTechId] = useState<string | null>(null);
 
@@ -106,6 +107,36 @@ export function AskView({ cases, selectedCaseId, onSelectCase }: AskViewProps) {
   const followUpScrollRef = useRef<HTMLDivElement | null>(null);
 
   const activeCase = cases.find(c => c.case_id === selectedCaseId);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  // Keyboard Shortcuts: Esc to close Side Inspector, '/' to focus chat input
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // If user pressed Escape, close inspector if open
+      if (e.key === 'Escape') {
+        if (inspectorOpen) {
+          setInspectorOpen(false);
+        }
+      }
+
+      // If user pressed '/' and is not already typing in an input/textarea
+      if (e.key === '/' && document.activeElement !== textareaRef.current) {
+        const isInputField = ['INPUT', 'TEXTAREA', 'SELECT'].includes((document.activeElement?.tagName || '').toUpperCase());
+        if (!isInputField) {
+          e.preventDefault();
+          textareaRef.current?.focus();
+          showToast('Focused chat input (Shortcut: /)');
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [inspectorOpen]);
 
   const scrollFollowUps = (direction: 'left' | 'right') => {
     if (followUpScrollRef.current) {
@@ -227,9 +258,10 @@ export function AskView({ cases, selectedCaseId, onSelectCase }: AskViewProps) {
     }
   };
 
-  const handleCopy = (text: string, id: string) => {
+  const handleCopy = (text: string, id: string, label: string = 'Đã sao chép vào clipboard') => {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
+    showToast(label);
     setTimeout(() => setCopiedId(null), 2000);
   };
 
@@ -249,10 +281,12 @@ export function AskView({ cases, selectedCaseId, onSelectCase }: AskViewProps) {
     a.download = `audit_chat_${selectedCaseId || 'all_cases'}_${new Date().toISOString().slice(0, 10)}.md`;
     a.click();
     URL.revokeObjectURL(url);
+    showToast('Đã xuất toàn bộ lịch sử hội thoại ra tệp Markdown');
   };
 
   const handleSaveToAuditNotes = (msg: ChatMessage) => {
     setSavedFeedbackId(msg.id);
+    showToast('Đã lưu phát hiện vào ghi chú kiểm toán viên');
     setTimeout(() => setSavedFeedbackId(null), 2500);
   };
 
@@ -269,7 +303,15 @@ export function AskView({ cases, selectedCaseId, onSelectCase }: AskViewProps) {
   };
 
   return (
-    <div className="flex flex-col h-full max-w-7xl mx-auto px-2 sm:px-4 lg:px-6 py-2 overflow-hidden">
+    <div className="flex flex-col h-full max-w-7xl mx-auto px-2 sm:px-4 lg:px-6 py-2 overflow-hidden relative">
+      {/* Floating Toast Notification Banner */}
+      {toastMessage && (
+        <div className="fixed top-6 right-6 z-50 bg-neutral-900/95 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-2xl border border-neutral-700 backdrop-blur-md animate-in fade-in slide-in-from-top-3 duration-200 flex items-center gap-2">
+          <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
       {/* Top Header & Context Control Strip */}
       <div className="bg-white border border-neutral-200/90 rounded-2xl p-2.5 mb-2 shadow-xs transition-all">
         {/* Row 1: Brand & Top Action Toolbar */}
@@ -580,7 +622,7 @@ export function AskView({ cases, selectedCaseId, onSelectCase }: AskViewProps) {
                           <div className="flex items-center justify-between pt-1 text-xs text-neutral-400">
                             <div className="flex items-center gap-1">
                               <button
-                                onClick={() => handleCopy(msg.content, msg.id)}
+                                onClick={() => handleCopy(msg.content, msg.id, 'Đã sao chép câu trả lời vào clipboard')}
                                 className="hover:text-neutral-800 flex items-center gap-1 py-1 px-2 rounded-lg hover:bg-neutral-100 transition-colors cursor-pointer text-[11px] font-medium"
                                 title="Copy response text"
                               >
@@ -742,7 +784,9 @@ export function AskView({ cases, selectedCaseId, onSelectCase }: AskViewProps) {
                       <span>Press <kbd className="font-mono bg-neutral-100 text-neutral-700 px-1 py-0.5 rounded text-[9.5px] font-semibold border border-neutral-200">Enter</kbd> to send</span>
                     </span>
                     <span>·</span>
-                    <span><kbd className="font-mono bg-neutral-100 text-neutral-700 px-1 py-0.5 rounded text-[9.5px] font-semibold border border-neutral-200">Shift+Enter</kbd> newline</span>
+                    <span><kbd className="font-mono bg-neutral-100 text-neutral-700 px-1 py-0.5 rounded text-[9.5px] font-semibold border border-neutral-200">/</kbd> focus input</span>
+                    <span>·</span>
+                    <span><kbd className="font-mono bg-neutral-100 text-neutral-700 px-1 py-0.5 rounded text-[9.5px] font-semibold border border-neutral-200">Esc</kbd> close panel</span>
                   </div>
 
                   {/* Right Send Button */}
@@ -822,7 +866,7 @@ export function AskView({ cases, selectedCaseId, onSelectCase }: AskViewProps) {
 
                   <div className="flex gap-2 pt-2">
                     <button
-                      onClick={() => handleCopy(selectedCitation.cite.evidence, 'inspect-copy')}
+                      onClick={() => handleCopy(selectedCitation.cite.evidence, 'inspect-copy', 'Đã sao chép trích dẫn bằng chứng vào clipboard')}
                       className="flex-1 py-1.5 px-3 rounded-xl border border-neutral-300 hover:bg-neutral-50 text-xs font-medium text-neutral-700 flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       <Copy className="w-3.5 h-3.5" />
