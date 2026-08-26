@@ -36,3 +36,6 @@ node_modules/
 dist/
 .vite/
 *.tsbuildinfo
+
+# Personal interview notes, not part of the product
+INTERVIEW_PREP.md
