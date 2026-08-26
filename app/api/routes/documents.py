@@ -6,10 +6,11 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
 from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_session
-from app.models import Chunk, Document
+from app.models import Chunk, Document, ExtractionRun
 from app.services.documents import DocumentService
 
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -50,6 +51,20 @@ class DocumentDetail(DocumentSummary):
     doc_metadata: dict[str, Any]
     element_count: int
     chunk_count: int
+
+
+class ExtractionResponse(BaseModel):
+    """Stored structured fields for a document, or an honest 'not extracted yet'."""
+
+    document_id: uuid.UUID
+    filename: str
+    document_type: str | None
+    extracted: bool
+    fields: dict[str, Any] = {}
+    method: str | None = None
+    prompt_name: str | None = None
+    prompt_version: str | None = None
+    extracted_at: datetime | None = None
 
 
 class ChunkResponse(BaseModel):
@@ -157,6 +172,49 @@ async def get_document(document_id: uuid.UUID, session: SessionDep) -> DocumentD
 async def get_document_chunks(document_id: uuid.UUID, session: SessionDep) -> list[ChunkResponse]:
     chunks = await DocumentService(session).get_chunks(document_id)
     return [_chunk_response(chunk) for chunk in chunks]
+
+
+@router.get("/{document_id}/extraction")
+async def get_document_extraction(
+    document_id: uuid.UUID, session: SessionDep
+) -> ExtractionResponse:
+    """Return the stored structured fields for one document.
+
+    Serves the most recent schema-valid extraction run. This never invokes the
+    model: a document that has not been extracted yet reports
+    ``extracted: false`` rather than triggering work behind a GET.
+    """
+    document, _element_count, _chunk_count = await DocumentService(session).get_document(
+        document_id
+    )
+    result = await session.execute(
+        select(ExtractionRun)
+        .where(
+            ExtractionRun.document_id == document_id,
+            ExtractionRun.schema_valid.is_(True),
+        )
+        .order_by(ExtractionRun.created_at.desc())
+        .limit(1)
+    )
+    run = result.scalar_one_or_none()
+    if run is None:
+        return ExtractionResponse(
+            document_id=document_id,
+            filename=document.filename,
+            document_type=document.document_type,
+            extracted=False,
+        )
+    return ExtractionResponse(
+        document_id=document_id,
+        filename=document.filename,
+        document_type=run.document_type,
+        extracted=True,
+        fields=dict(run.data),
+        method=run.method,
+        prompt_name=run.prompt_name,
+        prompt_version=run.prompt_version,
+        extracted_at=run.created_at,
+    )
 
 
 @router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
