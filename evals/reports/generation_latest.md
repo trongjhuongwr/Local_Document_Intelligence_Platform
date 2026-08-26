@@ -1,8 +1,8 @@
 # Citation Quality Evaluation (end-to-end Q&A)
 
-Queries completed: 60/60 · Citations present: **88.33%** · Citations valid: **88.33%** · Correct document cited: **80.00%**
+Queries completed: 60/60 · Citations present: **90.00%** · Citations valid: **90.00%** · Correct document cited: **81.67%**
 
-Median latency: 926.6 ms · P95: 2625.5 ms
+Median latency: 799.3 ms · P95: 933.9 ms
 
 | Case | Expected | Cited |
 | --- | --- | --- |
@@ -14,5 +14,5 @@ Median latency: 926.6 ms · P95: 2625.5 ms
 | case_008 | invoice_001.pdf | service_contract.pdf |
 | case_009 | payment_policy.pdf | (none) |
 | case_010 | payment_policy.pdf | (none) |
-| case_011 | invoice_001.pdf | (none) |
 | case_012 | payment_policy.pdf | (none) |
+| case_012 | invoice_001.pdf | service_contract.pdf |

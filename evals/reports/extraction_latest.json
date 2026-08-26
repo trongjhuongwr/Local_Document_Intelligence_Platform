@@ -1,12 +1,12 @@
 {
   "eval": "extraction",
-  "generated_at": "2026-08-18T03:21:41+00:00",
+  "generated_at": "2026-08-26T03:35:03+00:00",
   "cases_evaluated": 15,
   "model": "llama3.2:1b",
-  "overall_field_accuracy": 0.9527,
+  "overall_field_accuracy": 0.9572,
   "overall_schema_valid_rate": 1.0,
-  "median_llm_latency_ms": 1548.8,
-  "p95_llm_latency_ms": 1812.3,
+  "median_llm_latency_ms": 1643.0,
+  "p95_llm_latency_ms": 1940.1,
   "by_document_type": {
     "invoice": {
       "documents": 17,
@@ -18,15 +18,15 @@
         "issue_date": 1.0,
         "due_date": 0.9412,
         "currency": 1.0,
-        "subtotal": 0.8824,
-        "tax_rate_percent": 0.5294,
-        "tax": 0.8824,
-        "total": 0.8235,
-        "payment_terms": 0.8824,
+        "subtotal": 0.9412,
+        "tax_rate_percent": 0.4706,
+        "tax": 0.9412,
+        "total": 0.8824,
+        "payment_terms": 0.9412,
         "po_reference": 1.0
       },
-      "overall_field_accuracy": 0.9069,
-      "numeric_accuracy": 0.7794,
+      "overall_field_accuracy": 0.9216,
+      "numeric_accuracy": 0.8088,
       "date_accuracy": 0.9706,
       "required_field_completeness": 1.0
     },
@@ -51,13 +51,13 @@
       "documents": 15,
       "schema_valid_rate": 1.0,
       "field_accuracy": {
-        "po_number": 1.0,
+        "po_number": 0.9333,
         "vendor_name": 1.0,
         "issue_date": 1.0,
         "currency": 1.0,
         "approved_amount": 0.9333
       },
-      "overall_field_accuracy": 0.9867,
+      "overall_field_accuracy": 0.9733,
       "numeric_accuracy": 0.9333,
       "date_accuracy": 1.0,
       "required_field_completeness": 0.9867

@@ -1,6 +1,6 @@
 {
   "eval": "routing",
-  "generated_at": "2026-08-18T03:27:49+00:00",
+  "generated_at": "2026-08-26T03:36:58+00:00",
   "model": "llama3.2:1b",
   "production_router": {
     "total": 40,
@@ -112,18 +112,18 @@
   },
   "llm_only": {
     "total": 40,
-    "accuracy": 0.7,
-    "macro_f1": 0.6977,
+    "accuracy": 0.675,
+    "macro_f1": 0.6709,
     "per_route": {
       "factual_rag": {
-        "precision": 0.5714,
-        "recall": 0.5,
-        "f1": 0.5333
+        "precision": 0.5,
+        "recall": 0.375,
+        "f1": 0.4286
       },
       "structured_lookup": {
-        "precision": 0.5333,
+        "precision": 0.5,
         "recall": 1.0,
-        "f1": 0.6957
+        "f1": 0.6667
       },
       "document_compare": {
         "precision": 0.7778,
@@ -143,8 +143,8 @@
     },
     "confusion_matrix": {
       "factual_rag": {
-        "factual_rag": 4,
-        "structured_lookup": 4
+        "factual_rag": 3,
+        "structured_lookup": 5
       },
       "structured_lookup": {
         "structured_lookup": 8
@@ -217,5 +217,5 @@
       }
     }
   },
-  "headline": "routing accuracy 92.50% (deterministic default); LLM-assisted 82.50%, LLM-only 70.00%"
+  "headline": "routing accuracy 92.50% (deterministic default); LLM-assisted 82.50%, LLM-only 67.50%"
 }

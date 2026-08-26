@@ -1,358 +1,318 @@
 # 🏛️ Document Intelligence & Cross-Verification Copilot
 
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue.svg?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
+[![Python](https://img.shields.io/badge/Python-3.12+-3776AB.svg?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688.svg?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com/)
+[![PostgreSQL + pgvector](https://img.shields.io/badge/PostgreSQL-16_+_pgvector-4169E1.svg?style=flat-square&logo=postgresql&logoColor=white)](https://github.com/pgvector/pgvector)
+[![Ollama](https://img.shields.io/badge/Ollama-llama3.2:1b-000000.svg?style=flat-square&logo=ollama)](https://ollama.com/)
+[![LangGraph](https://img.shields.io/badge/LangGraph-workflow-1C3C3C.svg?style=flat-square)](https://langchain-ai.github.io/langgraph/)
 [![React](https://img.shields.io/badge/React-18.3-61DAFB.svg?style=flat-square&logo=react)](https://reactjs.org/)
-[![Tailwind CSS v4](https://img.shields.io/badge/Tailwind_CSS-v4.0-38B2AC.svg?style=flat-square&logo=tailwind-css)](https://tailwindcss.com/)
-[![Express](https://img.shields.io/badge/Express-4.21-000000.svg?style=flat-square&logo=express)](https://expressjs.com/)
-[![Gemini 3.7 Flash](https://img.shields.io/badge/Gemini-3.7_Flash-4285F4.svg?style=flat-square&logo=google)](https://ai.google.dev/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg?style=flat-square)](LICENSE)
 
-> A modern, audit-grade Document Intelligence platform that cross-examines packs of business documents (Master Services Agreements, Invoices, Purchase Orders, and AP Policies), performs deterministic anomaly detection, and provides grounded conversational Q&A with interactive page-level evidence citations.
+> A **local-first** document intelligence platform that cross-examines packs of business documents (service agreements, purchase orders, invoices, AP policies), detects inconsistencies with deterministic rules, and answers questions with page-level evidence citations — running entirely on a consumer laptop with a 1-billion-parameter model and **no paid AI APIs**.
 
 ---
 
-## 📌 Problem Statement & Core Thesis
+## 📌 Problem statement & core thesis
 
-Enterprise finance and procurement teams handle document packs across multiple vendors. Critical failures and expensive compliance leaks routinely hide **between related documents**:
+The expensive failures in accounts payable do not live inside a single document — they live **between** documents. An invoice that exceeds the contract cap. A currency that silently changed. Payment terms that drifted from what was signed. A duplicate invoice number carrying a different total.
 
-* **Invoice Overbilling**: An invoice line item or total exceeding the contracted price cap or approved PO budget.
-* **Payment Term Drift**: Payment terms subtly drifting (e.g., Net 15 vs. Net 45) from Master Agreements.
-* **Tax Calculation & VAT Inconsistencies**: Discrepancies in subtotal sums, VAT rates, and mathematical calculations.
-* **Unauthorized Invoicing Dates**: Invoices issued outside the valid contractual period.
-* **Missing or Unapproved PO Citations**: Billing without mandatory policy-compliant approvals.
+Checking this by hand is slow. Handing it to an unconstrained chatbot is unauditable.
 
-### 💡 The Platform Philosophy: Software Determinism + Bounded AI
-1. **Deterministic Software Decides What Software Can Calculate**: Mathematical differences, budget ceilings, date validity, and citation grounding are verified through deterministic code with full provenance.
-2. **Bounded AI for Structured Extraction & Synthesis**: Gemini 3.7 Flash (with automatic resilient fallback) or local models handle schema-validated parsing and grounded conversational synthesis.
-3. **Interactive Citation Inspector**: Every claim in the chat or discrepancy report links to interactive citations (`[1]`, `[2]`), allowing auditors to inspect the exact source chunk, page number, confidence score, and document text.
-4. **Human-in-the-Loop Review Queue**: Discrepancies generate actionable review tasks where controllers can inspect, approve, or reject findings with a full audit log.
+This project takes the third path, and it is the entire point of the repository:
+
+> **Reliability comes from system design, not model size.**
+
+`llama3.2:1b` is a weak model, chosen deliberately. Everything software can decide, software decides:
+
+| Concern | Who decides | Why |
+|---|---|---|
+| Financial comparisons & differences | **Python** (`Decimal`, storing formula + operands as provenance) | An LLM must never do arithmetic a controller will act on |
+| Which documents are inconsistent | **12 deterministic rules** over normalised values | Reproducible, explainable, testable — scores F1 = 1.00 against ground truth |
+| Query routing | **Deterministic keyword rules** | Measured: 92.5% vs 67.5% for the 1B model on the same labelled set |
+| Ranking & fusion | **Reciprocal Rank Fusion in Python** | Deterministic, no model in the loop |
+| Citations | **Built by software before generation**, verified after | The model may only reference IDs it was handed; invented IDs are stripped |
+| Approval of findings | **A human**, through a persisted review queue | The system never claims accounting authority |
+
+The LLM is left with the bounded jobs it can actually do: schema-validated field extraction and evidence-grounded answer synthesis.
 
 ---
 
-## 🛠️ End-to-End System Architecture
+## 🛠️ System architecture
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'ui-sans-serif, system-ui, sans-serif', 'fontSize': '13px', 'primaryColor': '#ffffff', 'primaryBorderColor': '#cbd5e1', 'lineColor': '#64748b', 'textColor': '#0f172a' }}}%%
-flowchart LR
-    %% INPUT PACKS
-    subgraph Inputs ["📦 Document Ingestion Pack"]
-        direction TB
-        DOC_MSA["📄 Master Services Agreement (MSA)"]
-        DOC_PO["📑 Purchase Order (PO)"]
-        DOC_INV["🧾 Vendor Invoice Pack"]
-        DOC_POL["📜 Corporate AP Policy"]
-    end
+flowchart TD
+    UI["React + Vite SPA"] -->|/api| API["FastAPI backend"]
+    MCP["MCP server (read-only tools)"] --> SVC
 
-    %% PROCESSING PIPELINE
-    subgraph Pipeline ["⚙️ Intelligence & Extraction Core"]
-        direction TB
-        PARSER["🔍 Text Parser & Chunking Engine\n(Chunk Size: 500 tokens | Overlap: 50)"]
-        SCHEMA["🛡️ Schema Validator & Normalizer\n(Dates, Currencies, Tax Rates)"]
-        PARSER --> SCHEMA
-    end
+    API --> SVC["Service layer"]
+    SVC --> ING["Ingestion: parse → structure-aware chunk → SHA-256 dedupe"]
+    ING --> PG[("PostgreSQL 16 + pgvector")]
 
-    %% DUAL ENGINES: DETERMINISTIC vs RAG
-    subgraph AuditEngine ["⚖️ 12-Rule Deterministic Engine"]
-        direction TB
-        R_CAP["💰 Price Cap & Budget Ceiling Check"]
-        R_TERM["⏱️ Payment Terms (Net 30 vs 60)"]
-        R_TAX["🧮 Subtotal, VAT & Math Reconciliation"]
-        R_DATE["📅 Contract Validity Window Check"]
-        R_PO["🏢 Missing / Unapproved PO Verification"]
-    end
+    SVC --> ROUTE["Deterministic query router"]
+    ROUTE --> BM25["BM25 (in-process)"]
+    ROUTE --> VEC["pgvector dense search"]
+    BM25 --> RRF["Reciprocal Rank Fusion"]
+    VEC --> RRF
+    RRF --> CTX["Context builder (budget + dedupe)"]
+    CTX --> LLM["llama3.2:1b via Ollama"]
+    LLM --> VERIFY["Citation verification"]
 
-    subgraph RAGEngine ["💬 Grounded Copilot & RAG Pipeline"]
-        direction TB
-        ROUTER["🧭 Deterministic Query Router (92.5% Acc)"]
-        RETRIEVAL["⚡ Hybrid Search (BM25 + Dense + RRF)"]
-        GEMINI["✨ Gemini 3.7 Flash + Multi-Model Fallback"]
-        CITATION["🎯 Evidence Verifier & Citation Binder [1][2]"]
-        ROUTER --> RETRIEVAL --> GEMINI --> CITATION
-    end
+    SVC --> WF["LangGraph compare workflow"]
+    WF --> EX["Structured extraction (schema-validated + repair pass)"]
+    EX --> RULES["12-rule discrepancy engine"]
+    RULES --> REPORT["Exception report + calculation provenance"]
+    REPORT --> REVIEW["Human review queue"]
+    REVIEW --> AUDIT["Audit trail"]
 
-    %% HUMAN IN THE LOOP & OUTPUTS
-    subgraph Outcomes ["📊 Actionable Audit Outcomes"]
-        direction TB
-        REVIEW_QUEUE["📋 Human-in-the-Loop Review Queue\n(Approve / Reject / Flag Anomaly)"]
-        INSPECTOR["🔎 Side Evidence Inspector\n(Page-level Snippets & Chunk Provenance)"]
-        AUDIT_REPORT["📑 Exception Report & Markdown Export"]
-    end
-
-    %% CONNECTIONS
-    Inputs --> PARSER
-    SCHEMA --> AuditEngine
-    SCHEMA --> RAGEngine
-
-    AuditEngine --> REVIEW_QUEUE
-    AuditEngine --> AUDIT_REPORT
-    CITATION --> INSPECTOR
-    CITATION --> REVIEW_QUEUE
-
-    %% STYLING
-    classDef inputStyle fill:#f8fafc,stroke:#94a3b8,stroke-width:1.5px,color:#1e293b;
-    classDef pipelineStyle fill:#eff6ff,stroke:#3b82f6,stroke-width:1.5px,color:#1e3a8a;
-    classDef auditStyle fill:#fef2f2,stroke:#ef4444,stroke-width:1.5px,color:#7f1d1d;
-    classDef ragStyle fill:#faf5ff,stroke:#a855f7,stroke-width:1.5px,color:#581c87;
-    classDef outcomeStyle fill:#ecfdf5,stroke:#10b981,stroke-width:1.5px,color:#064e3b;
-
-    class DOC_MSA,DOC_PO,DOC_INV,DOC_POL inputStyle;
-    class PARSER,SCHEMA pipelineStyle;
-    class R_CAP,R_TERM,R_TAX,R_DATE,R_PO auditStyle;
-    class ROUTER,RETRIEVAL,GEMINI,CITATION ragStyle;
-    class REVIEW_QUEUE,INSPECTOR,AUDIT_REPORT outcomeStyle;
+    EVAL["evals/ — 7 reproducible suites"] -.measures.-> RULES
+    EVAL -.measures.-> EX
+    EVAL -.measures.-> RRF
+    EVAL -.measures.-> LLM
 ```
 
-### 🔄 Data & Execution Flow Breakdown
-
-```text
-┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                   BUSINESS DOCUMENT PACKS                                        │
-│             [Contracts / MSA]        [Purchase Orders]        [Invoices]        [AP Policies]    │
-└───────────────────────────────────────────────┬──────────────────────────────────────────────────┘
-                                                │
-                                                ▼
-┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
-│ 1. INGESTION & NORMALIZATION                                                                     │
-│    • Structural Chunking (Token bounds, header hierarchy, metadata binding)                      │
-│    • Strict schema extraction (Amounts, Currencies, Tax rates, Payment terms, Vendor IDs)       │
-└───────────────────────┬──────────────────────────────────────────────────┬───────────────────────┘
-                        │                                                  │
-                        ▼                                                  ▼
-┌───────────────────────────────────────────────┐  ┌───────────────────────────────────────────────┐
-│ 2A. DETERMINISTIC AUDIT ENGINE (12 RULES)     │  │ 2B. GROUNDED RAG COPILOT & CITATION ENGINE    │
-│    • Total > Contract Maximum Cap             │  │    • Deterministic Query Router (92.5% Acc)   │
-│    • Invoiced Net 15 vs Contract Net 45 Drift │  │    • BM25 + Dense + Reciprocal Rank Fusion    │
-│    • Mathematical & VAT Rate Recalculation    │  │    • Gemini 3.7 Flash Resilient Fallback      │
-│    • Invoice Date Outside Contract Term       │  │    • Physical Chunk & Page Citation Validator │
-└───────────────────────┬───────────────────────┘  └───────────────────────┬───────────────────────┘
-                        │                                                  │
-                        ▼                                                  ▼
-┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
-│ 3. HUMAN-IN-THE-LOOP CONTROLLER WORKSPACE                                                        │
-│    • Discrepancy Matrix with exact calculation proof (e.g. $82,500 - $75,000 = $7,500 Overage)    │
-│    • Side Evidence Inspector with document text highlight and confidence scoring                 │
-│    • Controller Decision Log: [Approve Finding] [Reject Finding] [Flag for CFO Review]           │
-└──────────────────────────────────────────────────────────────────────────────────────────────────┘
-```
+**Embeddings** use a dedicated 45 MB encoder (`all-minilm`) rather than the generation model — a generation model makes a poor embedder, and separating the two frees the LLM for generation.
 
 ---
 
-## 📸 Product Tour & Interactive Screenshots
+## 📸 Product tour
 
-<div align="center">
-  <img src="docs/images/01_home_dashboard.png" alt="Document Intelligence Home Workspace" width="100%" />
-  <p><em>Figure 1: Executive Audit Workspace featuring 4-step workflow pipeline and real-time case monitoring.</em></p>
-</div>
+<p align="center">
+  <img src="docs/images/01_home_dashboard.png" alt="Home workspace" width="100%" />
+  <br/><em>Workspace home: case readiness, open findings and system status, all read from the running backend.</em>
+</p>
 
-<br />
+### 1. Grounded Q&A with an evidence inspector
 
-### 1. 🔍 Grounded AI Copilot & Interactive Citation Inspector (`Ask Documents`)
+<p align="center">
+  <img src="docs/images/04_grounded_qa_inspector.png" alt="Grounded Q&A with citation inspector" width="100%" />
+  <br/><em>Every factual claim carries a citation marker. Clicking it opens the exact chunk — verbatim text, document, page, section.</em>
+</p>
 
-> **Eliminating Hallucinations with Traceable Evidence**: Every claim generated by the Gemini 3.7 Flash model links to clickable citation badges (`[1]`, `[2]`). Clicking any citation opens the **Side Evidence Inspector** to display verbatim chunk text, section name, document filename, and page number.
+The model receives only retrieved evidence blocks and may cite only the identifiers it was given. Citations are constructed deterministically *before* generation and verified *after*: any marker that does not resolve to a stored chunk is detected and stripped rather than displayed.
 
-<div align="center">
-  <img src="docs/images/04_grounded_qa_inspector.png" alt="Grounded Copilot and Side Evidence Inspector" width="100%" />
-  <p><em>Figure 2: AI Copilot identifying payment term discrepancies (Net 30 vs Net 60) with interactive Side Evidence Inspector and follow-up prompt carousel.</em></p>
-</div>
+<p align="center">
+  <img src="docs/images/03_ask_copilot_initial.png" alt="Ask view with suggested questions" width="100%" />
+</p>
 
-<br />
+### 2. Case & document-pack management
 
-<div align="center">
-  <img src="docs/images/03_ask_copilot_initial.png" alt="3x3 Prompt Library and Multi-Engine Switcher" width="100%" />
-  <p><em>Figure 3: Compact 3×3 Prompt Library categorized by Discrepancies, Compliance, and Obligations, with multi-mode retrieval toggles (BM25, Hybrid, Dense).</em></p>
-</div>
+<p align="center">
+  <img src="docs/images/02_cases_manager.png" alt="Case manager" width="100%" />
+  <br/><em>A case groups a document pack. Readiness is computed from what has actually been ingested and indexed.</em>
+</p>
 
-<br />
+### 3. Human-in-the-loop review queue
 
----
+<p align="center">
+  <img src="docs/images/05_review_findings.png" alt="Review queue" width="100%" />
+  <br/><em>Each finding shows severity, the deterministic calculation behind it, and its evidence. States: OPEN → APPROVED/REJECTED → RESOLVED, with reviewer and timestamp persisted.</em>
+</p>
 
-### 2. 📁 Multi-Pack Case Management & Readiness Verification (`Cases`)
+### 4. Benchmark & evaluation dashboard
 
-> **Structured Document Packs**: Cross-examine related documents including Master Services Agreements (MSA), Purchase Orders (PO), Vendor Invoices, and Corporate Accounts Payable (AP) Policies with automated completeness scoring.
-
-<div align="center">
-  <img src="docs/images/02_cases_manager.png" alt="Multi-Pack Case Manager" width="100%" />
-  <p><em>Figure 4: Case Repository managing 4 pre-configured audit packs: High-Risk Overage, 100% Compliant Hosting, Cross-Border EUR Currency Drift, and Missing PO Audits.</em></p>
-</div>
-
-<br />
-
----
-
-### 3. ⚖️ Human-in-the-Loop Discrepancy Queue (`Review Findings`)
-
-> **Deterministic Auditing with Human Oversight**: 12 deterministic rules calculate mathematical variances (e.g. invoice total exceeding contract maximum, illegal currency conversions, invalid dates). Human reviewers can inspect the math, view evidence quotes, and log approved/rejected decisions with an immutable audit trail.
-
-<div align="center">
-  <img src="docs/images/05_review_findings.png" alt="Human-in-the-Loop Review Queue" width="100%" />
-  <p><em>Figure 5: Actionable Controller Review Queue displaying severity badges, expected vs observed parameters, source snippets, and decision controls.</em></p>
-</div>
-
-<br />
+<p align="center">
+  <img src="docs/images/06_benchmark_evaluation.png" alt="Evaluation dashboard" width="100%" />
+  <br/><em>The dashboard renders the JSON reports generated by the evaluation suite. It never displays a number the suite did not produce — sections without a report say so.</em>
+</p>
 
 ---
 
-### 4. 📊 Empirical Evaluation & Benchmark Suite (`Evaluation`)
+## 📊 Benchmark results
 
-> **DocFlowBench Ground-Truth Evaluation**: Built-in benchmark suite evaluating retrieval latency, field extraction accuracy (95.3%), routing accuracy (92.5%), and recall across BM25, Dense, and Hybrid Reciprocal Rank Fusion modes.
+Every number below was produced by `python -m evals.run_all --cases 15` on the hardware described further down, against the **DocFlowBench** synthetic corpus, and written to [`evals/reports/`](evals/reports/). Run date: **2026-08-26**. Nothing here is hand-written — regenerate it and the claims either reproduce or they do not.
 
-<div align="center">
-  <img src="docs/images/06_benchmark_evaluation.png" alt="Evaluation and Benchmark Suite" width="100%" />
-  <p><em>Figure 6: Retrieval Mode Comparison Matrix benchmarking BM25 (33.2ms, Recall@5 93.3%) against Dense Vector and Hybrid Fusion.</em></p>
-</div>
+| Evaluation | Result | Detail |
+|---|---|---|
+| **Discrepancy rules** (perfect extraction) | **P/R/F1 = 1.00** | 14/14 ground-truth anomalies, 0 false positives |
+| **Structured extraction** (`llama3.2:1b`) | **95.7%** field accuracy · **100%** schema validity | contract 99.1% · PO 97.3% · invoice 92.2% · policy 100% · median 1.6 s/doc |
+| **Retrieval** — BM25 | **Recall@5 0.93** · MRR 0.70 · **17.5 ms** | recommended default |
+| **Retrieval** — dense (pgvector) | Recall@5 0.65 · MRR 0.41 · 518 ms | |
+| **Retrieval** — hybrid RRF | Recall@5 0.88 · MRR 0.58 · 520 ms | |
+| **Query routing** | **92.5%** deterministic | LLM-assisted 82.5% · LLM-only 67.5% |
+| **Discrepancy detection, end-to-end** | P 52.2% · R 85.7% · **F1 0.65** | 12 TP / 11 FP / 2 FN across 15 cases |
+| **Grounded Q&A citations** | present **90%** · valid **90%** · correct document **82%** | 60 queries · median 799 ms · p95 934 ms |
+| **Workflow success** | **15/15 completed** · review-task consistency **100%** | median 10.8 s per case · 0 extraction failures |
 
----
+### The two results worth discussing in an interview
 
-## ✨ Key Capabilities
+**1. Deterministic routing beats the LLM — so the LLM was switched off.**
+The 1B model scores 67.5% on the labelled routing set (20% zero-shot, before few-shot prompting). Keyword rules score 92.5%. Even keyword-first-then-LLM lands at 82.5% — the model *degrades* an already-good decision. `ROUTER_LLM_ENABLED=false` is therefore the default, and the routing report keeps all four variants side by side as the evidence.
 
-### 1. 🔍 Grounded AI Copilot (`Ask Documents`)
-* **Interactive Evidence Citations**: Clickable citation badges `[1]`, `[2]` that open the **Side Evidence Inspector** to highlight exact text snippets, document names, and page numbers.
-* **Multi-Mode Retrieval Engine**: Toggle seamlessly between **BM25 Lexical Search**, **Dense Vector Search**, or **Hybrid RRF** (Reciprocal Rank Fusion).
-* **Suggested Follow-up Carousel**: Single-line quick prompt slider with smooth left/right slide controls (`<` and `>`).
-* **Cross-Corpus & Case Scoping**: Query a specific case pack or search across all indexed business documents.
-* **Export Transcript**: Download full Q&A transcripts as formatted Markdown with citation metadata.
-
-### 2. 📑 Case & Document Pack Management
-* **Document Pack Types**: First-class support for `Contracts`, `Invoices`, `Purchase Orders`, and `AP Policies`.
-* **Instant Case Switcher**: Switch between active business audit cases or upload new document packs.
-* **Document Previews**: View extracted text, raw chunks, document hashes, and metadata in one click.
-
-### 3. 🚨 12-Rule Deterministic Discrepancy Engine
-Automated anomaly detection across 12 rule types:
-* `amount_exceeds_contract`: Invoice amount exceeds Master Contract maximum cap.
-* `payment_terms_mismatch`: Payment term differences (e.g. Net 30 vs. Net 60).
-* `missing_required_po`: Invoices over mandatory threshold lacking PO reference.
-* `tax_calculation_error`: Mathematical errors in tax rate or total summation.
-* `date_outside_contract_term`: Billing dated before contract start or after expiration.
-* `vendor_name_mismatch`, `currency_mismatch`, `line_item_rate_exceeded`, `duplicate_invoice_number`, etc.
-
-### 4. ✍️ Human-in-the-Loop Review Queue
-* Filter discrepancies by status: `OPEN`, `APPROVED`, `REJECTED`, or `FLAGGED`.
-* View exact mathematical calculations, affected fields, and source evidence.
-* Persist reviewer identity, comments, timestamps, and decision history.
-
-### 5. 📈 Benchmark & Evaluation Dashboard
-* Built-in evaluation dashboard visualizing **Retrieval Recall@5, MRR**, **Field Extraction Accuracy (95.3%)**, **Routing Accuracy (92.5%)**, and **Latency Metrics**.
-* Ground-truth synthetic benchmark (`DocFlowBench`) testing edge cases and subtle discrepancies.
+**2. The gap between rules (F1 1.00) and end-to-end (F1 0.65) is the measured price of a 1B extractor.**
+The rules are perfect when handed perfect fields. End to end, precision falls to 52% while recall holds at 86%. With roughly 30 extracted fields per case, a single wrong field invents a finding or hides one. Because the engine is deterministic, **every end-to-end error is attributable to extraction** — a bounded, measurable component rather than a diffuse "the AI got it wrong". Swapping in a 3B model is a configuration change, and the same suite will quantify the delta.
 
 ---
 
-## 🚀 Quick Start Guide
+## 🧪 DocFlowBench: the synthetic benchmark
 
-### Prerequisites
-* **Node.js**: v18.0 or higher
-* **Package Manager**: `npm` or `bun`
-* *(Optional)* **Gemini API Key**: Set `GEMINI_API_KEY` for real-time AI reasoning. The system runs fully self-contained even without cloud keys via its built-in deterministic audit engine.
-
-### 1. Installation
+Public invoice datasets rarely ship as *related packs with labelled cross-document inconsistencies*, so the repository generates its own, deterministically:
 
 ```bash
-# Clone the repository
-git clone https://github.com/your-username/local-document-intelligence-platform.git
-cd local-document-intelligence-platform
+python -m synthetic_data.generator --seed 42 --cases 30
+```
 
-# Install dependencies
+Same seed → byte-identical PDFs and ground truth. Each case is a contract + purchase order + invoice(s) + AP policy rendered as real PDFs, with ground-truth JSON covering **12 anomaly types** (amount exceeds contract, PO mismatch, wrong currency, vendor mismatch, duplicate invoice, date outside contract term, inconsistent payment terms, missing required field, incorrect tax, incorrect total, conflicting invoice number, policy violation) plus deliberately clean cases, in obvious and subtle variants.
+
+---
+
+## ✨ Capabilities
+
+* **Ingestion** — PDF / DOCX / TXT / MD / CSV, structure-aware chunking that never splits a table, SHA-256 content dedupe, MIME sniffing by magic bytes (never by extension).
+* **Structured extraction** — Pydantic schemas enforced through Ollama constrained decoding at temperature 0, with a corrective retry and a **single-field repair pass** for anything left null.
+* **Hybrid retrieval** — BM25 + pgvector dense + RRF, with metadata filters (case, document type, filename).
+* **12-rule discrepancy engine** — normalised comparison of vendor, currency, terms, dates, totals, tax and caps; every numeric finding carries `formula`, `operands` and `result`.
+* **LangGraph workflow** — an explicit state machine (load → extract → rules → review tasks → report), persisted with its step trace; extraction failures force human review rather than passing silently.
+* **Human review queue** — single and batch decisions, reviewer identity and timestamps persisted.
+* **Audit trail** — a chronological event view projected from rows the system already persists (cases, documents, workflow runs, review decisions, queries, auditor attestations), with a SHA-256 integrity digest chained over the projected sequence and re-verified on read.
+* **Read-only MCP server** — exposes search, document fields, comparison and review findings to MCP-compatible clients without granting write access.
+
+---
+
+## 🛡️ Reliability & guardrails
+
+* Structured outputs are Pydantic-validated with a corrective retry; persistent failures are recorded as failed extraction runs — **never silently filled with invented values** (nullable fields are mandatory wherever evidence may be absent).
+* Retrieved document text is treated as untrusted data; system prompts pin the model to evidence-only behaviour against prompt injection.
+* Tools are allowlisted with typed input/output contracts; the model has **no SQL, file or shell access**.
+* Upload size limits, path-traversal-safe storage (server-generated UUID filenames), MIME validation.
+* Separate `product` / `test` / `eval` databases with a hard guard (`assert_safe_database_url`) that refuses to point a test or evaluation run at production data.
+* Structured JSON logging on every LLM call (tokens, durations, retries, schema validity), retrieval (mode, candidates, latency) and workflow (steps, status, review flags).
+
+---
+
+## 💻 Designed for consumer hardware
+
+```text
+AMD Ryzen 5 6600H · 16 GB RAM · RTX 3050 4 GB · Windows 11
+```
+
+The constraint is the feature: a 1B generation model plus a 45 MB embedder, pgvector instead of a vector-database service, in-process BM25 instead of Elasticsearch, one container of infrastructure, ~4096-token contexts, batched embeddings. Everything still runs CPU-only if the GPU is unavailable.
+
+---
+
+## 🚀 Quick start
+
+**Prerequisites:** Python 3.12+, Node.js 18+, Docker Desktop, [Ollama](https://ollama.com).
+
+```bash
+# 1. Models (one-time, ~1.4 GB total)
+ollama pull llama3.2:1b
+ollama pull all-minilm
+
+# 2. One-shot setup: Postgres + databases + venv + migrations + benchmark corpus
+scripts/bootstrap.sh          # Windows: scripts\bootstrap.ps1
+
+# 3. Frontend dependencies
 npm install
 ```
 
-### 2. Environment Configuration
+`bootstrap` starts the `pgvector/pgvector:pg16` container, creates the `docintel_product` / `docintel_test` / `docintel_eval` databases, builds `.venv`, applies Alembic migrations and generates the DocFlowBench corpus. Copy `.env.example` to `.env` first if you need non-default ports.
 
-Create a `.env` file (or copy from `.env.example`):
-
-```env
-# Server Port (Default: 3000)
-PORT=3000
-
-# Optional: Google Gemini API Key for AI synthesis
-GEMINI_API_KEY=your_gemini_api_key_here
-```
-
-### 3. Running Development Server
+**Run it:**
 
 ```bash
-# Start Vite + Express backend with live hot-reloading
+# Terminal 1 — API on http://127.0.0.1:8001
+.venv/bin/uvicorn app.api.main:app --port 8001 --reload
+
+# Terminal 2 — UI on http://localhost:5173 (proxies /api to the backend)
 npm run dev
 ```
 
-Open your browser at `http://localhost:3000`.
+`GET /ready` verifies PostgreSQL, Ollama and both models, returning actionable hints (e.g. `ollama pull all-minilm`) when something is missing. Interactive OpenAPI docs live at `/docs`.
 
-### 4. Production Build
+---
+
+## ✅ Tests & evaluations
 
 ```bash
-# Build Vite frontend and bundle Express server into dist/server.cjs
-npm run build
+pytest -m "not ollama and not integration"   # fast suite — no services required
+pytest -m integration                        # + live PostgreSQL
+pytest -m ollama                             # + live Ollama
+npm run lint                                 # tsc --noEmit
 
-# Start production server
-npm start
+python -m evals.run_all --cases 15           # full suite (requires EVAL_DATABASE_URL)
+python -m evals.run_all --skip-llm           # deterministic evaluations only (CI-safe)
 ```
+
+Reports are written to `evals/reports/*_latest.{json,md}` plus a consolidated `latest.md`, and the Evaluation view renders exactly those files.
 
 ---
 
-## 📂 Project Structure
+## 📡 API reference
+
+All application routes are served under `/api`; `/health` and `/ready` are additionally exposed bare for container probes.
 
 ```text
-├── package.json              # Dependencies and scripts (React 18, Tailwind v4, Express)
-├── server.ts                 # Full-stack backend: Express API, RAG, Discrepancy Engine & Gemini proxy
-├── vite.config.ts            # Vite 6 configuration with Tailwind CSS v4 plugin
-├── index.html                # Single-page application root entry
-├── src/
-│   ├── main.tsx              # React DOM mounting
-│   ├── App.tsx               # Primary app shell & view coordinator
-│   ├── types.ts              # Core TypeScript interfaces & schemas
-│   ├── index.css             # Tailwind CSS theme & custom styling rules
-│   └── components/
-│       ├── AskView.tsx       # AI Copilot chat, prompt library, and Evidence Inspector
-│       ├── CasesView.tsx     # Case creation, pack uploads, and document inspector
-│       ├── ReviewsView.tsx   # Human-in-the-Loop discrepancy audit queue
-│       ├── EvaluationView.tsx# Benchmark evaluation metrics & accuracy charts
-│       ├── HomeView.tsx      # Overview dashboard & system status
-│       ├── Sidebar.tsx       # Navigation drawer & case switcher
-│       └── StatusBadges.tsx  # Severity badges, status indicators, and chip pills
+GET    /api/ready                        POST   /api/query
+GET    /api/cases                        POST   /api/search
+POST   /api/cases                        POST   /api/compare
+GET    /api/cases/{id}                   GET    /api/workflows/{id}
+DELETE /api/cases/{id}                   GET    /api/reviews
+POST   /api/cases/{id}/documents         POST   /api/reviews/{id}/approve|reject|resolve
+POST   /api/cases/{id}/analyses          POST   /api/reviews/batch
+POST   /api/demo/cases                   GET    /api/audit-trail
+GET    /api/documents                    GET    /api/audit-trail/export
+GET    /api/documents/{id}               GET    /api/evals
+GET    /api/documents/{id}/chunks        POST   /api/evals/run
+DELETE /api/documents/{id}               GET    /api/evals/runs/{id}
+POST   /api/documents/{id}/index
+```
+
+`POST /api/cases/{id}/analyses` returns `202` with a workflow id — poll `GET /api/workflows/{id}` for step-by-step progress. `POST /api/evals/run` launches the real evaluation subprocess and returns a run id; it never returns metrics.
+
+---
+
+## 📂 Repository structure
+
+```text
+app/              FastAPI backend
+  api/            routes, dependencies, middleware
+  agents/         deterministic router, LangGraph graph, typed tools
+  discrepancy/    normalisation + the 12-rule engine
+  extraction/     Pydantic schemas, extraction service with repair pass
+  retrieval/      bm25, vector, fusion, hybrid, context budgeting, indexer
+  citations/      deterministic citation construction + verification
+  llm/            provider abstraction, Ollama client, versioned prompts
+  embeddings/     provider abstraction, Ollama embeddings
+  services/       documents, cases, compare, reviews, qa, audit, evals runner
+  models/         SQLAlchemy models
+src/              React + Vite frontend
+evals/            7 evaluation suites + generated reports
+synthetic_data/   DocFlowBench generator (seeded PDFs + ground truth)
+mcp_server/       read-only MCP tools over the existing services
+migrations/       Alembic migrations
+tests/            unit · integration · ollama-marked live tests
+docs/adr/         architecture decision records
+scripts/          bootstrap + database provisioning
 ```
 
 ---
 
-## 📡 REST API Reference
+## ⚠️ Known limitations
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/health` | System health check & environment info |
-| `GET` | `/api/cases` | Retrieve all document cases with file counts |
-| `POST` | `/api/cases` | Create a new audit case |
-| `GET` | `/api/cases/:id` | Get case details, documents, and discrepancy reports |
-| `POST` | `/api/cases/:id/documents` | Upload document files to a case pack |
-| `POST` | `/api/cases/:id/analyze` | Trigger 12-rule cross-document discrepancy analysis |
-| `POST` | `/api/query` | Run grounded RAG query with citation generation |
-| `GET` | `/api/reviews` | List pending human review audit items |
-| `POST` | `/api/reviews/:id/decision` | Approve, reject, or flag a discrepancy finding |
-| `GET` | `/api/evaluations/latest` | Retrieve latest benchmark evaluation results |
+Stated plainly, because a portfolio that hides its edges is not worth reading:
+
+* **The 1B extractor is the accuracy bottleneck** — 95.7% field accuracy yields end-to-end discrepancy precision of 52%. Measured, attributed, and improvable by swapping the model.
+* **The audit trail is a projection, not an append-only ledger.** Events are derived from live tables at read time and the SHA-256 digest is computed over that projection. It makes changes *visible on re-read*; it does **not** prove the source rows were never modified, and it is not a compliance control.
+* **No authentication or multi-tenancy.** Reviewer identity is a free-text field. This is a single-user portfolio system, not a hosted product.
+* **BM25 rebuilds its corpus per search** — fine at benchmark scale (~10³ chunks), documented as a scaling limit.
+* **No OCR** — native-text PDFs, DOCX, TXT, MD and CSV only. Scanned documents are out of scope.
+* **Citations are chunk/page-level**, not character-offset level.
+* **Dense retrieval underperforms BM25 on this corpus** (0.65 vs 0.93 Recall@5), because business documents are dense with exact identifiers. The honest conclusion was to default to BM25 rather than ship hybrid because it sounds more sophisticated.
 
 ---
 
-## 📊 Benchmark & Evaluation Results
+## 🔭 Future improvements
 
-Tested on synthetic multi-document packs (`DocFlowBench`) with ground-truth anomalies:
-
-| Metric | Result | Benchmark Details |
-|---|---|---|
-| **Discrepancy Rule Accuracy (Ground Truth)** | **100% (F1 = 1.00)** | 12 deterministic cross-document rules |
-| **Field Extraction Schema Validity** | **100.0%** | Pydantic / TypeScript validated structure |
-| **Field Extraction Accuracy** | **95.3%** | Contract (99.1%), PO (98.7%), Invoice (90.7%) |
-| **BM25 Retrieval Recall@5** | **0.93** (MRR: 0.70) | Average search latency: **33 ms** |
-| **Deterministic Query Routing** | **92.5%** | Exact intent matching without LLM overhead |
-| **Citation Validity & Grounding** | **88.3%** | Chunk-verified interactive citations |
-
----
-
-## 🛡️ Reliability & Security
-* **Zero API Key Leakage**: Client communicates solely through server-side `/api/*` proxy routes.
-* **Multi-Model Resilient Fallback**: Graceful handling of transient 503 / high demand spikes with automatic retry.
-* **Deterministic Fallback**: Never hallucinates calculations; if AI is offline, deterministic calculation rules provide verified mathematical comparisons.
-* **Evidence Integrity**: Citations that cannot be mapped to physical document chunks are filtered out before reaching the auditor.
+* Swap in `llama3.2:3b` (fits 4 GB VRAM at Q4) behind the existing provider abstraction and publish the before/after eval delta.
+* Optional cloud-provider fallback through the same `LLMProvider` protocol.
+* A genuine append-only audit ledger written at event time, so "tamper-evident" becomes a defensible claim.
+* Tesseract OCR path for scanned documents.
+* CPU cross-encoder reranking behind `ENABLE_RERANKER` (scaffolded, disabled).
+* Incremental BM25 indexing and pgvector HNSW tuning for larger corpora.
+* A `GET /api/documents/{id}/extraction` endpoint so the split viewer can do field-by-field reconciliation directly.
 
 ---
 
 ## 📄 License
 
-This project is licensed under the **MIT License**. Feel free to use, modify, and distribute for personal or commercial projects.
-
+MIT © Arthur Nguyen

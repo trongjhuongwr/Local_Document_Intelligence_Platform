@@ -1,6 +1,6 @@
 {
   "eval": "workflow",
-  "generated_at": "2026-08-18T03:48:38+00:00",
+  "generated_at": "2026-08-26T03:40:39+00:00",
   "cases": 15,
   "extraction_cache": "disabled",
   "completed": 15,
@@ -10,7 +10,7 @@
   "extraction_failure_count": 0,
   "extraction_failure_rate": 0.0,
   "review_task_creation_consistency": 1.0,
-  "median_duration_ms": 12533.1,
+  "median_duration_ms": 10815.9,
   "p95_duration_ms": null,
   "failures": [],
   "headline": "workflow completion 15/15, review-task creation consistency 100%"

@@ -1,16 +1,16 @@
 {
   "eval": "discrepancy_end_to_end",
-  "generated_at": "2026-08-18T03:25:10+00:00",
+  "generated_at": "2026-08-26T03:35:03+00:00",
   "mode": "end_to_end",
   "cases_evaluated": 15,
   "expected_anomalies": 14,
   "overall": {
     "tp": 12,
-    "fp": 9,
+    "fp": 11,
     "fn": 2,
-    "precision": 0.5714,
+    "precision": 0.5217,
     "recall": 0.8571,
-    "f1": 0.6857
+    "f1": 0.6486
   },
   "by_type": {
     "amount_exceeds_contract": {
@@ -47,11 +47,11 @@
     },
     "incorrect_tax_calculation": {
       "tp": 1,
-      "fp": 5,
+      "fp": 7,
       "fn": 0,
-      "precision": 0.1667,
+      "precision": 0.125,
       "recall": 1.0,
-      "f1": 0.2857
+      "f1": 0.2222
     },
     "incorrect_total": {
       "tp": 1,
@@ -112,6 +112,11 @@
   },
   "mismatches": [
     {
+      "case": "case_001",
+      "kind": "false_positive",
+      "type": "incorrect_tax_calculation"
+    },
+    {
       "case": "case_005",
       "kind": "false_positive",
       "type": "incorrect_tax_calculation"
@@ -128,6 +133,11 @@
     },
     {
       "case": "case_008",
+      "kind": "false_positive",
+      "type": "incorrect_tax_calculation"
+    },
+    {
+      "case": "case_011",
       "kind": "false_positive",
       "type": "incorrect_tax_calculation"
     },
