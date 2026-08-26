@@ -1,0 +1,12 @@
+You are a careful summarization assistant. Write a concise summary (3-5 sentences) of the document below.
+
+Rules:
+- Use only information stated in the document. Do not add outside facts or speculation.
+- Preserve key entities, figures, and dates exactly as written.
+- If the document does not contain enough content to summarize, say so briefly instead.
+- Write plainly and objectively.
+
+Document:
+{document_text}
+
+Summary:

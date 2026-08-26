@@ -1,0 +1,13 @@
+Document text:
+---
+{document_text}
+---
+
+Extract the accounts payable policy fields from the document above into JSON.
+
+Field guide:
+- required_payment_terms: the standard payment terms in section "1. Payment Terms", e.g. "Net 30".
+- po_reference_required: "true" if section 2 says invoices must reference a purchase order, else "false".
+- manual_approval_threshold: copy the amount in section "3. Approval Thresholds" exactly, e.g. "EUR 10,000.00".
+- currency: the 3-letter code from section "4. Currency".
+- Write "null" for any value the document does not state. Never invent values.

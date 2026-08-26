@@ -1,0 +1,736 @@
+{
+  "results": {
+    "discrepancy_rules": {
+      "eval": "discrepancy_rules",
+      "generated_at": "2026-08-18T03:18:07+00:00",
+      "mode": "rules",
+      "cases_evaluated": 15,
+      "expected_anomalies": 14,
+      "overall": {
+        "tp": 14,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      },
+      "by_type": {
+        "conflicting_invoice_number": {
+          "tp": 1,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "duplicate_invoice": {
+          "tp": 1,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "inconsistent_payment_terms": {
+          "tp": 1,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "incorrect_tax_calculation": {
+          "tp": 1,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "incorrect_total": {
+          "tp": 1,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "invoice_date_outside_contract": {
+          "tp": 1,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "missing_required_field": {
+          "tp": 1,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "po_mismatch": {
+          "tp": 1,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "policy_violation": {
+          "tp": 2,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "vendor_name_mismatch": {
+          "tp": 2,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "wrong_currency": {
+          "tp": 2,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        }
+      },
+      "mismatches": []
+    },
+    "extraction": {
+      "eval": "extraction",
+      "generated_at": "2026-08-18T03:21:41+00:00",
+      "cases_evaluated": 15,
+      "model": "llama3.2:1b",
+      "overall_field_accuracy": 0.9527,
+      "overall_schema_valid_rate": 1.0,
+      "median_llm_latency_ms": 1548.8,
+      "p95_llm_latency_ms": 1812.3,
+      "by_document_type": {
+        "invoice": {
+          "documents": 17,
+          "schema_valid_rate": 1.0,
+          "field_accuracy": {
+            "invoice_number": 0.9412,
+            "vendor_name": 1.0,
+            "customer_name": 1.0,
+            "issue_date": 1.0,
+            "due_date": 0.9412,
+            "currency": 1.0,
+            "subtotal": 0.8824,
+            "tax_rate_percent": 0.5294,
+            "tax": 0.8824,
+            "total": 0.8235,
+            "payment_terms": 0.8824,
+            "po_reference": 1.0
+          },
+          "overall_field_accuracy": 0.9069,
+          "numeric_accuracy": 0.7794,
+          "date_accuracy": 0.9706,
+          "required_field_completeness": 1.0
+        },
+        "contract": {
+          "documents": 15,
+          "schema_valid_rate": 1.0,
+          "field_accuracy": {
+            "vendor_name": 1.0,
+            "customer_name": 1.0,
+            "effective_date": 1.0,
+            "expiration_date": 1.0,
+            "currency": 1.0,
+            "maximum_amount": 0.9333,
+            "payment_terms": 1.0
+          },
+          "overall_field_accuracy": 0.9905,
+          "numeric_accuracy": 0.9333,
+          "date_accuracy": 1.0,
+          "required_field_completeness": 1.0
+        },
+        "purchase_order": {
+          "documents": 15,
+          "schema_valid_rate": 1.0,
+          "field_accuracy": {
+            "po_number": 1.0,
+            "vendor_name": 1.0,
+            "issue_date": 1.0,
+            "currency": 1.0,
+            "approved_amount": 0.9333
+          },
+          "overall_field_accuracy": 0.9867,
+          "numeric_accuracy": 0.9333,
+          "date_accuracy": 1.0,
+          "required_field_completeness": 0.9867
+        },
+        "policy": {
+          "documents": 15,
+          "schema_valid_rate": 1.0,
+          "field_accuracy": {
+            "required_payment_terms": 1.0,
+            "po_reference_required": 1.0,
+            "manual_approval_threshold": 1.0,
+            "currency": 1.0
+          },
+          "overall_field_accuracy": 1.0,
+          "numeric_accuracy": 1.0,
+          "date_accuracy": 0.0,
+          "required_field_completeness": 1.0
+        }
+      }
+    },
+    "discrepancy_end_to_end": {
+      "eval": "discrepancy_end_to_end",
+      "generated_at": "2026-08-18T03:25:10+00:00",
+      "mode": "end_to_end",
+      "cases_evaluated": 15,
+      "expected_anomalies": 14,
+      "overall": {
+        "tp": 12,
+        "fp": 9,
+        "fn": 2,
+        "precision": 0.5714,
+        "recall": 0.8571,
+        "f1": 0.6857
+      },
+      "by_type": {
+        "amount_exceeds_contract": {
+          "tp": 0,
+          "fp": 1,
+          "fn": 0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        },
+        "conflicting_invoice_number": {
+          "tp": 1,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "duplicate_invoice": {
+          "tp": 1,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "inconsistent_payment_terms": {
+          "tp": 1,
+          "fp": 1,
+          "fn": 0,
+          "precision": 0.5,
+          "recall": 1.0,
+          "f1": 0.6667
+        },
+        "incorrect_tax_calculation": {
+          "tp": 1,
+          "fp": 5,
+          "fn": 0,
+          "precision": 0.1667,
+          "recall": 1.0,
+          "f1": 0.2857
+        },
+        "incorrect_total": {
+          "tp": 1,
+          "fp": 1,
+          "fn": 0,
+          "precision": 0.5,
+          "recall": 1.0,
+          "f1": 0.6667
+        },
+        "invoice_date_outside_contract": {
+          "tp": 0,
+          "fp": 1,
+          "fn": 1,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        },
+        "missing_required_field": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 1,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        },
+        "po_mismatch": {
+          "tp": 1,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "policy_violation": {
+          "tp": 2,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "vendor_name_mismatch": {
+          "tp": 2,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "wrong_currency": {
+          "tp": 2,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        }
+      },
+      "mismatches": [
+        {
+          "case": "case_005",
+          "kind": "false_positive",
+          "type": "incorrect_tax_calculation"
+        },
+        {
+          "case": "case_006",
+          "kind": "false_positive",
+          "type": "incorrect_tax_calculation"
+        },
+        {
+          "case": "case_007",
+          "kind": "false_positive",
+          "type": "incorrect_tax_calculation"
+        },
+        {
+          "case": "case_008",
+          "kind": "false_positive",
+          "type": "incorrect_tax_calculation"
+        },
+        {
+          "case": "case_011",
+          "kind": "false_positive",
+          "type": "incorrect_total"
+        },
+        {
+          "case": "case_012",
+          "kind": "false_positive",
+          "type": "invoice_date_outside_contract"
+        },
+        {
+          "case": "case_012",
+          "kind": "false_positive",
+          "type": "inconsistent_payment_terms"
+        },
+        {
+          "case": "case_012",
+          "kind": "false_negative",
+          "type": "invoice_date_outside_contract"
+        },
+        {
+          "case": "case_013",
+          "kind": "false_negative",
+          "type": "missing_required_field"
+        },
+        {
+          "case": "case_014",
+          "kind": "false_positive",
+          "type": "amount_exceeds_contract"
+        },
+        {
+          "case": "case_014",
+          "kind": "false_positive",
+          "type": "incorrect_tax_calculation"
+        }
+      ]
+    },
+    "retrieval": {
+      "eval": "retrieval",
+      "generated_at": "2026-08-18T03:44:46+00:00",
+      "cases_evaluated": 15,
+      "query_count": 60,
+      "top_k": 10,
+      "embedding_model": "all-minilm",
+      "corpus_documents": 61,
+      "documents_ingested_or_reused": 62,
+      "chunks_newly_indexed": 0,
+      "modes": {
+        "bm25": {
+          "recall_at_1": 0.5833,
+          "recall_at_3": 0.75,
+          "recall_at_5": 0.9333,
+          "mrr": 0.6992,
+          "ndcg_at_5": 0.3431,
+          "mean_latency_ms": 33.2
+        },
+        "dense": {
+          "recall_at_1": 0.2333,
+          "recall_at_3": 0.4833,
+          "recall_at_5": 0.65,
+          "mrr": 0.4083,
+          "ndcg_at_5": 0.1724,
+          "mean_latency_ms": 835.3
+        },
+        "hybrid": {
+          "recall_at_1": 0.4,
+          "recall_at_3": 0.6833,
+          "recall_at_5": 0.9333,
+          "mrr": 0.5836,
+          "ndcg_at_5": 0.2825,
+          "mean_latency_ms": 748.3
+        }
+      },
+      "recommended_default": "bm25",
+      "recommendation_basis": "BM25 ties hybrid on Recall@5 while producing better Recall@1, MRR, nDCG@5, and mean latency on this benchmark.",
+      "headline": "BM25 recommended: Recall@5 0.93, MRR 0.70, 33 ms; hybrid Recall@5 0.93, MRR 0.58, 748 ms"
+    },
+    "routing": {
+      "eval": "routing",
+      "generated_at": "2026-08-18T03:27:49+00:00",
+      "model": "llama3.2:1b",
+      "production_router": {
+        "total": 40,
+        "accuracy": 0.925,
+        "macro_f1": 0.9263,
+        "per_route": {
+          "factual_rag": {
+            "precision": 0.7778,
+            "recall": 0.875,
+            "f1": 0.8235
+          },
+          "structured_lookup": {
+            "precision": 0.8889,
+            "recall": 1.0,
+            "f1": 0.9412
+          },
+          "document_compare": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0
+          },
+          "discrepancy_analysis": {
+            "precision": 1.0,
+            "recall": 0.875,
+            "f1": 0.9333
+          },
+          "summarization": {
+            "precision": 1.0,
+            "recall": 0.875,
+            "f1": 0.9333
+          }
+        },
+        "confusion_matrix": {
+          "factual_rag": {
+            "factual_rag": 7,
+            "structured_lookup": 1
+          },
+          "structured_lookup": {
+            "structured_lookup": 8
+          },
+          "document_compare": {
+            "document_compare": 8
+          },
+          "discrepancy_analysis": {
+            "discrepancy_analysis": 7,
+            "factual_rag": 1
+          },
+          "summarization": {
+            "summarization": 7,
+            "factual_rag": 1
+          }
+        }
+      },
+      "production_router_method_counts": {
+        "keyword_default": 9,
+        "keyword": 31
+      },
+      "llm_assisted_router": {
+        "total": 40,
+        "accuracy": 0.825,
+        "macro_f1": 0.8216,
+        "per_route": {
+          "factual_rag": {
+            "precision": 1.0,
+            "recall": 0.375,
+            "f1": 0.5455
+          },
+          "structured_lookup": {
+            "precision": 0.5333,
+            "recall": 1.0,
+            "f1": 0.6957
+          },
+          "document_compare": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0
+          },
+          "discrepancy_analysis": {
+            "precision": 1.0,
+            "recall": 0.875,
+            "f1": 0.9333
+          },
+          "summarization": {
+            "precision": 1.0,
+            "recall": 0.875,
+            "f1": 0.9333
+          }
+        },
+        "confusion_matrix": {
+          "factual_rag": {
+            "factual_rag": 3,
+            "structured_lookup": 5
+          },
+          "structured_lookup": {
+            "structured_lookup": 8
+          },
+          "document_compare": {
+            "document_compare": 8
+          },
+          "discrepancy_analysis": {
+            "discrepancy_analysis": 7,
+            "structured_lookup": 1
+          },
+          "summarization": {
+            "summarization": 7,
+            "structured_lookup": 1
+          }
+        }
+      },
+      "llm_only": {
+        "total": 40,
+        "accuracy": 0.7,
+        "macro_f1": 0.6977,
+        "per_route": {
+          "factual_rag": {
+            "precision": 0.5714,
+            "recall": 0.5,
+            "f1": 0.5333
+          },
+          "structured_lookup": {
+            "precision": 0.5333,
+            "recall": 1.0,
+            "f1": 0.6957
+          },
+          "document_compare": {
+            "precision": 0.7778,
+            "recall": 0.875,
+            "f1": 0.8235
+          },
+          "discrepancy_analysis": {
+            "precision": 1.0,
+            "recall": 0.5,
+            "f1": 0.6667
+          },
+          "summarization": {
+            "precision": 1.0,
+            "recall": 0.625,
+            "f1": 0.7692
+          }
+        },
+        "confusion_matrix": {
+          "factual_rag": {
+            "factual_rag": 4,
+            "structured_lookup": 4
+          },
+          "structured_lookup": {
+            "structured_lookup": 8
+          },
+          "document_compare": {
+            "document_compare": 7,
+            "factual_rag": 1
+          },
+          "discrepancy_analysis": {
+            "document_compare": 2,
+            "discrepancy_analysis": 4,
+            "structured_lookup": 2
+          },
+          "summarization": {
+            "summarization": 5,
+            "factual_rag": 2,
+            "structured_lookup": 1
+          }
+        }
+      },
+      "keyword_only": {
+        "total": 40,
+        "accuracy": 0.925,
+        "macro_f1": 0.9263,
+        "per_route": {
+          "factual_rag": {
+            "precision": 0.7778,
+            "recall": 0.875,
+            "f1": 0.8235
+          },
+          "structured_lookup": {
+            "precision": 0.8889,
+            "recall": 1.0,
+            "f1": 0.9412
+          },
+          "document_compare": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0
+          },
+          "discrepancy_analysis": {
+            "precision": 1.0,
+            "recall": 0.875,
+            "f1": 0.9333
+          },
+          "summarization": {
+            "precision": 1.0,
+            "recall": 0.875,
+            "f1": 0.9333
+          }
+        },
+        "confusion_matrix": {
+          "factual_rag": {
+            "factual_rag": 7,
+            "structured_lookup": 1
+          },
+          "structured_lookup": {
+            "structured_lookup": 8
+          },
+          "document_compare": {
+            "document_compare": 8
+          },
+          "discrepancy_analysis": {
+            "discrepancy_analysis": 7,
+            "factual_rag": 1
+          },
+          "summarization": {
+            "summarization": 7,
+            "factual_rag": 1
+          }
+        }
+      },
+      "headline": "routing accuracy 92.50% (deterministic default); LLM-assisted 82.50%, LLM-only 70.00%"
+    },
+    "generation": {
+      "eval": "generation",
+      "generated_at": "2026-08-18T03:36:29+00:00",
+      "model": "llama3.2:1b",
+      "queries": 60,
+      "queries_attempted": 60,
+      "query_completion_rate": 1.0,
+      "failed_queries_skipped": 0,
+      "citation_presence_rate": 0.8833,
+      "valid_citation_rate": 0.8833,
+      "correct_document_rate": 0.8,
+      "no_evidence_rate": 0.0,
+      "median_latency_ms": 926.6,
+      "p95_latency_ms": 2625.5,
+      "note": "Unsupported-claim detection beyond citation resolution requires manual review; a sample of answers is stored in query_runs for inspection.",
+      "miscited_examples": [
+        {
+          "case": "case_001",
+          "query": "What is the total due on invoice INV-2025-64282?",
+          "expected": "invoice_001.pdf",
+          "cited": [
+            "invoice_002.pdf"
+          ]
+        },
+        {
+          "case": "case_003",
+          "query": "What are the standard payment terms required by the accounts payable policy of Crescent Media Group?",
+          "expected": "payment_policy.pdf",
+          "cited": []
+        },
+        {
+          "case": "case_003",
+          "query": "What is the total due on invoice INV-2025-12567?",
+          "expected": "invoice_001.pdf",
+          "cited": [
+            "service_contract.pdf"
+          ]
+        },
+        {
+          "case": "case_005",
+          "query": "What are the standard payment terms required by the accounts payable policy of Atlas Construction Holdings?",
+          "expected": "payment_policy.pdf",
+          "cited": []
+        },
+        {
+          "case": "case_007",
+          "query": "What is the total due on invoice INV-2025-37481?",
+          "expected": "invoice_001.pdf",
+          "cited": [
+            "service_contract.pdf"
+          ]
+        },
+        {
+          "case": "case_008",
+          "query": "What is the total due on invoice INV-2025-43177?",
+          "expected": "invoice_001.pdf",
+          "cited": [
+            "service_contract.pdf"
+          ]
+        },
+        {
+          "case": "case_009",
+          "query": "What are the standard payment terms required by the accounts payable policy of Horizon Education Partners?",
+          "expected": "payment_policy.pdf",
+          "cited": []
+        },
+        {
+          "case": "case_010",
+          "query": "What are the standard payment terms required by the accounts payable policy of Atlas Construction Holdings?",
+          "expected": "payment_policy.pdf",
+          "cited": []
+        },
+        {
+          "case": "case_011",
+          "query": "What is the total due on invoice INV-2025-13095?",
+          "expected": "invoice_001.pdf",
+          "cited": []
+        },
+        {
+          "case": "case_012",
+          "query": "What are the standard payment terms required by the accounts payable policy of Bluewater Foods JSC?",
+          "expected": "payment_policy.pdf",
+          "cited": []
+        }
+      ],
+      "headline": "citations present 88%, valid 88%, correct document 80% over 60 queries"
+    },
+    "workflow": {
+      "eval": "workflow",
+      "generated_at": "2026-08-18T03:48:38+00:00",
+      "cases": 15,
+      "extraction_cache": "disabled",
+      "completed": 15,
+      "failed": 0,
+      "completion_rate": 1.0,
+      "documents_processed": 61,
+      "extraction_failure_count": 0,
+      "extraction_failure_rate": 0.0,
+      "review_task_creation_consistency": 1.0,
+      "median_duration_ms": 12533.1,
+      "p95_duration_ms": null,
+      "failures": [],
+      "headline": "workflow completion 15/15, review-task creation consistency 100%"
+    }
+  },
+  "skipped": [],
+  "source": "individual_latest_reports",
+  "source_generated_at": {
+    "discrepancy_rules": "2026-08-18T03:18:07+00:00",
+    "extraction": "2026-08-18T03:21:41+00:00",
+    "discrepancy_end_to_end": "2026-08-18T03:25:10+00:00",
+    "retrieval": "2026-08-18T03:44:46+00:00",
+    "routing": "2026-08-18T03:27:49+00:00",
+    "generation": "2026-08-18T03:36:29+00:00",
+    "workflow": "2026-08-18T03:48:38+00:00"
+  }
+}

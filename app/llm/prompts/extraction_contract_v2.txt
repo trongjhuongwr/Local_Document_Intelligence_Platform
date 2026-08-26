@@ -1,0 +1,16 @@
+Document text:
+---
+{document_text}
+---
+
+Extract the contract fields from the document above into JSON.
+
+Field guide:
+- vendor_name: the Provider company name (before "the Provider").
+- customer_name: the Client company name (before "the Client").
+- effective_date / expiration_date: from the "Effective Date:" and "Expiration Date:" lines, YYYY-MM-DD.
+- currency: the 3-letter code the amounts are stated in (USD, EUR or GBP).
+- maximum_amount: copy the value after "Maximum aggregate fees:" exactly, e.g. "EUR 23,000.00".
+- payment_terms: copy the value after "Payment terms:", e.g. "Net 45".
+- obligations: the numbered obligation sentences from section 4.
+- Write "null" for any value the document does not state. Never invent values.

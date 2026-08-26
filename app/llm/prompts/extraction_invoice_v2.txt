@@ -1,0 +1,20 @@
+Document text:
+---
+{document_text}
+---
+
+Extract the invoice fields from the document above into JSON.
+
+Field guide:
+- invoice_number: copy the value after "Invoice Number:", e.g. "INV-2025-64282".
+- vendor_name: the company under the "From" heading.
+- customer_name: the company under the "Bill To" heading.
+- issue_date / due_date: from the "Issue Date:" and "Due Date:" lines, YYYY-MM-DD.
+- currency: the 3-letter code (USD, EUR or GBP).
+- subtotal: copy the value after "Subtotal:" exactly, e.g. "EUR 8,050.00".
+- tax_rate_percent: the percentage inside "Tax (...%)", e.g. "10".
+- tax: copy the amount after "Tax (...%):" exactly, e.g. "EUR 805.00".
+- total: copy the value after "Total Due:" exactly, e.g. "EUR 8,855.00".
+- payment_terms: copy the value after "Payment Terms:", e.g. "Net 30".
+- po_reference: copy the value after "PO Reference:", if present.
+- Write "null" for any value the document does not state. Never invent values.

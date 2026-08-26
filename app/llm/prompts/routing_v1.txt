@@ -1,0 +1,10 @@
+Classify the user query into exactly one route.
+
+Routes:
+- factual_rag: a question answered by reading document passages (e.g. "What does the contract say about confidentiality?")
+- structured_lookup: asks for a specific extracted field value (e.g. "What is the total of invoice INV-2025-1?")
+- document_compare: asks to compare two or more documents (e.g. "Compare the contract and the purchase order")
+- discrepancy_analysis: asks to find inconsistencies, mismatches, anomalies or violations across documents (e.g. "Are there any discrepancies between these invoices and the contract?")
+- summarization: asks for a summary or overview of a document (e.g. "Summarize the payment policy")
+
+Query: {query}

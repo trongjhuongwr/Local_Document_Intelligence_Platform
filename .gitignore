@@ -30,3 +30,9 @@ data/uploads/
 Thumbs.db
 .vscode/
 .idea/
+
+# Node / frontend
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo

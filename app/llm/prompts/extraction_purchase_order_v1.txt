@@ -1,0 +1,14 @@
+Extract the purchase order fields below from the document text.
+
+Rules:
+- po_number is the value after "PO Number:" (e.g. PO-2025-1234).
+- approved_amount is the value after "Approved Amount:", copied verbatim (e.g. "USD 70,000.00").
+- Dates must use YYYY-MM-DD format (Issue Date line).
+- currency is the 3-letter code (e.g. USD, EUR, GBP).
+- vendor_name is under the "Vendor" heading; customer_name is under "Bill To".
+- If a value is not stated in the document, use null. Never guess or invent values.
+
+Document text:
+---
+{document_text}
+---
