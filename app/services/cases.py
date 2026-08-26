@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import CaseConflictError, CaseNotFoundError
 from app.models import Case, Document, ReviewTask, WorkflowRun
+from app.services.audit import append_projection_event, case_event
 from app.services.documents import UPLOAD_DIR, DocumentService
 from synthetic_data.generator.builder import build_case
 from synthetic_data.generator.pdf_render import render_case_documents
@@ -53,6 +54,11 @@ class CaseService:
             raise CaseConflictError(f"Case {identifier} already exists")
         case = Case(case_id=identifier, name=clean_name, source=source)
         self._session.add(case)
+        # Flush + refresh so the ledger event is appended in the same transaction
+        # as the case row, with the server-assigned created_at already loaded.
+        await self._session.flush()
+        await self._session.refresh(case)
+        await append_projection_event(self._session, case_event(case))
         await self._session.commit()
         await self._session.refresh(case)
         return case

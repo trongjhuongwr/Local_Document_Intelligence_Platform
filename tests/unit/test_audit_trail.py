@@ -12,6 +12,7 @@ from datetime import UTC, datetime, timedelta
 
 from app.models import Document, QueryRun, ReviewTask, WorkflowRun
 from app.models.audit import AuditAttestation
+from app.models.audit import AuditEvent as AuditEventRow
 from app.models.case import Case
 from app.services.audit import (
     GENESIS_HASH,
@@ -22,11 +23,14 @@ from app.services.audit import (
     document_event,
     entries_to_csv,
     filter_entries,
+    ledger_entry,
+    merge_trail,
     query_event,
     review_events,
     verify_ledger,
     workflow_events,
 )
+from app.services.audit_ledger import compute_entry_hash, event_payload
 
 BASE = datetime(2026, 3, 1, 12, 0, tzinfo=UTC)
 
@@ -319,3 +323,141 @@ def test_naive_and_aware_timestamps_order_together() -> None:
     )
     assert [entry["action"] for entry in entries] == ["B", "A"]
     assert entries[0]["timestamp"].endswith("+00:00")
+
+
+# --------------------------------------------------------------------------
+# Merging the append-only ledger with the read-time projection
+# --------------------------------------------------------------------------
+
+
+def _ledger_row(sequence: int, minute: int, action: str, entity_id: str, **kwargs) -> AuditEventRow:
+    """One stored ledger row, chained the way append_event would have written it."""
+    payload = event_payload(
+        occurred_at=BASE + timedelta(minutes=minute),
+        event_type=action,
+        actor=kwargs.get("actor", "system:test"),
+        summary=kwargs.get("summary", f"{action} on {entity_id}"),
+        case_id=kwargs.get("case_id", "case-1"),
+        entity_type=kwargs.get("entity_type", "document"),
+        entity_id=entity_id,
+        details=kwargs.get("details", {}),
+    )
+    prev_hash = kwargs.get("prev_hash", GENESIS_HASH)
+    return AuditEventRow(
+        id=uuid.uuid4(),
+        sequence=sequence,
+        occurred_at=BASE + timedelta(minutes=minute),
+        event_type=action,
+        actor=payload["actor"],
+        case_id=payload["case_id"],
+        entity_type=payload["entity_type"],
+        entity_id=entity_id,
+        summary=payload["summary"],
+        details=payload["details"],
+        prev_hash=prev_hash,
+        entry_hash=compute_entry_hash(prev_hash, payload),
+    )
+
+
+def _chained_rows(*specs) -> list[AuditEventRow]:
+    """Each spec is ``(minute, action, entity_id)`` with an optional kwargs dict."""
+    rows: list[AuditEventRow] = []
+    prev_hash = GENESIS_HASH
+    for sequence, spec in enumerate(specs, start=1):
+        minute, action, entity_id, *rest = spec
+        overrides = dict(rest[0]) if rest else {}
+        row = _ledger_row(sequence, minute, action, entity_id, prev_hash=prev_hash, **overrides)
+        rows.append(row)
+        prev_hash = row.entry_hash
+    return rows
+
+
+def test_merge_labels_every_entry_with_its_source() -> None:
+    rows = _chained_rows((5, "FINDING_APPROVED", "rev-1"))
+    trail = merge_trail(rows, [_event(0, "DOCUMENT_INGESTED", "doc-a")], {"case-1": "Acme review"})
+
+    assert [entry["source"] for entry in trail.entries] == ["ledger", "projected"]
+    assert trail.ledger_count == 1
+    assert trail.projected_count == 1
+    assert trail.ledger_verification.valid is True
+    assert trail.projection_chain_valid is True
+    assert all(entry["case_name"] == "Acme review" for entry in trail.entries)
+
+
+def test_merge_drops_the_projection_of_an_action_the_ledger_already_records() -> None:
+    rows = _chained_rows((5, "FINDING_APPROVED", "rev-1", {"entity_type": "review_finding"}))
+    projected = [
+        _event(5, "FINDING_APPROVED", "rev-1", entity_type="review_finding"),
+        _event(1, "FINDING_FLAGGED", "rev-1", entity_type="review_finding"),
+    ]
+    trail = merge_trail(rows, projected)
+
+    assert trail.ledger_count == 1
+    assert trail.projected_count == 1  # the duplicated decision is gone, the flag survives
+    assert [(entry["action"], entry["source"]) for entry in trail.entries] == [
+        ("FINDING_APPROVED", "ledger"),
+        ("FINDING_FLAGGED", "projected"),
+    ]
+
+
+def test_merge_keeps_the_projection_chain_self_consistent_after_deduplication() -> None:
+    rows = _chained_rows((2, "DOCUMENT_INGESTED", "doc-b"))
+    projected = [
+        _event(1, "DOCUMENT_INGESTED", "doc-a"),
+        _event(2, "DOCUMENT_INGESTED", "doc-b"),
+        _event(3, "DOCUMENT_INGESTED", "doc-c"),
+    ]
+    trail = merge_trail(rows, projected)
+
+    surviving = [entry for entry in trail.entries if entry["source"] == "projected"]
+    assert [entry["entity_id"] for entry in surviving] == ["doc-c", "doc-a"]
+    assert verify_ledger(surviving) is True
+    assert trail.projection_chain_valid is True
+
+
+def test_merge_is_reverse_chronological_across_both_sources() -> None:
+    rows = _chained_rows((10, "A", "one"), (30, "B", "two"))
+    projected = [_event(20, "C", "three"), _event(40, "D", "four")]
+    trail = merge_trail(rows, projected)
+
+    assert [entry["action"] for entry in trail.entries] == ["D", "B", "C", "A"]
+    timestamps = [entry["timestamp"] for entry in trail.entries]
+    assert timestamps == sorted(timestamps, reverse=True)
+
+
+def test_merge_reports_a_broken_ledger_without_touching_the_projection() -> None:
+    rows = _chained_rows((1, "A", "one"), (2, "B", "two"))
+    rows[1].actor = "tampered"
+    trail = merge_trail(rows, [_event(3, "C", "three")])
+
+    assert trail.ledger_verification.valid is False
+    assert trail.ledger_verification.first_broken_sequence == 2
+    assert trail.projection_chain_valid is True  # the two chains are reported separately
+    assert trail.ledger_count == 2  # broken rows are still shown, not hidden
+
+
+def test_ledger_entries_expose_the_stored_hashes() -> None:
+    rows = _chained_rows((5, "CASE_CREATED", "case-1", {"entity_type": "case"}))
+    entry = ledger_entry(rows[0], {"case-1": "Acme review"})
+
+    assert entry["source"] == "ledger"
+    assert entry["sequence"] == 1
+    assert entry["prev_hash"] == GENESIS_HASH
+    assert entry["integrity_hash"] == rows[0].entry_hash
+    assert entry["log_id"] == f"AUD-{rows[0].entry_hash[:16].upper()}"
+    assert entry["action"] == "CASE_CREATED"
+    assert entry["case_name"] == "Acme review"
+
+
+def test_merge_with_an_empty_ledger_is_the_old_projection_only_behaviour() -> None:
+    projected = [_event(0, "A", "one"), _event(1, "B", "two")]
+    trail = merge_trail([], projected)
+
+    assert trail.ledger_count == 0
+    assert trail.projected_count == 2
+    assert trail.ledger_verification.checked == 0
+    assert trail.ledger_verification.valid is True
+    assert [entry["source"] for entry in trail.entries] == ["projected", "projected"]
+    assert [entry["log_id"] for entry in trail.entries] == [
+        entry["log_id"] for entry in build_ledger(projected)
+    ]

@@ -184,7 +184,7 @@ Same seed → byte-identical PDFs and ground truth. Each case is a contract + pu
 * **12-rule discrepancy engine** — normalised comparison of vendor, currency, terms, dates, totals, tax and caps; every numeric finding carries `formula`, `operands` and `result`.
 * **LangGraph workflow** — an explicit state machine (load → extract → rules → review tasks → report), persisted with its step trace; extraction failures force human review rather than passing silently.
 * **Human review queue** — single and batch decisions, reviewer identity and timestamps persisted.
-* **Audit trail** — a chronological event view projected from rows the system already persists (cases, documents, workflow runs, review decisions, queries, auditor attestations), with a SHA-256 integrity digest chained over the projected sequence and re-verified on read.
+* **Audit trail** — actions are appended to an `audit_events` table at the moment they happen, SHA-256 hash-chained, behind a database trigger that rejects `UPDATE` and `DELETE`. Events recorded before the ledger existed are still projected from the live tables at read time; every entry is labelled `ledger` or `projected`, and chain validity is reported separately for each.
 * **Read-only MCP server** — exposes search, document fields, comparison and review findings to MCP-compatible clients without granting write access.
 
 ---
@@ -314,7 +314,7 @@ scripts/          bootstrap + database provisioning
 Stated plainly, because a portfolio that hides its edges is not worth reading:
 
 * **The 1B extractor is the accuracy bottleneck** — 95.7% field accuracy yields end-to-end discrepancy precision of 52%. Measured, attributed, and improvable by swapping the model.
-* **The audit trail is a projection, not an append-only ledger.** Events are derived from live tables at read time and the SHA-256 digest is computed over that projection. It makes changes *visible on re-read*; it does **not** prove the source rows were never modified, and it is not a compliance control.
+* **The append-only ledger is tamper-*evident*, not tamper-proof, and it is not a compliance control.** The trigger blocks ordinary `UPDATE`/`DELETE`, but this application owns the table, so its own role can drop the trigger; `TRUNCATE` and `DROP TABLE` are not guarded; the chain has no external anchor, so anyone able to rewrite the whole table can recompute every hash; and deleting the newest rows breaks no link, so it cannot be detected from the chain alone. Four flows append (case created, document ingested, workflow finished, review decided/resolved) — everything else, and every event predating the ledger, is a read-time projection over mutable rows and is labelled as such in the response.
 * **No authentication or multi-tenancy.** Reviewer identity is a free-text field. This is a single-user portfolio system, not a hosted product.
 * **BM25 rebuilds its corpus per search** — fine at benchmark scale (~10³ chunks), documented as a scaling limit.
 * **No OCR** — native-text PDFs, DOCX, TXT, MD and CSV only. Scanned documents are out of scope.
@@ -327,7 +327,7 @@ Stated plainly, because a portfolio that hides its edges is not worth reading:
 
 * Swap in `llama3.2:3b` (fits 4 GB VRAM at Q4) behind the existing provider abstraction and publish the before/after eval delta.
 * Optional cloud-provider fallback through the same `LLMProvider` protocol.
-* A genuine append-only audit ledger written at event time, so "tamper-evident" becomes a defensible claim.
+* An external anchor for the ledger chain (periodic digest published outside the database) so whole-table rewrites become detectable.
 * Tesseract OCR path for scanned documents.
 * CPU cross-encoder reranking behind `ENABLE_RERANKER` (scaffolded, disabled).
 * Incremental BM25 indexing and pgvector HNSW tuning for larger corpora.

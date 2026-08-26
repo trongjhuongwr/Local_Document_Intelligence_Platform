@@ -16,9 +16,11 @@ from app.core.exceptions import AppError, StructuredOutputValidationError
 from app.core.logging import get_logger
 from app.extraction.service import ExtractionService
 from app.models import Case, Chunk, Document, ExtractionRun, WorkflowRun
+from app.services.audit import append_projection_event, workflow_events
 from app.services.reviews import ReviewService
 
 logger = get_logger(__name__)
+
 
 WORKFLOW_STEPS = [
     ("load_documents", "Load documents"),
@@ -39,6 +41,20 @@ def initial_workflow_steps() -> list[dict[str, Any]]:
 class CompareInputError(AppError):
     status_code = 422
     error_code = "compare_input_error"
+
+
+async def _append_terminal_event(session: AsyncSession, run: WorkflowRun) -> None:
+    """Record a completed/failed workflow run in the append-only ledger.
+
+    ``workflow_events`` yields the start event first and the terminal event last,
+    and only returns the terminal one once ``status`` and ``completed_at`` are
+    set. WORKFLOW_STARTED stays a read-time projection: it is fully recoverable
+    from ``workflow_runs.started_at`` and adding it would mean a second ledger
+    write per run.
+    """
+    events = workflow_events(run)
+    if len(events) > 1:
+        await append_projection_event(session, events[-1])
 
 
 class _GraphServices:
@@ -300,6 +316,7 @@ class CompareService:
                     row.duration_ms = (time.perf_counter() - started) * 1000
                     row.completed_at = datetime.now(UTC)
                     row.errors = [f"{type(exc).__name__}: {exc}"]
+                    await _append_terminal_event(session, row)
                     await session.commit()
             logger.exception("compare_workflow_failed", workflow_id=workflow_run_id)
             if raise_errors:
@@ -324,6 +341,7 @@ class CompareService:
                     case = await session.get(Case, row.case_id)
                     if case is not None:
                         case.updated_at = datetime.now(UTC)
+                await _append_terminal_event(session, row)
                 await session.commit()
 
         logger.info(

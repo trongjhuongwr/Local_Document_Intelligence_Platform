@@ -1,16 +1,41 @@
-"""Audit trail projected from the rows the platform already persists.
+"""Audit trail: read-time projection, plus the merge with the append-only ledger.
 
-There is no separate event store. Every entry produced here is derived from a
-real row in ``cases``, ``documents``, ``workflow_runs``, ``review_tasks``,
-``query_runs`` or ``audit_attestations``. Nothing is synthesised: if a value is
-not recorded by the system it is left out of the event rather than invented.
+Two kinds of entry reach the API, and they are labelled so nobody has to guess
+which is which:
 
-The SHA-256 chain (``prev_hash`` / ``integrity_hash``) is computed over the
-projected events *at read time*. It is a real digest of the real event payload,
-so any client can re-derive the identical chain from the same rows, and
-``verify_ledger`` re-checks it independently of how it was built. It is **not** a
-write-time append-only ledger, so on its own it does not prove that the
-underlying source rows were never modified.
+``source="ledger"``
+    A row appended to ``audit_events`` at the moment the action happened, by
+    :mod:`app.services.audit_ledger`. The table rejects ``UPDATE`` and ``DELETE``
+    via a trigger and the rows are hash-chained, so these entries are
+    tamper-evident. See :class:`app.models.audit.AuditEvent` for the precise
+    limits of that claim.
+
+``source="projected"``
+    Derived here, at read time, from a real row in ``cases``, ``documents``,
+    ``workflow_runs``, ``review_tasks``, ``query_runs`` or
+    ``audit_attestations``. Nothing is synthesised: if a value is not recorded by
+    the system it is left out of the event rather than invented. But a projection
+    is a *reconstruction of the current state of a mutable row*, not a record of
+    what happened. Its SHA-256 chain is recomputed on every request, so it proves
+    the response is internally consistent and lets any client re-derive the same
+    digests from the same rows — it does **not** prove the source rows were never
+    modified. Everything the platform recorded before the ledger existed can only
+    ever be projected.
+
+Deduplication rule
+------------------
+:func:`merge_trail` drops a projected entry when the ledger already holds an
+entry with the same ``(action, entity_type, entity_id)`` triple, so an action
+that now writes a ledger row is never also reported as a projection. Identity is
+used rather than a cutover timestamp because it is exact: a cutover would drop
+genuine older events whose rows happen to be inserted after the first ledger row
+(bulk imports, back-dated fixtures, rows written directly by tooling), and would
+keep double-reporting anything the cutover misordered.
+
+The rule assumes ``entity_id`` uniquely identifies the thing an event is about
+within its ``entity_type``, which holds here: every id is a UUID primary key or a
+case id. Events that are not distinguished by that triple (there are none today)
+would be reported twice.
 """
 
 from __future__ import annotations
@@ -29,9 +54,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Case, Document, QueryRun, ReviewTask, WorkflowRun
 from app.models.audit import AuditAttestation
+from app.models.audit import AuditEvent as AuditEventRow
+from app.services.audit_ledger import (
+    GENESIS_HASH,
+    LedgerVerification,
+    append_event,
+    read_ledger,
+)
+from app.services.audit_ledger import verify_ledger as verify_ledger_rows
 
-GENESIS_HASH = "0" * 64
-"""``prev_hash`` of the oldest entry in the chain."""
+LEDGER_SOURCE = "ledger"
+PROJECTED_SOURCE = "projected"
 
 MAX_SOURCE_ROWS = 2_000
 """Newest rows read per source table when projecting the ledger."""
@@ -55,6 +88,8 @@ CORE_FIELDS: tuple[str, ...] = (
 
 ENTRY_FIELDS: tuple[str, ...] = (
     "log_id",
+    "source",
+    "sequence",
     "timestamp",
     "action",
     "actor",
@@ -142,6 +177,8 @@ def build_ledger(
         entries.append(
             {
                 "log_id": _log_id(core),
+                "source": PROJECTED_SOURCE,
+                "sequence": None,
                 **core,
                 "case_name": names.get(event.case_id) if event.case_id else None,
                 "prev_hash": prev_hash,
@@ -165,6 +202,93 @@ def verify_ledger(entries: Sequence[Mapping[str, Any]]) -> bool:
             return False
         prev_hash = expected
     return True
+
+
+def ledger_entry(row: AuditEventRow, case_names: Mapping[str, str] | None = None) -> dict[str, Any]:
+    """Render one stored ledger row in the same shape as a projected entry."""
+    names = case_names or {}
+    prev_hash = row.prev_hash or GENESIS_HASH
+    return {
+        "log_id": f"AUD-{row.entry_hash[:16].upper()}",
+        "source": LEDGER_SOURCE,
+        "sequence": row.sequence,
+        "timestamp": _as_utc(row.occurred_at).isoformat(),
+        "action": row.event_type,
+        "actor": row.actor,
+        "case_id": row.case_id,
+        "case_name": names.get(row.case_id) if row.case_id else None,
+        "entity_type": row.entity_type,
+        "entity_id": row.entity_id,
+        "details": row.summary,
+        "metadata": dict(row.details or {}),
+        "prev_hash": prev_hash,
+        "integrity_hash": row.entry_hash,
+    }
+
+
+def _identity(entry: Mapping[str, Any]) -> tuple[str, str, str]:
+    """Deduplication key for a rendered entry: which action, on which thing."""
+    return (
+        str(entry.get("action") or ""),
+        str(entry.get("entity_type") or ""),
+        str(entry.get("entity_id") or ""),
+    )
+
+
+def _event_identity(event: AuditEvent) -> tuple[str, str, str]:
+    """The same key for an unrendered projection event; normalised identically."""
+    return (event.action or "", event.entity_type or "", event.entity_id or "")
+
+
+@dataclass(frozen=True)
+class MergedAuditTrail:
+    """The merged view plus the integrity facts that apply to each half."""
+
+    entries: list[dict[str, Any]]
+    ledger_count: int
+    projected_count: int
+    ledger_verification: LedgerVerification
+    projection_chain_valid: bool
+
+
+def merge_trail(
+    ledger_rows: Sequence[AuditEventRow],
+    events: Iterable[AuditEvent],
+    case_names: Mapping[str, str] | None = None,
+) -> MergedAuditTrail:
+    """Merge append-only ledger rows with read-time projections, newest first.
+
+    Ledger rows win: a projected event whose ``(action, entity_type, entity_id)``
+    already appears in the ledger is dropped, so nothing is reported twice. Both
+    halves are verified, separately, and the results are kept separate — the
+    ledger's chain says something the projection's chain does not.
+    """
+    ledger_entries = [ledger_entry(row, case_names) for row in ledger_rows]
+    covered = {_identity(entry) for entry in ledger_entries}
+
+    # Drop duplicates *before* chaining: the projection chain has to be built
+    # over exactly the entries the response returns, or its prev_hash links
+    # would refer to entries nobody can see.
+    surviving = [event for event in events if _event_identity(event) not in covered]
+    projected_entries = build_ledger(surviving, case_names)
+    projection_valid = verify_ledger(projected_entries)
+
+    ordered = sorted(
+        ledger_entries + projected_entries,
+        key=lambda entry: (
+            str(entry["timestamp"]),
+            int(entry["sequence"] or 0),
+            str(entry["log_id"]),
+        ),
+        reverse=True,
+    )
+    return MergedAuditTrail(
+        entries=ordered,
+        ledger_count=len(ledger_entries),
+        projected_count=len(projected_entries),
+        ledger_verification=verify_ledger_rows(ledger_rows),
+        projection_chain_valid=projection_valid,
+    )
 
 
 def _matches_search(entry: Mapping[str, Any], needle: str) -> bool:
@@ -422,6 +546,35 @@ def attestation_event(attestation: AuditAttestation) -> AuditEvent:
 
 
 # --------------------------------------------------------------------------
+# Write path: the same vocabulary, appended to the real ledger
+# --------------------------------------------------------------------------
+
+
+async def append_projection_event(session: AsyncSession, event: AuditEvent) -> AuditEventRow:
+    """Append a projection-shaped event to the append-only ledger.
+
+    Call sites build the event with the very same projection function the read
+    path uses (:func:`case_event`, :func:`document_event`, :func:`review_events`,
+    :func:`workflow_events`), so the ledger and the projection share one
+    vocabulary and one metadata shape. That is also what makes the
+    ``(action, entity_type, entity_id)`` deduplication in :func:`merge_trail`
+    exact.
+
+    The row is flushed, not committed; the caller commits it with its own work.
+    """
+    return await append_event(
+        session,
+        event_type=event.action,
+        actor=event.actor,
+        summary=event.details,
+        case_id=event.case_id,
+        entity_type=event.entity_type,
+        entity_id=event.entity_id,
+        details=event.metadata,
+    )
+
+
+# --------------------------------------------------------------------------
 # Database-backed assembly
 # --------------------------------------------------------------------------
 
@@ -511,8 +664,15 @@ class AuditService:
         return events
 
     async def ledger(self) -> list[dict[str, Any]]:
+        """Projection-only view. Kept for callers that want just the derived events."""
         events = await self.collect_events()
         return build_ledger(events, await self._case_names())
+
+    async def merged_trail(self) -> MergedAuditTrail:
+        """The full audit trail: append-only ledger rows plus deduplicated projections."""
+        ledger_rows = await read_ledger(self._session)
+        events = await self.collect_events()
+        return merge_trail(ledger_rows, events, await self._case_names())
 
     async def record_attestation(
         self,

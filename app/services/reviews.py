@@ -10,12 +10,26 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.core.exceptions import AppError
 from app.core.logging import get_logger
 from app.models import Case, ReviewTask
+from app.services.audit import append_projection_event, review_events
 
 logger = get_logger(__name__)
 
 _DECISIONS = {"APPROVED", "REJECTED"}
 _OPEN = "OPEN"
 _RESOLVED = "RESOLVED"
+
+
+async def _append_decision_event(session: AsyncSession, task: ReviewTask) -> None:
+    """Record a decided/resolved review in the append-only ledger.
+
+    ``review_events`` yields the flagged event first and the decision event last;
+    only the decision is appended here, and only once the task actually carries
+    one. Batch decisions go through ``decide``/``resolve``, so each finding in a
+    batch gets its own ledger row.
+    """
+    events = review_events(task)
+    if len(events) > 1:
+        await append_projection_event(session, events[-1])
 
 
 class ReviewNotFoundError(AppError):
@@ -138,6 +152,7 @@ class ReviewService:
                 case = await session.get(Case, task.case_id)
                 if case is not None:
                     case.updated_at = datetime.now(UTC)
+            await _append_decision_event(session, task)
             await session.commit()
             await session.refresh(task)
         logger.info("review_decided", review_id=str(review_id), decision=decision)
@@ -157,6 +172,7 @@ class ReviewService:
                 case = await session.get(Case, task.case_id)
                 if case is not None:
                     case.updated_at = datetime.now(UTC)
+            await _append_decision_event(session, task)
             await session.commit()
             await session.refresh(task)
         return task

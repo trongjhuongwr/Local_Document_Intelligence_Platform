@@ -19,6 +19,7 @@ from app.ingestion.parsers.registry import EXTENSION_BY_MIME, sniff_mime_type
 from app.ingestion.pipeline import PARSER_VERSION, run_pipeline
 from app.models import Chunk, Document
 from app.repositories.documents import DocumentRepository
+from app.services.audit import append_projection_event, document_event
 
 logger = get_logger(__name__)
 
@@ -39,6 +40,7 @@ class DocumentService:
     """Orchestrates the ingestion pipeline, persistence, and file storage."""
 
     def __init__(self, session: AsyncSession) -> None:
+        self._session = session
         self._repository = DocumentRepository(session)
 
     async def upload(
@@ -123,6 +125,12 @@ class DocumentService:
             elements=result.elements,
             chunks=result.chunks,
         )
+        # DocumentRepository.create() commits the document itself, so this append
+        # is a second transaction rather than part of the first: a crash in
+        # between leaves the document with no ledger row, and it then shows up in
+        # the audit trail as source="projected" instead of source="ledger".
+        await append_projection_event(self._session, document_event(document))
+        await self._session.commit()
         stored_path.parent.mkdir(parents=True, exist_ok=True)
         stored_path.write_bytes(data)
         logger.info(
