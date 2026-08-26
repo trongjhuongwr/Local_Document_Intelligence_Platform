@@ -1,5 +1,7 @@
 # 🏛️ Document Intelligence & Cross-Verification Copilot
 
+<div align="center">
+
 [![Python](https://img.shields.io/badge/Python-3.12+-3776AB.svg?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688.svg?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com/)
 [![PostgreSQL + pgvector](https://img.shields.io/badge/PostgreSQL-16_+_pgvector-4169E1.svg?style=flat-square&logo=postgresql&logoColor=white)](https://github.com/pgvector/pgvector)
@@ -7,6 +9,8 @@
 [![LangGraph](https://img.shields.io/badge/LangGraph-workflow-1C3C3C.svg?style=flat-square)](https://langchain-ai.github.io/langgraph/)
 [![React](https://img.shields.io/badge/React-18.3-61DAFB.svg?style=flat-square&logo=react)](https://reactjs.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg?style=flat-square)](LICENSE)
+
+</div>
 
 > A **local-first** document intelligence platform that cross-examines packs of business documents (service agreements, purchase orders, invoices, AP policies), detects inconsistencies with deterministic rules, and answers questions with page-level evidence citations — running entirely on a consumer laptop with a small local model and **no paid AI APIs**.
 
@@ -311,25 +315,30 @@ app/                          FastAPI backend
 │       ├── retrieval.py      search + embedding index
 │       ├── reviews.py        single and batch review decisions
 │       └── workflows.py      workflow run status and step trace
+|
 ├── agents/
 │   ├── graph.py              LangGraph compare workflow
 │   ├── router.py             deterministic query router
 │   ├── state.py              workflow state + step recording
 │   └── tools.py              typed, allowlisted tools
+|
 ├── ingestion/
 │   ├── chunking.py           structure-aware chunking
 │   ├── pipeline.py           bytes → elements → chunks
 │   ├── types.py
 │   └── parsers/              pdf · docx · text · csv · registry (MIME sniffing)
+|
 ├── extraction/
 │   ├── patterns.py           deterministic reads of labelled fields
 │   ├── schemas.py            Pydantic extraction schemas
 │   └── service.py            constrained decoding + single-field repair pass
+|
 ├── discrepancy/
 │   ├── engine.py             the 12 deterministic rules
 │   ├── evidence.py
 │   ├── models.py
 │   └── normalize.py          vendor / currency / terms normalisation
+|
 ├── retrieval/
 │   ├── bm25.py               in-process lexical search
 │   ├── vector.py             pgvector dense search
@@ -338,15 +347,19 @@ app/                          FastAPI backend
 │   ├── context.py            context budget + dedupe
 │   ├── indexer.py            embedding indexer
 │   └── service.py
+|
 ├── citations/
 │   ├── builder.py            citations built before generation
 │   ├── models.py
 │   └── verifier.py           invented markers detected and stripped
+|
 ├── llm/
 │   ├── base.py               LLMProvider protocol + telemetry
 │   ├── ollama.py             structured outputs with corrective retry
 │   └── prompts/              versioned prompt files + registry
+|
 ├── embeddings/               provider protocol + Ollama embeddings
+|
 ├── services/
 │   ├── audit.py              read-time projection of audit events
 │   ├── audit_ledger.py       append-only hash-chained ledger
@@ -357,6 +370,7 @@ app/                          FastAPI backend
 │   ├── hints.py
 │   ├── qa.py                 route → retrieve → cite → verify
 │   └── reviews.py
+|
 ├── models/                   SQLAlchemy models (audit, case, document, …)
 ├── repositories/             data access
 ├── workflows/report.py       exception report generation
@@ -386,10 +400,8 @@ evals/                        7 reproducible evaluation suites
 
 tests/
 ├── conftest.py
-├── unit/                     25 files — parsers, chunking, rules, router,
-│                             citations, ledger, extraction, evals framework
-├── integration/              10 files — live PostgreSQL: documents, cases,
-│                             compare workflow, reviews batch, audit ledger, MCP
+├── unit/                     25 files — parsers, chunking, rules, router, citations, ledger, extraction, evals framework
+├── integration/              10 files — live PostgreSQL: documents, cases, compare workflow, reviews batch,...
 └── ollama/                   live-model smoke tests (excluded from CI)
 
 synthetic_data/generator/     DocFlowBench: seeded PDFs + ground truth
@@ -432,4 +444,4 @@ Stated plainly, because a portfolio that hides its edges is not worth reading:
 
 ## 📄 License
 
-MIT © Arthur Nguyen
+MIT © Nguyen Trong Huong
