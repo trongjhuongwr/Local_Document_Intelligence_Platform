@@ -278,7 +278,7 @@ export function printOrExportPDF(reviews: ReviewFinding[], title = 'Audit Findin
       const d = r.discrepancy || {};
       const sevClass = r.severity === 'high' ? 'badge-high' : r.severity === 'medium' ? 'badge-medium' : 'badge-low';
       const statusClass = r.status === 'APPROVED' ? 'badge-approved' : r.status === 'REJECTED' ? 'badge-rejected' : r.status === 'RESOLVED' ? 'badge-resolved' : 'badge-open';
-      
+
       return `
         <div class="finding-card">
           <div class="finding-header">
@@ -313,8 +313,8 @@ export function printOrExportPDF(reviews: ReviewFinding[], title = 'Audit Findin
 
           ${r.reviewer ? `
             <div class="reviewer-trail">
-              <strong>Auditor Decision:</strong> ${r.reviewer} &nbsp;|&nbsp; 
-              ${r.note ? `<em>"${r.note}"</em>` : 'No note provided'} 
+              <strong>Auditor Decision:</strong> ${r.reviewer} &nbsp;|&nbsp;
+              ${r.note ? `<em>"${r.note}"</em>` : 'No note provided'}
               ${r.decided_at ? `&nbsp;(${r.decided_at.slice(0, 16).replace('T', ' ')})` : ''}
             </div>
           ` : ''}
@@ -445,8 +445,8 @@ export function printOrExportAuditDossier(data: AuditDossierData) {
     </div>
     <h1>${caseDetail.name}</h1>
     <div class="meta-bar">
-      Case ID: <span class="mono">${caseDetail.case_id}</span> &bull; 
-      Generated: ${new Date().toLocaleString()} &bull; 
+      Case ID: <span class="mono">${caseDetail.case_id}</span> &bull;
+      Generated: ${new Date().toLocaleString()} &bull;
       Status: <strong>${caseDetail.readiness.toUpperCase()}</strong>
     </div>
   </div>

@@ -1047,13 +1047,13 @@ export function ThemeLanguageProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('doc_intel_theme', theme);
     const root = document.documentElement;
     const body = document.body;
-    
+
     if (theme === 'dark') {
       root.classList.add('dark');
       root.classList.remove('light');
       root.setAttribute('data-theme', 'dark');
       root.style.colorScheme = 'dark';
-      
+
       if (body) {
         body.classList.add('dark');
         body.classList.remove('light');
@@ -1064,7 +1064,7 @@ export function ThemeLanguageProvider({ children }: { children: ReactNode }) {
       root.classList.add('light');
       root.setAttribute('data-theme', 'light');
       root.style.colorScheme = 'light';
-      
+
       if (body) {
         body.classList.remove('dark');
         body.classList.add('light');

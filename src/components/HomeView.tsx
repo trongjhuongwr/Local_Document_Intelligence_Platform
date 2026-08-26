@@ -1,15 +1,15 @@
 import React from 'react';
 import { CaseItem } from '../types';
 import { ReadinessChip } from './StatusBadges';
-import { 
-  ArrowRight, 
-  Sparkles, 
-  FolderPlus, 
-  FileText, 
-  CheckCircle2, 
-  Search, 
-  Briefcase, 
-  AlertTriangle, 
+import {
+  ArrowRight,
+  Sparkles,
+  FolderPlus,
+  FileText,
+  CheckCircle2,
+  Search,
+  Briefcase,
+  AlertTriangle,
   ShieldCheck,
   History,
   CheckSquare,
@@ -27,14 +27,14 @@ interface HomeViewProps {
   loadingSample: boolean;
 }
 
-export function HomeView({ 
-  cases, 
-  onCreateCase, 
-  onTrySampleCase, 
-  onOpenCase, 
+export function HomeView({
+  cases,
+  onCreateCase,
+  onTrySampleCase,
+  onOpenCase,
   onNavigateToReviews,
   onNavigateToAuditTrail,
-  loadingSample 
+  loadingSample
 }: HomeViewProps) {
   const { lang, t } = useThemeLanguage();
 
@@ -42,7 +42,7 @@ export function HomeView({
   const totalCases = cases.length;
   const totalOpenFindings = cases.reduce((acc, c) => acc + (c.open_review_count || 0), 0);
   const totalDocuments = cases.reduce((acc, c) => acc + (c.document_count || 0), 0);
-  
+
   // Share of cases that hold a complete document pack with no open findings.
   // With no cases loaded there is nothing to report, so show an em dash
   // rather than inventing a percentage.
@@ -255,10 +255,10 @@ export function HomeView({
                     {lang === 'vi' ? 'Cập nhật' : 'Updated'} {c.updated_at ? c.updated_at.slice(0, 10) : 'recent'} · {c.document_count} {lang === 'vi' ? 'tài liệu đã nạp' : 'document(s) ingested'}
                   </span>
                 </div>
-                
+
                 <div className="flex items-center gap-2 flex-wrap">
                   <ReadinessChip readiness={c.readiness} />
-                  
+
                   {c.open_review_count > 0 && onNavigateToReviews && (
                     <button
                       onClick={() => onNavigateToReviews(c.case_id)}
@@ -297,4 +297,3 @@ export function HomeView({
     </div>
   );
 }
-

@@ -1,26 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  History, 
-  ShieldCheck, 
-  Search, 
-  Filter, 
-  Download, 
-  Plus, 
-  CheckCircle2, 
-  XCircle, 
-  FileText, 
-  Play, 
-  FolderOpen, 
-  KeyRound, 
-  Calendar, 
-  User, 
-  ExternalLink, 
-  RefreshCw, 
-  Copy, 
-  Check, 
-  AlertCircle, 
-  Hash, 
-  ShieldAlert, 
+import {
+  History,
+  ShieldCheck,
+  Search,
+  Filter,
+  Download,
+  Plus,
+  CheckCircle2,
+  XCircle,
+  FileText,
+  Play,
+  FolderOpen,
+  KeyRound,
+  Calendar,
+  User,
+  ExternalLink,
+  RefreshCw,
+  Copy,
+  Check,
+  AlertCircle,
+  Hash,
+  ShieldAlert,
   Layers,
   ChevronRight,
   Sparkles
@@ -54,7 +54,7 @@ export function AuditTrailView({
   const [filterAction, setFilterAction] = useState<string>('ALL');
   const [activeCaseFilter, setActiveCaseFilter] = useState<string>(selectedCaseId || 'ALL');
   const [selectedEntry, setSelectedEntry] = useState<AuditTrailEntry | null>(null);
-  
+
   // Attestation modal
   const [attestationModalOpen, setAttestationModalOpen] = useState(false);
   const [attestActor, setAttestActor] = useState(lang === 'vi' ? 'Kiểm toán viên phụ trách' : 'Lead Auditor');
@@ -456,7 +456,7 @@ export function AuditTrailView({
                           </span>
 
                           {entry.case_name && (
-                            <span 
+                            <span
                               onClick={e => {
                                 e.stopPropagation();
                                 if (entry.case_id) onNavigateToCase(entry.case_id);
@@ -512,7 +512,7 @@ export function AuditTrailView({
                         <span>{formattedTime}</span>
                       </div>
 
-                      <div 
+                      <div
                         onClick={e => {
                           e.stopPropagation();
                           handleCopy(entry.integrity_hash, entry.log_id);
@@ -539,11 +539,11 @@ export function AuditTrailView({
 
       {/* Entry Details Inspection Modal */}
       {selectedEntry && (
-        <div 
+        <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-neutral-900/60 dark:bg-black/75 backdrop-blur-xs animate-in fade-in duration-100"
           onClick={() => setSelectedEntry(null)}
         >
-          <div 
+          <div
             className="w-full max-w-2xl bg-white dark:bg-neutral-900 rounded-2xl shadow-2xl border border-neutral-200 dark:border-neutral-800 overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-150"
             onClick={e => e.stopPropagation()}
           >
@@ -649,11 +649,11 @@ export function AuditTrailView({
 
       {/* Record Manual Attestation Modal */}
       {attestationModalOpen && (
-        <div 
+        <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-neutral-900/60 dark:bg-black/75 backdrop-blur-xs animate-in fade-in duration-100"
           onClick={() => setAttestationModalOpen(false)}
         >
-          <div 
+          <div
             className="w-full max-w-xl bg-white dark:bg-neutral-900 rounded-2xl shadow-2xl border border-neutral-200 dark:border-neutral-800 overflow-hidden flex flex-col animate-in zoom-in-95 duration-150"
             onClick={e => e.stopPropagation()}
           >
@@ -755,4 +755,3 @@ export function AuditTrailView({
     </div>
   );
 }
-

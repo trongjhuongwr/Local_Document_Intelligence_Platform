@@ -14,28 +14,28 @@ import { LoadedDocument, loadDocument } from '../utils/documentText';
 import { SeverityBadge, ReadinessChip } from './StatusBadges';
 import { DocumentSplitViewer } from './DocumentSplitViewer';
 import { printOrExportAuditDossier } from '../utils/exportUtils';
-import { 
-  ArrowLeft, 
-  UploadCloud, 
-  CheckCircle2, 
-  Circle, 
-  AlertTriangle, 
-  FileText, 
-  Download, 
-  Trash2, 
-  Play, 
-  Check, 
-  ChevronDown, 
-  ChevronRight, 
-  Calculator, 
-  Search, 
-  Filter, 
-  Eye, 
-  X, 
-  Copy, 
-  Hash, 
-  FileSpreadsheet, 
-  Columns, 
+import {
+  ArrowLeft,
+  UploadCloud,
+  CheckCircle2,
+  Circle,
+  AlertTriangle,
+  FileText,
+  Download,
+  Trash2,
+  Play,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Calculator,
+  Search,
+  Filter,
+  Eye,
+  X,
+  Copy,
+  Hash,
+  FileSpreadsheet,
+  Columns,
   ArrowLeftRight,
   Printer,
   Sparkles,
@@ -411,7 +411,7 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
 
   // Filtered cases list based on search and status
   const filteredCases = cases.filter(c => {
-    const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           c.case_id.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'ALL' || c.readiness === statusFilter;
     return matchesSearch && matchesStatus;
@@ -645,8 +645,8 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
         <div className="p-3.5 rounded-lg bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-300 text-xs flex items-center gap-2 font-medium">
           <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
           <span>
-            {lang === 'vi' 
-              ? 'Hồ sơ chưa đủ điều kiện đối soát: Cần tải lên tối thiểu 1 Hợp đồng và 1 Hóa đơn hoặc Đơn đặt hàng để kích hoạt.' 
+            {lang === 'vi'
+              ? 'Hồ sơ chưa đủ điều kiện đối soát: Cần tải lên tối thiểu 1 Hợp đồng và 1 Hóa đơn hoặc Đơn đặt hàng để kích hoạt.'
               : 'Blocked: Pack requires at least Contract + Invoice or PO to perform cross-reconciliation.'}
           </span>
         </div>
@@ -654,8 +654,8 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
         <div className="p-3.5 rounded-lg bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-xs flex items-center gap-2 font-medium">
           <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
           <span>
-            {lang === 'vi' 
-              ? `Hồ sơ có thể đối soát một phần. Còn thiếu các loại chứng từ: ${caseDetail.missing_document_types.map(t => docLabels[t]).join(', ')}` 
+            {lang === 'vi'
+              ? `Hồ sơ có thể đối soát một phần. Còn thiếu các loại chứng từ: ${caseDetail.missing_document_types.map(t => docLabels[t]).join(', ')}`
               : `Partial pack ready. Missing recommended documents: ${caseDetail.missing_document_types.map(t => docLabels[t]).join(', ')}`}
           </span>
         </div>
@@ -663,7 +663,7 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
         <div className="p-3.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs flex items-center gap-2 font-medium">
           <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
           <span>
-            {lang === 'vi' 
+            {lang === 'vi'
               ? 'Bộ 4 chứng từ hoàn chỉnh, đủ điều kiện để đối soát chéo toàn bộ.'
               : 'Complete 4-document pack ready for full cross-document reconciliation.'}
           </span>
@@ -675,21 +675,21 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
         <h2 className="text-base font-bold text-neutral-900 dark:text-white">
           {lang === 'vi' ? 'Bước 1: Tải lên hồ sơ chứng từ' : 'Step 1: Ingest Document Pack'}
         </h2>
-        <div 
+        <div
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           className={`p-8 rounded-xl border-2 border-dashed text-center space-y-3 transition-all ${
-            isDragging 
-              ? 'border-blue-500 bg-blue-50/80 dark:bg-blue-950/40 scale-[1.01] shadow-md' 
+            isDragging
+              ? 'border-blue-500 bg-blue-50/80 dark:bg-blue-950/40 scale-[1.01] shadow-md'
               : 'border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 hover:border-neutral-400 dark:hover:border-neutral-600'
           }`}
         >
           <UploadCloud className={`w-10 h-10 mx-auto transition-colors ${isDragging ? 'text-blue-600 scale-110' : 'text-neutral-400 dark:text-neutral-500'}`} />
           <div>
             <p className="text-sm font-bold text-neutral-900 dark:text-white">
-              {isDragging 
-                ? (lang === 'vi' ? 'Thả tệp vào đây để tải lên...' : 'Drop files here to upload...') 
+              {isDragging
+                ? (lang === 'vi' ? 'Thả tệp vào đây để tải lên...' : 'Drop files here to upload...')
                 : (lang === 'vi' ? 'Kéo thả tệp chứng từ vào đây hoặc duyệt tệp từ máy tính' : 'Drag & drop audit documents here, or click to browse')}
             </p>
             <div className="mt-2">
@@ -718,7 +718,7 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
                 <Sparkles className="w-3.5 h-3.5 text-amber-500" />
                 <span>{lang === 'vi' ? `Tệp đã chọn & Tự động gán nhãn (${selectedFiles.length})` : `Selected Files & Smart Type Ingestion (${selectedFiles.length})`}</span>
               </span>
-              <button 
+              <button
                 onClick={() => setSelectedFiles([])}
                 className="text-[11px] font-semibold text-red-600 hover:underline cursor-pointer"
               >
@@ -845,11 +845,11 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
             </div>
             <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
               {caseDetail.documents.map(d => (
-                <div 
-                  key={d.document_id} 
+                <div
+                  key={d.document_id}
                   className="py-2.5 px-2 -mx-2 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-800/60 transition-colors flex items-center justify-between text-xs group"
                 >
-                  <div 
+                  <div
                     onClick={() => handleOpenPeek(d.document_id)}
                     className="flex items-center gap-2.5 cursor-pointer flex-1 min-w-0"
                   >
@@ -1221,7 +1221,7 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
                             <button
                               onClick={() => {
                                 const doc1 = caseDetail.documents?.find(d => d.filename === issue.evidence![0]?.filename);
-                                const doc2 = caseDetail.documents?.find(d => d.filename === issue.evidence![1]?.filename) || 
+                                const doc2 = caseDetail.documents?.find(d => d.filename === issue.evidence![1]?.filename) ||
                                              caseDetail.documents?.find(d => d.document_id !== doc1?.document_id);
                                 setSplitViewerConfig({
                                   open: true,
@@ -1329,4 +1329,3 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
     </div>
   );
 }
-

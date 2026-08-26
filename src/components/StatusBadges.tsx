@@ -5,7 +5,7 @@ import { useThemeLanguage } from '../context/ThemeLanguageContext';
 export function SeverityBadge({ severity }: { severity: Severity | string }) {
   const { lang, t } = useThemeLanguage();
   const s = severity.toLowerCase();
-  
+
   if (s === 'high') {
     return (
       <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-rose-50 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200 dark:border-rose-800/60">
@@ -93,4 +93,3 @@ export function NeutralChip({ children }: { children: React.ReactNode }) {
     </span>
   );
 }
-

@@ -3,18 +3,18 @@ import { CaseDocument, Discrepancy, DocumentType, ReviewFinding } from '../types
 import { errorMessage } from '../api';
 import { LoadedDocument, loadDocument } from '../utils/documentText';
 import { SeverityBadge } from './StatusBadges';
-import { 
-  X, 
-  Columns, 
-  Rows, 
-  ArrowLeftRight, 
-  Search, 
-  FileText, 
-  CheckCircle2, 
-  AlertTriangle, 
-  Calculator, 
-  Copy, 
-  Maximize2, 
+import {
+  X,
+  Columns,
+  Rows,
+  ArrowLeftRight,
+  Search,
+  FileText,
+  CheckCircle2,
+  AlertTriangle,
+  Calculator,
+  Copy,
+  Maximize2,
   Minimize2,
   Table,
   FileCode,
@@ -96,7 +96,7 @@ export function DocumentSplitViewer({
     if (finding?.evidence && finding.evidence.length > 0) {
       const matchLeft = documents.find(d => d.filename === finding.evidence![0].filename);
       if (matchLeft) setLeftDocId(matchLeft.document_id);
-      
+
       if (finding.evidence.length > 1) {
         const matchRight = documents.find(d => d.filename === finding.evidence![1].filename);
         if (matchRight) setRightDocId(matchRight.document_id);
@@ -345,7 +345,7 @@ export function DocumentSplitViewer({
       <div className={`bg-white rounded-2xl border border-neutral-200 shadow-2xl flex flex-col overflow-hidden transition-all duration-200 ${
         isFullScreen ? 'w-full h-full max-w-none rounded-none' : 'w-full max-w-7xl h-[92vh]'
       }`}>
-        
+
         {/* Top Control Bar */}
         <div className="p-3 bg-neutral-900 text-white flex flex-wrap items-center justify-between gap-3 border-b border-neutral-800 shrink-0">
           <div className="flex items-center gap-3">
@@ -616,9 +616,9 @@ export function DocumentSplitViewer({
         <div className={`flex-1 overflow-hidden flex ${
           layoutRatio === 'stacked' ? 'flex-col' : 'flex-row'
         } divide-x divide-neutral-200`}>
-          
+
           {/* ================= LEFT PANE ================= */}
-          <div 
+          <div
             className={`flex flex-col h-full overflow-hidden ${
               layoutRatio === '50-50' ? 'w-1/2' :
               layoutRatio === '65-35' ? 'w-[65%]' :
@@ -699,7 +699,7 @@ export function DocumentSplitViewer({
           </div>
 
           {/* ================= RIGHT PANE ================= */}
-          <div 
+          <div
             className={`flex flex-col h-full overflow-hidden ${
               layoutRatio === '50-50' ? 'w-1/2' :
               layoutRatio === '65-35' ? 'w-[35%]' :

@@ -4,15 +4,15 @@ import { apiGet, apiPost, errorMessage } from '../api';
 import { SeverityBadge, StatusChip } from './StatusBadges';
 import { DocumentSplitViewer } from './DocumentSplitViewer';
 import { exportReviewsToCSV, exportReviewsToMarkdown, printOrExportPDF } from '../utils/exportUtils';
-import { 
-  CheckCircle2, 
-  XCircle, 
-  RotateCcw, 
-  HelpCircle, 
-  Filter, 
-  User, 
-  Calculator, 
-  ChevronLeft, 
+import {
+  CheckCircle2,
+  XCircle,
+  RotateCcw,
+  HelpCircle,
+  Filter,
+  User,
+  Calculator,
+  ChevronLeft,
   ChevronRight,
   Clock,
   Download,
@@ -190,7 +190,7 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
 
   // Toggle single item selection
   const toggleSelectOne = (id: string) => {
-    setSelectedReviewIds(prev => 
+    setSelectedReviewIds(prev =>
       prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
     );
   };
@@ -500,7 +500,7 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
               <Square className="w-4 h-4 text-neutral-400" />
             )}
             <span>
-              {selectedReviewIds.length > 0 
+              {selectedReviewIds.length > 0
                 ? (lang === 'vi' ? `Đã chọn ${selectedReviewIds.length} phát hiện` : `${selectedReviewIds.length} findings selected`)
                 : (lang === 'vi' ? 'Chọn tất cả hiển thị' : 'Select all visible')}
             </span>
@@ -596,8 +596,8 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
               <div
                 key={item.review_id}
                 className={`p-5 rounded-xl border transition-all shadow-xs space-y-4 ${
-                  isSelected 
-                    ? 'border-emerald-500 bg-emerald-50/20 dark:bg-emerald-950/30' 
+                  isSelected
+                    ? 'border-emerald-500 bg-emerald-50/20 dark:bg-emerald-950/30'
                     : 'border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900'
                 }`}
               >
@@ -825,4 +825,3 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
     </div>
   );
 }
-

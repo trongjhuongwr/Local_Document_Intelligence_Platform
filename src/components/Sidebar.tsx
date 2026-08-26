@@ -1,10 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { 
-  FolderOpen, 
-  MessageSquare, 
-  CheckSquare, 
-  BarChart3, 
-  Home, 
+import {
+  FolderOpen,
+  MessageSquare,
+  CheckSquare,
+  BarChart3,
+  Home,
   ShieldCheck,
   Cpu,
   Sparkles,
@@ -44,11 +44,11 @@ interface SidebarProps {
   onOpenCommandPalette?: () => void;
 }
 
-export function Sidebar({ 
-  currentTab, 
-  onSelectTab, 
-  openFindingCount = 0, 
-  mobileOpen = false, 
+export function Sidebar({
+  currentTab,
+  onSelectTab,
+  openFindingCount = 0,
+  mobileOpen = false,
   onCloseMobile,
   collapsed = false,
   onToggleCollapse,
@@ -118,9 +118,9 @@ export function Sidebar({
   const workspaceNav = [
     { id: 'home', label: t.nav.home, icon: Home },
     { id: 'cases', label: t.nav.cases, icon: FolderOpen },
-    { 
-      id: 'reviews', 
-      label: t.nav.reviews, 
+    {
+      id: 'reviews',
+      label: t.nav.reviews,
       icon: CheckSquare,
       badge: openFindingCount > 0 ? openFindingCount : undefined
     },
@@ -167,7 +167,7 @@ export function Sidebar({
     <>
       {/* Mobile Backdrop Overlay */}
       {mobileOpen && (
-        <div 
+        <div
           onClick={onCloseMobile}
           className="fixed inset-0 bg-neutral-950/60 backdrop-blur-xs z-40 lg:hidden transition-opacity"
         />
@@ -191,14 +191,14 @@ export function Sidebar({
           {/* Header */}
           <div className="p-3.5 border-b border-neutral-100 dark:border-neutral-800 flex items-center justify-between">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div 
+              <div
                 onClick={() => handleNavClick('home')}
                 className="w-8 h-8 rounded-lg bg-neutral-900 dark:bg-neutral-800 text-white flex items-center justify-center font-bold text-sm shrink-0 cursor-pointer shadow-2xs hover:bg-neutral-800 dark:hover:bg-neutral-700 transition-colors"
                 title={t.common.appName}
               >
                 <ShieldCheck className="w-5 h-5 text-emerald-400" />
               </div>
-              
+
               {!collapsed && (
                 <div className="min-w-0">
                   <h1 className="text-sm font-black text-neutral-900 dark:text-white tracking-tight leading-tight truncate">Doc Intelligence</h1>
@@ -277,8 +277,8 @@ export function Sidebar({
                       onClick={() => handleNavClick(item.id)}
                       title={collapsed ? `${item.label} ${item.badge ? `(${item.badge})` : ''}` : undefined}
                       className={`relative flex items-center rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                        collapsed 
-                          ? 'justify-center p-2.5' 
+                        collapsed
+                          ? 'justify-center p-2.5'
                           : 'justify-between px-2.5 py-2'
                       } ${
                         active
@@ -296,8 +296,8 @@ export function Sidebar({
                           <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-500 ring-2 ring-white dark:ring-neutral-900" />
                         ) : (
                           <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded-full ${
-                            active 
-                              ? 'bg-amber-400 text-neutral-950' 
+                            active
+                              ? 'bg-amber-400 text-neutral-950'
                               : 'bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300'
                           }`}>
                             {item.badge}
@@ -328,8 +328,8 @@ export function Sidebar({
                       onClick={() => handleNavClick(item.id)}
                       title={collapsed ? item.label : undefined}
                       className={`flex items-center rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                        collapsed 
-                          ? 'justify-center p-2.5' 
+                        collapsed
+                          ? 'justify-center p-2.5'
                           : 'gap-2.5 px-2.5 py-2'
                       } ${
                         active
@@ -717,7 +717,7 @@ export function Sidebar({
                       >
                         <div className="font-bold text-xs">{t.settings.strictMode}</div>
                         <div className={`text-[10px] mt-1 ${
-                          auditMode === 'strict' 
+                          auditMode === 'strict'
                             ? (theme === 'dark' ? 'text-neutral-700' : 'text-neutral-300')
                             : 'text-neutral-500 dark:text-neutral-400'
                         }`}>
@@ -735,7 +735,7 @@ export function Sidebar({
                       >
                         <div className="font-bold text-xs">{t.settings.standardMode}</div>
                         <div className={`text-[10px] mt-1 ${
-                          auditMode === 'standard' 
+                          auditMode === 'standard'
                             ? (theme === 'dark' ? 'text-neutral-700' : 'text-neutral-300')
                             : 'text-neutral-500 dark:text-neutral-400'
                         }`}>
@@ -933,4 +933,3 @@ export function Sidebar({
     </>
   );
 }
-

@@ -554,7 +554,7 @@ export function AskView({ cases, selectedCaseId, onSelectCase }: AskViewProps) {
       <div className="flex-1 flex gap-3 overflow-hidden">
         {/* Left / Center Column: Conversation Thread */}
         <div className="flex-1 flex flex-col min-w-0 bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200/90 dark:border-neutral-800 overflow-hidden shadow-xs relative">
-          
+
           {/* Scrollable Messages Container */}
           <div className="flex-1 overflow-y-auto px-3 sm:px-6 py-2.5 space-y-4">
             {messages.length === 0 ? (
@@ -1153,4 +1153,3 @@ export function AskView({ cases, selectedCaseId, onSelectCase }: AskViewProps) {
     </div>
   );
 }
-

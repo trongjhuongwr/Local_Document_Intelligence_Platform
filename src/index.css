@@ -15,7 +15,7 @@
     font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
     @apply bg-neutral-50 text-neutral-900 transition-colors duration-150;
   }
-  
+
   .dark body, body.dark {
     @apply bg-neutral-950 text-neutral-100;
   }
@@ -50,9 +50,9 @@
   margin-bottom: 0.5rem;
 }
 
-.dark .markdown-body h1, 
-.dark .markdown-body h2, 
-.dark .markdown-body h3, 
+.dark .markdown-body h1,
+.dark .markdown-body h2,
+.dark .markdown-body h3,
 .dark .markdown-body h4 {
   color: #f8fafc;
 }
@@ -102,7 +102,7 @@
   text-align: left;
 }
 
-.dark .markdown-body th, 
+.dark .markdown-body th,
 .dark .markdown-body td {
   border-color: #334155;
 }
@@ -153,5 +153,3 @@
   -ms-overflow-style: none;  /* IE and Edge */
   scrollbar-width: none;  /* Firefox */
 }
-
-

@@ -1,18 +1,18 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { 
-  Search, 
-  FolderOpen, 
-  FileText, 
-  AlertTriangle, 
-  CheckSquare, 
-  ArrowRight, 
-  CornerDownLeft, 
-  X, 
-  Building2, 
-  Receipt, 
-  ShieldCheck, 
-  History, 
-  Sparkles, 
+import {
+  Search,
+  FolderOpen,
+  FileText,
+  AlertTriangle,
+  CheckSquare,
+  ArrowRight,
+  CornerDownLeft,
+  X,
+  Building2,
+  Receipt,
+  ShieldCheck,
+  History,
+  Sparkles,
   Sliders,
   BarChart3,
   MessageSquare
@@ -293,7 +293,7 @@ export function CommandPalette({
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-16 sm:pt-24 px-4 bg-neutral-950/60 backdrop-blur-xs animate-in fade-in duration-100">
-      <div 
+      <div
         className="w-full max-w-2xl bg-white dark:bg-neutral-900 rounded-2xl shadow-2xl border border-neutral-200 dark:border-neutral-800 overflow-hidden flex flex-col max-h-[80vh] animate-in zoom-in-95 duration-150"
         onClick={e => e.stopPropagation()}
       >
@@ -348,15 +348,15 @@ export function CommandPalette({
                     onClick={() => item.action()}
                     onMouseEnter={() => setSelectedIndex(idx)}
                     className={`flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer transition-colors ${
-                      isSelected 
-                        ? 'bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900 shadow-2xs' 
+                      isSelected
+                        ? 'bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900 shadow-2xs'
                         : 'text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800/60'
                     }`}
                   >
                     <div className="flex items-center gap-3 min-w-0 pr-2">
                       <div className={`p-2 rounded-lg shrink-0 ${
-                        isSelected 
-                          ? 'bg-neutral-800 text-white dark:bg-neutral-200 dark:text-neutral-900' 
+                        isSelected
+                          ? 'bg-neutral-800 text-white dark:bg-neutral-200 dark:text-neutral-900'
                           : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300'
                       }`}>
                         <IconComponent className="w-4 h-4" />
@@ -376,8 +376,8 @@ export function CommandPalette({
                         </div>
                         {item.subtitle && (
                           <p className={`text-[11px] truncate mt-0.5 ${
-                            isSelected 
-                              ? 'text-neutral-300 dark:text-neutral-600' 
+                            isSelected
+                              ? 'text-neutral-300 dark:text-neutral-600'
                               : 'text-neutral-500 dark:text-neutral-400'
                           }`}>
                             {item.subtitle}
@@ -423,4 +423,3 @@ export function CommandPalette({
     </div>
   );
 }
-

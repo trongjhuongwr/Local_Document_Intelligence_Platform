@@ -296,25 +296,111 @@ POST   /api/documents/{id}/index
 ## 📂 Repository structure
 
 ```text
-app/              FastAPI backend
-  api/            routes, dependencies, middleware
-  agents/         deterministic router, LangGraph graph, typed tools
-  discrepancy/    normalisation + the 12-rule engine
-  extraction/     Pydantic schemas, extraction service with repair pass
-  retrieval/      bm25, vector, fusion, hybrid, context budgeting, indexer
-  citations/      deterministic citation construction + verification
-  llm/            provider abstraction, Ollama client, versioned prompts
-  embeddings/     provider abstraction, Ollama embeddings
-  services/       documents, cases, compare, reviews, qa, audit, evals runner
-  models/         SQLAlchemy models
-src/              React + Vite frontend
-evals/            7 evaluation suites + generated reports
-synthetic_data/   DocFlowBench generator (seeded PDFs + ground truth)
-mcp_server/       read-only MCP tools over the existing services
-migrations/       Alembic migrations
-tests/            unit · integration · ollama-marked live tests
-docs/adr/         architecture decision records
-scripts/          bootstrap + database provisioning
+app/                          FastAPI backend
+├── api/
+│   ├── dependencies.py       lazily-built service singletons
+│   ├── main.py               app factory; every router mounted under /api
+│   └── routes/
+│       ├── audit.py          audit trail + CSV/JSON export
+│       ├── cases.py          case CRUD, pack upload, async analyses
+│       ├── compare.py        cross-document discrepancy workflow
+│       ├── documents.py      ingest, list, chunks, stored extraction
+│       ├── evals.py          read reports, launch a real benchmark run
+│       ├── health.py         /health and /ready probes
+│       ├── query.py          grounded Q&A
+│       ├── retrieval.py      search + embedding index
+│       ├── reviews.py        single and batch review decisions
+│       └── workflows.py      workflow run status and step trace
+├── agents/
+│   ├── graph.py              LangGraph compare workflow
+│   ├── router.py             deterministic query router
+│   ├── state.py              workflow state + step recording
+│   └── tools.py              typed, allowlisted tools
+├── ingestion/
+│   ├── chunking.py           structure-aware chunking
+│   ├── pipeline.py           bytes → elements → chunks
+│   ├── types.py
+│   └── parsers/              pdf · docx · text · csv · registry (MIME sniffing)
+├── extraction/
+│   ├── patterns.py           deterministic reads of labelled fields
+│   ├── schemas.py            Pydantic extraction schemas
+│   └── service.py            constrained decoding + single-field repair pass
+├── discrepancy/
+│   ├── engine.py             the 12 deterministic rules
+│   ├── evidence.py
+│   ├── models.py
+│   └── normalize.py          vendor / currency / terms normalisation
+├── retrieval/
+│   ├── bm25.py               in-process lexical search
+│   ├── vector.py             pgvector dense search
+│   ├── fusion.py             reciprocal rank fusion (k=60)
+│   ├── hybrid.py
+│   ├── context.py            context budget + dedupe
+│   ├── indexer.py            embedding indexer
+│   └── service.py
+├── citations/
+│   ├── builder.py            citations built before generation
+│   ├── models.py
+│   └── verifier.py           invented markers detected and stripped
+├── llm/
+│   ├── base.py               LLMProvider protocol + telemetry
+│   ├── ollama.py             structured outputs with corrective retry
+│   └── prompts/              versioned prompt files + registry
+├── embeddings/               provider protocol + Ollama embeddings
+├── services/
+│   ├── audit.py              read-time projection of audit events
+│   ├── audit_ledger.py       append-only hash-chained ledger
+│   ├── cases.py
+│   ├── compare.py
+│   ├── documents.py
+│   ├── evals_runner.py       spawns the real evaluation subprocess
+│   ├── hints.py
+│   ├── qa.py                 route → retrieve → cite → verify
+│   └── reviews.py
+├── models/                   SQLAlchemy models (audit, case, document, …)
+├── repositories/             data access
+├── workflows/report.py       exception report generation
+├── core/                     config, logging, exceptions
+└── db/                       engine + session
+
+src/                          React + Vite workspace
+├── App.tsx
+├── api.ts                    fetch wrapper + polling helper
+├── types.ts                  the API contract the backend matches
+├── components/               Home · Cases · Ask · Reviews · AuditTrail ·
+│                             Evaluation · SplitViewer · CommandPalette · Sidebar
+├── context/                  theme + language
+└── utils/                    export + document text helpers
+
+evals/                        7 reproducible evaluation suites
+├── common.py                 benchmark loading, report writing, metrics
+├── database.py               eval-database guard
+├── run_all.py                python -m evals.run_all
+├── extraction/run.py
+├── retrieval/run.py
+├── routing/run.py
+├── discrepancy/run.py
+├── generation/run.py
+├── workflow/run.py
+└── reports/                  generated JSON + Markdown (committed)
+
+tests/
+├── conftest.py
+├── unit/                     25 files — parsers, chunking, rules, router,
+│                             citations, ledger, extraction, evals framework
+├── integration/              10 files — live PostgreSQL: documents, cases,
+│                             compare workflow, reviews batch, audit ledger, MCP
+└── ollama/                   live-model smoke tests (excluded from CI)
+
+synthetic_data/generator/     DocFlowBench: seeded PDFs + ground truth
+mcp_server/                   read-only MCP tools over existing services
+migrations/versions/          Alembic migrations
+docs/
+├── adr/                      6 architecture decision records
+├── images/                   product screenshots used in this README
+├── mcp.md                    MCP client setup
+└── model-comparison.md       1B vs 3B head-to-head
+scripts/                      bootstrap + database provisioning
 ```
 
 ---
