@@ -9,5 +9,5 @@
 | Documents processed | 61 |
 | Extraction failure rate | 0.00% |
 | Review-task creation consistency | 100.00% |
-| Median duration | 11227.2 ms |
+| Median duration | 12766.4 ms |
 | P95 duration | None ms |

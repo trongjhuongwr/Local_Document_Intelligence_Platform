@@ -1,6 +1,6 @@
 {
   "eval": "retrieval",
-  "generated_at": "2026-08-26T04:24:35+00:00",
+  "generated_at": "2026-08-26T05:51:29+00:00",
   "cases_evaluated": 15,
   "query_count": 60,
   "top_k": 10,
@@ -15,7 +15,7 @@
       "recall_at_5": 0.9333,
       "mrr": 0.6992,
       "ndcg_at_5": 0.3419,
-      "mean_latency_ms": 16.6
+      "mean_latency_ms": 16.4
     },
     "dense": {
       "recall_at_1": 0.2333,
@@ -23,7 +23,7 @@
       "recall_at_5": 0.65,
       "mrr": 0.4083,
       "ndcg_at_5": 0.1724,
-      "mean_latency_ms": 540.0
+      "mean_latency_ms": 663.4
     },
     "hybrid": {
       "recall_at_1": 0.4167,
@@ -31,10 +31,10 @@
       "recall_at_5": 0.8833,
       "mrr": 0.5846,
       "ndcg_at_5": 0.2722,
-      "mean_latency_ms": 547.8
+      "mean_latency_ms": 617.9
     }
   },
   "recommended_default": "bm25",
   "recommendation_basis": "BM25 ties hybrid on Recall@5 while producing better Recall@1, MRR, nDCG@5, and mean latency on this benchmark.",
-  "headline": "BM25 recommended: Recall@5 0.93, MRR 0.70, 17 ms; hybrid Recall@5 0.88, MRR 0.58, 548 ms"
+  "headline": "BM25 recommended: Recall@5 0.93, MRR 0.70, 16 ms; hybrid Recall@5 0.88, MRR 0.58, 618 ms"
 }

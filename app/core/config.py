@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://docintel:docintel@localhost:5432/docintel_product"
 
     ollama_base_url: str = "http://localhost:11434"
-    ollama_llm_model: str = "llama3.2:1b"
+    ollama_llm_model: str = "llama3.2:3b"
     ollama_embedding_model: str = "all-minilm"
     ollama_num_ctx: int = 4096
     ollama_timeout_seconds: float = 120.0

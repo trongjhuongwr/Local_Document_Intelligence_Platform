@@ -86,7 +86,7 @@ def _headline(results: dict[str, Any]) -> list[str]:
     extraction = results.get("extraction")
     if extraction:
         lines.append(
-            f"- Extraction (llama3.2:1b): field accuracy "
+            f"- Extraction ({extraction.get('model', 'unknown model')}): field accuracy "
             f"**{extraction['overall_field_accuracy']:.2%}**, schema validity "
             f"**{extraction['overall_schema_valid_rate']:.2%}**"
         )

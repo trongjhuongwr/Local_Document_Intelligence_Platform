@@ -1,6 +1,6 @@
 """Eval 3 — query routing accuracy, macro F1, and confusion matrix.
 
-Scores both the LLM router (llama3.2:1b constrained classification) and the
+Scores both the LLM router (constrained classification) and the
 deterministic keyword fallback on the same labeled query set.
 """
 
@@ -10,6 +10,7 @@ from collections import defaultdict
 from typing import Any
 
 from app.agents.router import QueryRoute, QueryRouter, fallback_route
+from app.core.config import get_settings
 from app.core.exceptions import OllamaUnavailableError
 from app.llm.ollama import OllamaLLMProvider
 from evals.common import markdown_table, precision_recall_f1, write_report
@@ -141,7 +142,7 @@ async def run_routing_eval(max_cases: int | None = None, write: bool = True) -> 
     llm_scores = _score(llm_pairs)
     keyword_scores = _score(keyword_pairs)
     payload: dict[str, Any] = {
-        "model": "llama3.2:1b",
+        "model": get_settings().ollama_llm_model,
         "production_router": production_scores,
         "production_router_method_counts": dict(method_counts),
         "llm_assisted_router": assisted_scores,

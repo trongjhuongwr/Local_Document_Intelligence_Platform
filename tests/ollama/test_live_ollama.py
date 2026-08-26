@@ -1,7 +1,7 @@
 """Live smoke tests against a locally running Ollama server.
 
 Run with: pytest -m ollama
-Requires models: llama3.2:1b (LLM) and all-minilm (embeddings).
+Requires models: llama3.2:3b (LLM) and all-minilm (embeddings).
 """
 
 import pytest

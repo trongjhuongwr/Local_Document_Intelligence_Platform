@@ -1,6 +1,6 @@
 """Eval 1 — structured extraction accuracy against DocFlowBench ground truth.
 
-Runs the real extraction pipeline (PDF text -> llama3.2:1b structured output)
+Runs the real extraction pipeline (PDF text -> local LLM structured output)
 over every benchmark document and scores each field against ground truth.
 Documents whose extraction fails schema validation count every field as
 incorrect — the report reflects end-to-end pipeline reality, not just the
@@ -17,6 +17,7 @@ from typing import Any
 
 import pymupdf
 
+from app.core.config import get_settings
 from app.core.exceptions import OllamaUnavailableError, StructuredOutputValidationError
 from app.discrepancy.normalize import (
     normalize_company_name,
@@ -198,7 +199,7 @@ async def run_extraction_eval(
     ]
     payload: dict[str, Any] = {
         "cases_evaluated": len(cases),
-        "model": "llama3.2:1b",
+        "model": get_settings().ollama_llm_model,
         "overall_field_accuracy": _rate(all_field_results),
         "overall_schema_valid_rate": round(
             sum(schema_valid.values()) / max(1, sum(schema_attempts.values())), 4
@@ -226,7 +227,7 @@ async def run_extraction_eval(
     ]
     markdown = (
         "# Extraction Evaluation (DocFlowBench)\n\n"
-        f"Model: `llama3.2:1b` · Cases: {len(cases)} · "
+        f"Model: `{payload['model']}` · Cases: {len(cases)} · "
         f"Overall field accuracy: **{payload['overall_field_accuracy']:.2%}** · "
         f"Schema validity: **{payload['overall_schema_valid_rate']:.2%}**\n\n"
         + markdown_table(

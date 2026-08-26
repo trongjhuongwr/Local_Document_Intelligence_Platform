@@ -1,7 +1,7 @@
 """Eval 5 — citation quality of the end-to-end grounded Q&A pipeline.
 
 Runs the real stack (deterministic routing, the configured retrieval default,
-llama3.2:1b synthesis, deterministic citation verification) on the benchmark
+local-LLM synthesis, deterministic citation verification) on the benchmark
 query set and measures whether answers cite, whether citations resolve, and
 whether they point at the right document. Latency percentiles double as the
 performance evaluation for the Q&A path.
@@ -106,7 +106,7 @@ async def run_generation_eval(
         return round(count / total, 4) if total else 0.0
 
     payload: dict[str, Any] = {
-        "model": "llama3.2:1b",
+        "model": get_settings().ollama_llm_model,
         "queries": total,
         "queries_attempted": attempted,
         "query_completion_rate": round(total / attempted, 4) if attempted else 0.0,

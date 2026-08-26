@@ -61,7 +61,7 @@ async def test_ready_503_when_database_down(
 
 async def test_check_ollama_reports_missing_model(monkeypatch: pytest.MonkeyPatch) -> None:
     def fake_tags_response(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, json={"models": [{"name": "llama3.2:1b"}]})
+        return httpx.Response(200, json={"models": [{"name": "llama3.2:3b"}]})
 
     transport = httpx.MockTransport(fake_tags_response)
     original_client = httpx.AsyncClient
@@ -72,7 +72,7 @@ async def test_check_ollama_reports_missing_model(monkeypatch: pytest.MonkeyPatc
 
     monkeypatch.setattr(health_module.httpx, "AsyncClient", patched_client)
 
-    settings = Settings(ollama_llm_model="llama3.2:1b", ollama_embedding_model="all-minilm")
+    settings = Settings(ollama_llm_model="llama3.2:3b", ollama_embedding_model="all-minilm")
     result = await health_module.check_ollama(settings)
 
     assert result["status"] == "error"
