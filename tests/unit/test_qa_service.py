@@ -2,8 +2,8 @@ from uuid import uuid4
 
 from app.agents.router import QueryRoute, RouteDecision
 from app.llm.base import LLMResult, LLMTelemetry
-from app.retrieval.base import RetrievalMode, RetrievedChunk
-from app.services.qa import NO_EVIDENCE_ANSWER, QAService
+from app.retrieval.base import RetrievalMode, RetrievedChunk, SearchFilters
+from app.services.qa import NO_EVIDENCE_ANSWER, QAService, detect_ambiguous_scope
 
 
 def _chunk(text: str, filename: str = "service_contract.pdf") -> RetrievedChunk:
@@ -114,3 +114,56 @@ async def test_requested_retrieval_mode_is_forwarded() -> None:
 
     assert retriever.calls[0]["mode"] == RetrievalMode.DENSE
     assert result.retrieval_mode == RetrievalMode.DENSE
+
+
+# --- ambiguous-scope guardrail -------------------------------------------------
+
+
+def _chunk_from(document_id, filename: str = "service_contract.pdf") -> RetrievedChunk:
+    return RetrievedChunk(
+        chunk_id=uuid4(),
+        document_id=document_id,
+        filename=filename,
+        document_type="contract",
+        page_number=1,
+        section="Fees",
+        text="Maximum aggregate fees: USD 66,000.00",
+        score=0.9,
+        rank=1,
+        mode=RetrievalMode.BM25,
+    )
+
+
+def test_lookup_across_several_packs_is_flagged() -> None:
+    chunks = [_chunk_from(uuid4()), _chunk_from(uuid4()), _chunk_from(uuid4())]
+
+    warning = detect_ambiguous_scope(chunks, QueryRoute.STRUCTURED_LOOKUP, None)
+
+    assert warning is not None
+    assert "3 different documents" in warning
+    assert "service_contract.pdf" in warning
+
+
+def test_lookup_within_one_pack_is_not_flagged() -> None:
+    document_id = uuid4()
+    chunks = [_chunk_from(document_id), _chunk_from(document_id)]
+
+    assert detect_ambiguous_scope(chunks, QueryRoute.STRUCTURED_LOOKUP, None) is None
+
+
+def test_case_filter_removes_the_ambiguity() -> None:
+    chunks = [_chunk_from(uuid4()), _chunk_from(uuid4())]
+
+    warning = detect_ambiguous_scope(
+        chunks, QueryRoute.STRUCTURED_LOOKUP, SearchFilters(case_id="case_015")
+    )
+
+    assert warning is None
+
+
+def test_other_routes_are_not_flagged() -> None:
+    """Comparison and summarisation legitimately span packs."""
+    chunks = [_chunk_from(uuid4()), _chunk_from(uuid4())]
+
+    assert detect_ambiguous_scope(chunks, QueryRoute.DOCUMENT_COMPARE, None) is None
+    assert detect_ambiguous_scope(chunks, QueryRoute.FACTUAL_RAG, None) is None

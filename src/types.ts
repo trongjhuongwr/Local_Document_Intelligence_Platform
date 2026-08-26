@@ -221,6 +221,8 @@ export interface QueryResponse {
   context_chars: number;
   latency_ms: number;
   suggested_action?: string | null;
+  /** Set when a single-value lookup drew evidence from several document packs. */
+  scope_warning?: string | null;
 }
 
 export type RetrievalMode = 'bm25' | 'dense' | 'hybrid';
@@ -242,6 +244,7 @@ export interface ChatMessage {
     context_chars?: number;
     latency_ms?: number;
     suggested_action?: string | null;
+    scope_warning?: string | null;
   };
 }
 

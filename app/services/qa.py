@@ -38,6 +38,36 @@ NO_EVIDENCE_ANSWER = (
 MAX_ANSWER_TOKENS = 256
 
 
+def detect_ambiguous_scope(
+    chunks: list[RetrievedChunk], route: QueryRoute, filters: SearchFilters | None
+) -> str | None:
+    """Warn when a single-value lookup is answered from several document packs.
+
+    A question like "what is the maximum contract amount?" has one answer per
+    case. Asked across the whole workspace, retrieval legitimately returns the
+    same filename from several cases, each stating a different amount, and the
+    model then reports whichever one it saw first. Rather than hide that, the
+    caller is told the answer was drawn from more than one pack.
+    """
+    if route != QueryRoute.STRUCTURED_LOOKUP:
+        return None
+    if filters is not None and filters.case_id:
+        return None
+    documents_per_filename: dict[str, set[str]] = {}
+    for chunk in chunks:
+        documents_per_filename.setdefault(chunk.filename, set()).add(str(chunk.document_id))
+    ambiguous = {name: ids for name, ids in documents_per_filename.items() if len(ids) > 1}
+    if not ambiguous:
+        return None
+    count = max(len(ids) for ids in ambiguous.values())
+    names = ", ".join(sorted(ambiguous))
+    return (
+        f"This lookup drew on {count} different documents named {names} across "
+        "multiple cases, which may each state a different value. Select a single "
+        "case to get an unambiguous answer."
+    )
+
+
 class QAResult(BaseModel):
     answer: str
     route: QueryRoute
@@ -49,6 +79,7 @@ class QAResult(BaseModel):
     context_chars: int
     latency_ms: float
     suggested_action: str | None = None
+    scope_warning: str | None = None
 
 
 class QueryRetriever(Protocol):
@@ -100,6 +131,7 @@ class QAService:
         )
         context = build_context(candidates, self._budget)
         citations = build_citations(context.chunks)
+        scope_warning = detect_ambiguous_scope(context.chunks, routing.route, filters)
 
         if not context.chunks:
             result = self._finish(
@@ -145,6 +177,7 @@ class QAService:
             len(candidates),
             context.total_chars,
             started,
+            scope_warning=scope_warning,
         )
         await self._persist(result, question)
         return result
@@ -160,6 +193,7 @@ class QAService:
         retrieved_count: int,
         context_chars: int,
         started: float,
+        scope_warning: str | None = None,
     ) -> QAResult:
         latency_ms = (time.perf_counter() - started) * 1000
         suggested_action = (
@@ -173,6 +207,7 @@ class QAService:
             context_chars=context_chars,
             latency_ms=round(latency_ms, 1),
             citation_valid=verification.valid if verification else None,
+            scope_warning=bool(scope_warning),
         )
         return QAResult(
             answer=answer,
@@ -185,6 +220,7 @@ class QAService:
             context_chars=context_chars,
             latency_ms=round(latency_ms, 1),
             suggested_action=suggested_action,
+            scope_warning=scope_warning,
         )
 
     async def _persist(self, result: QAResult, question: str) -> None:

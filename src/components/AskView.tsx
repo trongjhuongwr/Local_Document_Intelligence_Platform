@@ -288,6 +288,7 @@ export function AskView({ cases, selectedCaseId, onSelectCase }: AskViewProps) {
           retrieval_mode: data.retrieval_mode,
           route: data.route,
           routing_method: data.routing_method,
+          scope_warning: data.scope_warning,
           retrieved_count: data.retrieved_count,
           context_chars: data.context_chars,
           latency_ms: data.latency_ms,
@@ -717,6 +718,12 @@ export function AskView({ cases, selectedCaseId, onSelectCase }: AskViewProps) {
                                   {msg.responseMeta.verification.unknown_citation_ids!.join(', ')}
                                 </span>
                               )}
+                            </div>
+                          )}
+
+                          {!msg.isError && msg.responseMeta?.scope_warning && (
+                            <div className="mb-2 px-2.5 py-2 rounded-lg border border-amber-300 bg-amber-50 text-[11px] text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                              {msg.responseMeta.scope_warning}
                             </div>
                           )}
 
