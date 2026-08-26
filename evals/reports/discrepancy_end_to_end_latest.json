@@ -1,16 +1,16 @@
 {
   "eval": "discrepancy_end_to_end",
-  "generated_at": "2026-08-26T03:35:03+00:00",
+  "generated_at": "2026-08-26T04:23:24+00:00",
   "mode": "end_to_end",
   "cases_evaluated": 15,
   "expected_anomalies": 14,
   "overall": {
     "tp": 12,
-    "fp": 11,
+    "fp": 7,
     "fn": 2,
-    "precision": 0.5217,
+    "precision": 0.6316,
     "recall": 0.8571,
-    "f1": 0.6486
+    "f1": 0.7273
   },
   "by_type": {
     "amount_exceeds_contract": {
@@ -47,19 +47,19 @@
     },
     "incorrect_tax_calculation": {
       "tp": 1,
-      "fp": 7,
+      "fp": 2,
       "fn": 0,
-      "precision": 0.125,
+      "precision": 0.3333,
       "recall": 1.0,
-      "f1": 0.2222
+      "f1": 0.5
     },
     "incorrect_total": {
       "tp": 1,
-      "fp": 1,
+      "fp": 2,
       "fn": 0,
-      "precision": 0.5,
+      "precision": 0.3333,
       "recall": 1.0,
-      "f1": 0.6667
+      "f1": 0.5
     },
     "invoice_date_outside_contract": {
       "tp": 0,
@@ -112,32 +112,12 @@
   },
   "mismatches": [
     {
-      "case": "case_001",
+      "case": "case_006",
       "kind": "false_positive",
-      "type": "incorrect_tax_calculation"
-    },
-    {
-      "case": "case_005",
-      "kind": "false_positive",
-      "type": "incorrect_tax_calculation"
+      "type": "incorrect_total"
     },
     {
       "case": "case_006",
-      "kind": "false_positive",
-      "type": "incorrect_tax_calculation"
-    },
-    {
-      "case": "case_007",
-      "kind": "false_positive",
-      "type": "incorrect_tax_calculation"
-    },
-    {
-      "case": "case_008",
-      "kind": "false_positive",
-      "type": "incorrect_tax_calculation"
-    },
-    {
-      "case": "case_011",
       "kind": "false_positive",
       "type": "incorrect_tax_calculation"
     },
@@ -149,12 +129,17 @@
     {
       "case": "case_012",
       "kind": "false_positive",
-      "type": "invoice_date_outside_contract"
+      "type": "inconsistent_payment_terms"
     },
     {
       "case": "case_012",
       "kind": "false_positive",
-      "type": "inconsistent_payment_terms"
+      "type": "incorrect_tax_calculation"
+    },
+    {
+      "case": "case_012",
+      "kind": "false_positive",
+      "type": "invoice_date_outside_contract"
     },
     {
       "case": "case_012",
@@ -170,11 +155,6 @@
       "case": "case_014",
       "kind": "false_positive",
       "type": "amount_exceeds_contract"
-    },
-    {
-      "case": "case_014",
-      "kind": "false_positive",
-      "type": "incorrect_tax_calculation"
     }
   ]
 }

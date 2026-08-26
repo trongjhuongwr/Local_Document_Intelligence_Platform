@@ -2,7 +2,7 @@
 
 Queries completed: 60/60 · Citations present: **90.00%** · Citations valid: **90.00%** · Correct document cited: **81.67%**
 
-Median latency: 799.3 ms · P95: 933.9 ms
+Median latency: 811.8 ms · P95: 964.5 ms
 
 | Case | Expected | Cited |
 | --- | --- | --- |

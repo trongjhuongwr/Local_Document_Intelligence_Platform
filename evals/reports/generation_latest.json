@@ -1,6 +1,6 @@
 {
   "eval": "generation",
-  "generated_at": "2026-08-26T03:37:47+00:00",
+  "generated_at": "2026-08-26T04:26:08+00:00",
   "model": "llama3.2:1b",
   "queries": 60,
   "queries_attempted": 60,
@@ -10,8 +10,8 @@
   "valid_citation_rate": 0.9,
   "correct_document_rate": 0.8167,
   "no_evidence_rate": 0.0,
-  "median_latency_ms": 799.3,
-  "p95_latency_ms": 933.9,
+  "median_latency_ms": 811.8,
+  "p95_latency_ms": 964.5,
   "note": "Unsupported-claim detection beyond citation resolution requires manual review; a sample of answers is stored in query_runs for inspection.",
   "miscited_examples": [
     {

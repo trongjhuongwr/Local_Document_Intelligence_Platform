@@ -124,22 +124,43 @@ Every number below was produced by `python -m evals.run_all --cases 15` on the h
 | Evaluation | Result | Detail |
 |---|---|---|
 | **Discrepancy rules** (perfect extraction) | **P/R/F1 = 1.00** | 14/14 ground-truth anomalies, 0 false positives |
-| **Structured extraction** (`llama3.2:1b`) | **95.7%** field accuracy · **100%** schema validity | contract 99.1% · PO 97.3% · invoice 92.2% · policy 100% · median 1.6 s/doc |
+| **Structured extraction** (`llama3.2:1b`) | **97.5%** field accuracy · **100%** schema validity | contract 99.1% · PO 97.3% · invoice 96.1% · policy 100% · median 1.6 s/doc |
 | **Retrieval** — BM25 | **Recall@5 0.93** · MRR 0.70 · **17.5 ms** | recommended default |
 | **Retrieval** — dense (pgvector) | Recall@5 0.65 · MRR 0.41 · 518 ms | |
 | **Retrieval** — hybrid RRF | Recall@5 0.88 · MRR 0.58 · 520 ms | |
 | **Query routing** | **92.5%** deterministic | LLM-assisted 82.5% · LLM-only 67.5% |
-| **Discrepancy detection, end-to-end** | P 52.2% · R 85.7% · **F1 0.65** | 12 TP / 11 FP / 2 FN across 15 cases |
+| **Discrepancy detection, end-to-end** | P 63.2% · R 85.7% · **F1 0.73** | 12 TP / 7 FP / 2 FN across 15 cases |
 | **Grounded Q&A citations** | present **90%** · valid **90%** · correct document **82%** | 60 queries · median 799 ms · p95 934 ms |
 | **Workflow success** | **15/15 completed** · review-task consistency **100%** | median 10.8 s per case · 0 extraction failures |
 
-### The two results worth discussing in an interview
+### The three results worth discussing in an interview
 
 **1. Deterministic routing beats the LLM — so the LLM was switched off.**
 The 1B model scores 67.5% on the labelled routing set (20% zero-shot, before few-shot prompting). Keyword rules score 92.5%. Even keyword-first-then-LLM lands at 82.5% — the model *degrades* an already-good decision. `ROUTER_LLM_ENABLED=false` is therefore the default, and the routing report keeps all four variants side by side as the evidence.
 
-**2. The gap between rules (F1 1.00) and end-to-end (F1 0.65) is the measured price of a 1B extractor.**
-The rules are perfect when handed perfect fields. End to end, precision falls to 52% while recall holds at 86%. With roughly 30 extracted fields per case, a single wrong field invents a finding or hides one. Because the engine is deterministic, **every end-to-end error is attributable to extraction** — a bounded, measurable component rather than a diffuse "the AI got it wrong". Swapping in a 3B model is a configuration change, and the same suite will quantify the delta.
+**2. One misleading word in a prompt cost 53 points of field accuracy — and caused most of the false alarms.**
+End-to-end precision started at 52%: 11 false findings against 12 real ones. The deterministic engine made the error attributable, so the cause could be traced instead of guessed:
+
+* 7 of the 11 false positives came from a single rule, `incorrect_tax_calculation` (precision 0.125);
+* that rule depends on one field, `tax_rate_percent`, which extracted at **47.1%** while every other invoice field scored ≥88%;
+* sampling real documents showed the model was not noisy but *biased*: it read 8% and 10% correctly and returned **10 for every 5% invoice**;
+* the prompt itself was the anchor — it said `tax_rate_percent: the percentage inside "Tax (...%)", e.g. "10"`.
+
+Removing the example and reading the labelled rate directly from the document text (`app/extraction/patterns.py`, with the model consulted only when no pattern matches) moved the measured numbers:
+
+| | before | after |
+|---|---|---|
+| `tax_rate_percent` accuracy | 47.1% | **100%** |
+| invoice numeric accuracy | 80.9% | **92.7%** |
+| extraction field accuracy | 95.7% | **97.5%** |
+| end-to-end false positives | 11 | **7** |
+| end-to-end precision | 52.2% | **63.2%** |
+| end-to-end F1 | 0.65 | **0.73** |
+
+Recall did not move (85.7% before and after), so precision was bought without trading away detection.
+
+**3. The remaining gap between rules (F1 1.00) and end-to-end (F1 0.73) is still the price of a 1B extractor.**
+The rules stay perfect when handed perfect fields. With roughly 30 extracted fields per case, a single wrong number still invents a finding or hides one, and the 7 surviving false positives trace to `subtotal`, `tax` and `total` transcription rather than to the rules. Swapping in a 3B model is a configuration change, and the same suite will quantify the delta.
 
 ---
 
@@ -253,7 +274,8 @@ POST   /api/demo/cases                   GET    /api/audit-trail
 GET    /api/documents                    GET    /api/audit-trail/export
 GET    /api/documents/{id}               GET    /api/evals
 GET    /api/documents/{id}/chunks        POST   /api/evals/run
-DELETE /api/documents/{id}               GET    /api/evals/runs/{id}
+GET    /api/documents/{id}/extraction    GET    /api/evals/runs/{id}
+DELETE /api/documents/{id}
 POST   /api/documents/{id}/index
 ```
 
@@ -309,7 +331,6 @@ Stated plainly, because a portfolio that hides its edges is not worth reading:
 * Tesseract OCR path for scanned documents.
 * CPU cross-encoder reranking behind `ENABLE_RERANKER` (scaffolded, disabled).
 * Incremental BM25 indexing and pgvector HNSW tuning for larger corpora.
-* A `GET /api/documents/{id}/extraction` endpoint so the split viewer can do field-by-field reconciliation directly.
 
 ---
 

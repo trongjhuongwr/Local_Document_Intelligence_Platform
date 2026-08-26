@@ -1,12 +1,12 @@
 {
   "eval": "extraction",
-  "generated_at": "2026-08-26T03:35:03+00:00",
+  "generated_at": "2026-08-26T04:23:24+00:00",
   "cases_evaluated": 15,
   "model": "llama3.2:1b",
-  "overall_field_accuracy": 0.9572,
+  "overall_field_accuracy": 0.9752,
   "overall_schema_valid_rate": 1.0,
-  "median_llm_latency_ms": 1643.0,
-  "p95_llm_latency_ms": 1940.1,
+  "median_llm_latency_ms": 1623.1,
+  "p95_llm_latency_ms": 1883.7,
   "by_document_type": {
     "invoice": {
       "documents": 17,
@@ -19,14 +19,14 @@
         "due_date": 0.9412,
         "currency": 1.0,
         "subtotal": 0.9412,
-        "tax_rate_percent": 0.4706,
-        "tax": 0.9412,
+        "tax_rate_percent": 1.0,
+        "tax": 0.8824,
         "total": 0.8824,
         "payment_terms": 0.9412,
         "po_reference": 1.0
       },
-      "overall_field_accuracy": 0.9216,
-      "numeric_accuracy": 0.8088,
+      "overall_field_accuracy": 0.9608,
+      "numeric_accuracy": 0.9265,
       "date_accuracy": 0.9706,
       "required_field_completeness": 1.0
     },

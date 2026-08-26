@@ -107,10 +107,10 @@
     "extraction": {
       "cases_evaluated": 15,
       "model": "llama3.2:1b",
-      "overall_field_accuracy": 0.9572,
+      "overall_field_accuracy": 0.9752,
       "overall_schema_valid_rate": 1.0,
-      "median_llm_latency_ms": 1643.0,
-      "p95_llm_latency_ms": 1940.1,
+      "median_llm_latency_ms": 1623.1,
+      "p95_llm_latency_ms": 1883.7,
       "by_document_type": {
         "invoice": {
           "documents": 17,
@@ -123,14 +123,14 @@
             "due_date": 0.9412,
             "currency": 1.0,
             "subtotal": 0.9412,
-            "tax_rate_percent": 0.4706,
-            "tax": 0.9412,
+            "tax_rate_percent": 1.0,
+            "tax": 0.8824,
             "total": 0.8824,
             "payment_terms": 0.9412,
             "po_reference": 1.0
           },
-          "overall_field_accuracy": 0.9216,
-          "numeric_accuracy": 0.8088,
+          "overall_field_accuracy": 0.9608,
+          "numeric_accuracy": 0.9265,
           "date_accuracy": 0.9706,
           "required_field_completeness": 1.0
         },
@@ -188,11 +188,11 @@
       "expected_anomalies": 14,
       "overall": {
         "tp": 12,
-        "fp": 11,
+        "fp": 7,
         "fn": 2,
-        "precision": 0.5217,
+        "precision": 0.6316,
         "recall": 0.8571,
-        "f1": 0.6486
+        "f1": 0.7273
       },
       "by_type": {
         "amount_exceeds_contract": {
@@ -229,19 +229,19 @@
         },
         "incorrect_tax_calculation": {
           "tp": 1,
-          "fp": 7,
+          "fp": 2,
           "fn": 0,
-          "precision": 0.125,
+          "precision": 0.3333,
           "recall": 1.0,
-          "f1": 0.2222
+          "f1": 0.5
         },
         "incorrect_total": {
           "tp": 1,
-          "fp": 1,
+          "fp": 2,
           "fn": 0,
-          "precision": 0.5,
+          "precision": 0.3333,
           "recall": 1.0,
-          "f1": 0.6667
+          "f1": 0.5
         },
         "invoice_date_outside_contract": {
           "tp": 0,
@@ -294,32 +294,12 @@
       },
       "mismatches": [
         {
-          "case": "case_001",
+          "case": "case_006",
           "kind": "false_positive",
-          "type": "incorrect_tax_calculation"
-        },
-        {
-          "case": "case_005",
-          "kind": "false_positive",
-          "type": "incorrect_tax_calculation"
+          "type": "incorrect_total"
         },
         {
           "case": "case_006",
-          "kind": "false_positive",
-          "type": "incorrect_tax_calculation"
-        },
-        {
-          "case": "case_007",
-          "kind": "false_positive",
-          "type": "incorrect_tax_calculation"
-        },
-        {
-          "case": "case_008",
-          "kind": "false_positive",
-          "type": "incorrect_tax_calculation"
-        },
-        {
-          "case": "case_011",
           "kind": "false_positive",
           "type": "incorrect_tax_calculation"
         },
@@ -331,12 +311,17 @@
         {
           "case": "case_012",
           "kind": "false_positive",
-          "type": "invoice_date_outside_contract"
+          "type": "inconsistent_payment_terms"
         },
         {
           "case": "case_012",
           "kind": "false_positive",
-          "type": "inconsistent_payment_terms"
+          "type": "incorrect_tax_calculation"
+        },
+        {
+          "case": "case_012",
+          "kind": "false_positive",
+          "type": "invoice_date_outside_contract"
         },
         {
           "case": "case_012",
@@ -352,11 +337,6 @@
           "case": "case_014",
           "kind": "false_positive",
           "type": "amount_exceeds_contract"
-        },
-        {
-          "case": "case_014",
-          "kind": "false_positive",
-          "type": "incorrect_tax_calculation"
         }
       ]
     },
@@ -367,7 +347,7 @@
       "embedding_model": "all-minilm",
       "corpus_documents": 61,
       "documents_ingested_or_reused": 62,
-      "chunks_newly_indexed": 258,
+      "chunks_newly_indexed": 0,
       "modes": {
         "bm25": {
           "recall_at_1": 0.5833,
@@ -375,7 +355,7 @@
           "recall_at_5": 0.9333,
           "mrr": 0.6992,
           "ndcg_at_5": 0.3419,
-          "mean_latency_ms": 17.5
+          "mean_latency_ms": 16.6
         },
         "dense": {
           "recall_at_1": 0.2333,
@@ -383,7 +363,7 @@
           "recall_at_5": 0.65,
           "mrr": 0.4083,
           "ndcg_at_5": 0.1724,
-          "mean_latency_ms": 518.2
+          "mean_latency_ms": 540.0
         },
         "hybrid": {
           "recall_at_1": 0.4167,
@@ -391,12 +371,12 @@
           "recall_at_5": 0.8833,
           "mrr": 0.5846,
           "ndcg_at_5": 0.2722,
-          "mean_latency_ms": 520.1
+          "mean_latency_ms": 547.8
         }
       },
       "recommended_default": "bm25",
       "recommendation_basis": "BM25 ties hybrid on Recall@5 while producing better Recall@1, MRR, nDCG@5, and mean latency on this benchmark.",
-      "headline": "BM25 recommended: Recall@5 0.93, MRR 0.70, 18 ms; hybrid Recall@5 0.88, MRR 0.58, 520 ms"
+      "headline": "BM25 recommended: Recall@5 0.93, MRR 0.70, 17 ms; hybrid Recall@5 0.88, MRR 0.58, 548 ms"
     },
     "routing": {
       "model": "llama3.2:1b",
@@ -627,8 +607,8 @@
       "valid_citation_rate": 0.9,
       "correct_document_rate": 0.8167,
       "no_evidence_rate": 0.0,
-      "median_latency_ms": 799.3,
-      "p95_latency_ms": 933.9,
+      "median_latency_ms": 811.8,
+      "p95_latency_ms": 964.5,
       "note": "Unsupported-claim detection beyond citation resolution requires manual review; a sample of answers is stored in query_runs for inspection.",
       "miscited_examples": [
         {
@@ -714,7 +694,7 @@
       "extraction_failure_count": 0,
       "extraction_failure_rate": 0.0,
       "review_task_creation_consistency": 1.0,
-      "median_duration_ms": 10815.9,
+      "median_duration_ms": 11227.2,
       "p95_duration_ms": null,
       "failures": [],
       "headline": "workflow completion 15/15, review-task creation consistency 100%"
