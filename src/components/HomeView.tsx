@@ -43,12 +43,14 @@ export function HomeView({
   const totalOpenFindings = cases.reduce((acc, c) => acc + (c.open_review_count || 0), 0);
   const totalDocuments = cases.reduce((acc, c) => acc + (c.document_count || 0), 0);
   
-  // Calculate average compliance rate
-  const fullyCompliantCases = cases.filter(c => (c.open_review_count === 0 && c.readiness === 'ready')).length;
-  const averageComplianceRate = totalCases > 0 ? Math.round((fullyCompliantCases / totalCases) * 100) : 100;
+  // Share of cases that hold a complete document pack with no open findings.
+  // With no cases loaded there is nothing to report, so show an em dash
+  // rather than inventing a percentage.
+  const fullyCompliantCases = cases.filter(c => c.open_review_count === 0 && c.readiness === 'complete').length;
+  const averageComplianceRate = totalCases > 0 ? Math.round((fullyCompliantCases / totalCases) * 100) : null;
 
   // Breakdown by readiness status
-  const readyCases = cases.filter(c => c.readiness === 'ready').length;
+  const readyCases = cases.filter(c => c.readiness === 'complete').length;
 
   const steps = [
     {
@@ -71,8 +73,8 @@ export function HomeView({
     },
     {
       num: '4',
-      title: lang === 'vi' ? '4. Ký Số Chứng Thực & Xuất Hồ Sơ' : '4. Attestation & Formal Export',
-      desc: lang === 'vi' ? 'Kiểm toán viên ký duyệt vào Sổ cái và xuất hồ sơ báo cáo PDF/CSV' : 'Sign immutable audit ledger and export executive dossier reports',
+      title: lang === 'vi' ? '4. Chứng Thực & Xuất Hồ Sơ' : '4. Attestation & Export',
+      desc: lang === 'vi' ? 'Kiểm toán viên ký duyệt và xuất hồ sơ báo cáo PDF/CSV' : 'Record an auditor sign-off and export the dossier as PDF/CSV',
       icon: CheckCircle2,
     },
   ];
@@ -174,7 +176,9 @@ export function HomeView({
               {t.home.statComplianceTitle}
             </span>
             <div className="mt-1 flex items-baseline gap-2">
-              <span className="text-2xl font-black text-neutral-900 dark:text-white">{averageComplianceRate}%</span>
+              <span className="text-2xl font-black text-neutral-900 dark:text-white">
+                {averageComplianceRate === null ? '—' : `${averageComplianceRate}%`}
+              </span>
               <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">{lang === 'vi' ? 'chuẩn hóa' : 'verified'}</span>
             </div>
           </div>

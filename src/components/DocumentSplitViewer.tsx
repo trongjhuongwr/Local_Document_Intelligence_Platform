@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { CaseDocument, Discrepancy, DocumentType, ReviewFinding } from '../types';
+import { errorMessage } from '../api';
+import { LoadedDocument, loadDocument } from '../utils/documentText';
 import { SeverityBadge } from './StatusBadges';
 import { 
   X, 
@@ -102,11 +104,15 @@ export function DocumentSplitViewer({
     }
   }, [finding, documents]);
 
-  // Loaded full document content state
-  const [leftDocData, setLeftDocData] = useState<any>(null);
-  const [rightDocData, setRightDocData] = useState<any>(null);
+  // Loaded document metadata + parsed text (reassembled from indexed chunks)
+  const [leftDoc, setLeftDoc] = useState<LoadedDocument | null>(null);
+  const [rightDoc, setRightDoc] = useState<LoadedDocument | null>(null);
+  const [leftError, setLeftError] = useState<string | null>(null);
+  const [rightError, setRightError] = useState<string | null>(null);
   const [loadingLeft, setLoadingLeft] = useState(false);
   const [loadingRight, setLoadingRight] = useState(false);
+  const leftDocData = leftDoc?.detail ?? null;
+  const rightDocData = rightDoc?.detail ?? null;
 
   // Layout & Viewing Mode
   const [layoutRatio, setLayoutRatio] = useState<'50-50' | '65-35' | '35-65' | 'stacked'>('50-50');
@@ -125,26 +131,52 @@ export function DocumentSplitViewer({
   const rightScrollRef = useRef<HTMLDivElement>(null);
   const isSyncingRef = useRef(false);
 
-  // Fetch Left Document full details
+  // Fetch left document metadata + parsed text
   useEffect(() => {
     if (!leftDocId) return;
+    let cancelled = false;
     setLoadingLeft(true);
-    fetch(`/api/documents/${leftDocId}`)
-      .then(res => res.json())
-      .then(data => setLeftDocData(data))
-      .catch(console.error)
-      .finally(() => setLoadingLeft(false));
+    setLeftError(null);
+    loadDocument(leftDocId)
+      .then(data => {
+        if (!cancelled) setLeftDoc(data);
+      })
+      .catch(err => {
+        if (!cancelled) {
+          setLeftDoc(null);
+          setLeftError(errorMessage(err));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingLeft(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [leftDocId]);
 
-  // Fetch Right Document full details
+  // Fetch right document metadata + parsed text
   useEffect(() => {
     if (!rightDocId) return;
+    let cancelled = false;
     setLoadingRight(true);
-    fetch(`/api/documents/${rightDocId}`)
-      .then(res => res.json())
-      .then(data => setRightDocData(data))
-      .catch(console.error)
-      .finally(() => setLoadingRight(false));
+    setRightError(null);
+    loadDocument(rightDocId)
+      .then(data => {
+        if (!cancelled) setRightDoc(data);
+      })
+      .catch(err => {
+        if (!cancelled) {
+          setRightDoc(null);
+          setRightError(errorMessage(err));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingRight(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [rightDocId]);
 
   // Handle Sync Scroll
@@ -240,10 +272,73 @@ export function DocumentSplitViewer({
     );
   };
 
-  // Structured Schema comparison matrix keys
-  const leftSchema = leftDocData?.extracted_data || {};
-  const rightSchema = rightDocData?.extracted_data || {};
-  const allSchemaKeys = Array.from(new Set([...Object.keys(leftSchema), ...Object.keys(rightSchema)]));
+  // Reconciliation rows.
+  //
+  // The API exposes no per-document extracted-field endpoint, so the only real
+  // field-level comparison available is the one the discrepancy engine already
+  // computed and attached to the finding. When a finding is open, show its
+  // actual expected/observed values and per-document evidence snippets;
+  // otherwise fall back to comparing the document metadata the API does return.
+  const comparisonRows: Array<{ label: string; left: string; right: string; mismatch: boolean }> = [];
+
+  if (finding) {
+    const leftEv = finding.evidence?.find(e => e.filename === leftDocData?.filename);
+    const rightEv = finding.evidence?.find(e => e.filename === rightDocData?.filename);
+    const asText = (value: unknown) =>
+      value === null || value === undefined
+        ? '—'
+        : typeof value === 'object'
+          ? JSON.stringify(value)
+          : String(value);
+
+    if (finding.field) {
+      comparisonRows.push({
+        label: 'field',
+        left: finding.field,
+        right: finding.field,
+        mismatch: false,
+      });
+    }
+    comparisonRows.push({
+      label: 'expected vs observed',
+      left: asText(finding.expected_value),
+      right: asText(finding.observed_value),
+      mismatch: asText(finding.expected_value) !== asText(finding.observed_value),
+    });
+    if (finding.difference !== null && finding.difference !== undefined) {
+      comparisonRows.push({
+        label: 'difference',
+        left: asText(finding.difference),
+        right: '',
+        mismatch: true,
+      });
+    }
+    if (leftEv?.snippet || rightEv?.snippet) {
+      comparisonRows.push({
+        label: 'evidence snippet',
+        left: leftEv?.snippet || '—',
+        right: rightEv?.snippet || '—',
+        mismatch: false,
+      });
+    }
+  } else if (leftDocData && rightDocData) {
+    const rows: Array<[string, unknown, unknown]> = [
+      ['document type', leftDocData.document_type, rightDocData.document_type],
+      ['status', leftDocData.status, rightDocData.status],
+      ['pages', leftDocData.page_count ?? '—', rightDocData.page_count ?? '—'],
+      ['chunks indexed', leftDocData.chunk_count, rightDocData.chunk_count],
+      ['size (KB)', (leftDocData.size_bytes / 1024).toFixed(1), (rightDocData.size_bytes / 1024).toFixed(1)],
+      ['parser version', leftDocData.parser_version, rightDocData.parser_version],
+    ];
+    for (const [label, l, r] of rows) {
+      comparisonRows.push({
+        label,
+        left: String(l),
+        right: String(r),
+        mismatch: String(l) !== String(r),
+      });
+    }
+  }
 
   return (
     <div className={`fixed inset-0 bg-neutral-950/75 backdrop-blur-xs z-50 flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-150`}>
@@ -279,7 +374,7 @@ export function DocumentSplitViewer({
                 className={`px-2.5 py-1 rounded-md font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
                   viewMode === 'comparison' ? 'bg-neutral-700 text-white shadow-2xs' : 'text-neutral-400 hover:text-neutral-200'
                 }`}
-                title="Structured Matrix & Text Dual View"
+                title="Reconciliation table plus document text"
               >
                 <Table className="w-3.5 h-3.5 text-emerald-400" />
                 <span>Matrix &amp; Text</span>
@@ -299,10 +394,10 @@ export function DocumentSplitViewer({
                 className={`px-2.5 py-1 rounded-md font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
                   viewMode === 'schema' ? 'bg-neutral-700 text-white shadow-2xs' : 'text-neutral-400 hover:text-neutral-200'
                 }`}
-                title="Extracted Schema Fields Comparison"
+                title="Reconciliation table only (discrepancy values, or document metadata when no finding is open)"
               >
                 <FileCode className="w-3.5 h-3.5 text-amber-400" />
-                <span>Schema Only</span>
+                <span>Table Only</span>
               </button>
             </div>
 
@@ -467,16 +562,16 @@ export function DocumentSplitViewer({
           </div>
         )}
 
-        {/* Comparative Schema Matrix (Shown in 'comparison' and 'schema' viewModes) */}
-        {(viewMode === 'comparison' || viewMode === 'schema') && allSchemaKeys.length > 0 && (
+        {/* Reconciliation table (shown in 'comparison' and 'schema' viewModes) */}
+        {(viewMode === 'comparison' || viewMode === 'schema') && comparisonRows.length > 0 && (
           <div className="bg-neutral-50 border-b border-neutral-200 p-3 max-h-48 overflow-y-auto shrink-0 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-[10px] uppercase font-bold tracking-wider text-neutral-500 flex items-center gap-1">
                 <Table className="w-3 h-3 text-neutral-600" />
-                Cross-Document Schema Reconciliation Matrix
+                {finding ? 'Discrepancy Reconciliation' : 'Document Metadata Comparison'}
               </span>
               <span className="text-[10px] text-neutral-400">
-                Comparing fields from {leftDocData?.filename || 'Doc 1'} vs {rightDocData?.filename || 'Doc 2'}
+                {leftDocData?.filename || 'Left document'} vs {rightDocData?.filename || 'Right document'}
               </span>
             </div>
 
@@ -484,7 +579,7 @@ export function DocumentSplitViewer({
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-neutral-100/70 border-b border-neutral-200 text-neutral-700 font-bold">
-                    <th className="py-1.5 px-3 w-1/3">Field Name</th>
+                    <th className="py-1.5 px-3 w-1/3">{finding ? 'Attribute' : 'Field'}</th>
                     <th className="py-1.5 px-3 w-1/3 border-l border-neutral-200 truncate">
                       {leftDocData?.filename || 'Left Document'}
                     </th>
@@ -494,27 +589,23 @@ export function DocumentSplitViewer({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100 font-mono text-[11px]">
-                  {allSchemaKeys.slice(0, 10).map(key => {
-                    const lVal = leftSchema[key];
-                    const rVal = rightSchema[key];
-                    const hasBoth = lVal !== undefined && rVal !== undefined;
-                    const isMismatch = hasBoth && String(lVal).trim() !== String(rVal).trim();
-
-                    return (
-                      <tr key={key} className={isMismatch ? 'bg-amber-50/60 font-semibold' : 'hover:bg-neutral-50'}>
-                        <td className="py-1.5 px-3 font-sans font-medium text-neutral-700 flex items-center gap-1.5">
-                          {isMismatch && <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />}
-                          <span className="capitalize">{key.replace(/_/g, ' ')}</span>
-                        </td>
-                        <td className="py-1.5 px-3 border-l border-neutral-100 text-neutral-900 truncate">
-                          {lVal !== undefined ? String(typeof lVal === 'object' ? JSON.stringify(lVal) : lVal) : <span className="text-neutral-300 font-sans italic">Not in doc</span>}
-                        </td>
-                        <td className="py-1.5 px-3 border-l border-neutral-100 text-neutral-900 truncate">
-                          {rVal !== undefined ? String(typeof rVal === 'object' ? JSON.stringify(rVal) : rVal) : <span className="text-neutral-300 font-sans italic">Not in doc</span>}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {comparisonRows.map(row => (
+                    <tr
+                      key={row.label}
+                      className={row.mismatch ? 'bg-amber-50/60 font-semibold' : 'hover:bg-neutral-50'}
+                    >
+                      <td className="py-1.5 px-3 font-sans font-medium text-neutral-700 flex items-center gap-1.5">
+                        {row.mismatch && <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />}
+                        <span className="capitalize">{row.label}</span>
+                      </td>
+                      <td className="py-1.5 px-3 border-l border-neutral-100 text-neutral-900 truncate" title={row.left}>
+                        {row.left}
+                      </td>
+                      <td className="py-1.5 px-3 border-l border-neutral-100 text-neutral-900 truncate" title={row.right}>
+                        {row.right}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -581,8 +672,10 @@ export function DocumentSplitViewer({
             >
               {loadingLeft ? (
                 <div className="p-8 text-center text-neutral-400 font-sans">Loading left document...</div>
+              ) : leftError ? (
+                <div className="p-8 text-center text-rose-600 font-sans break-words">{leftError}</div>
               ) : (
-                renderHighlightedText(leftDocData?.text_content || '', leftSearch, leftEvidenceSnippet)
+                renderHighlightedText(leftDoc?.text || '', leftSearch, leftEvidenceSnippet)
               )}
             </div>
 
@@ -592,7 +685,7 @@ export function DocumentSplitViewer({
                 <span>SHA: {leftDocData.sha256?.slice(0, 12)}... · {(leftDocData.size_bytes / 1024).toFixed(1)} KB</span>
                 <button
                   onClick={() => {
-                    navigator.clipboard.writeText(leftDocData.text_content || '');
+                    navigator.clipboard.writeText(leftDoc?.text || '');
                     setCopiedLeft(true);
                     setTimeout(() => setCopiedLeft(false), 2000);
                   }}
@@ -660,8 +753,10 @@ export function DocumentSplitViewer({
             >
               {loadingRight ? (
                 <div className="p-8 text-center text-neutral-400 font-sans">Loading right document...</div>
+              ) : rightError ? (
+                <div className="p-8 text-center text-rose-600 font-sans break-words">{rightError}</div>
               ) : (
-                renderHighlightedText(rightDocData?.text_content || '', rightSearch, rightEvidenceSnippet)
+                renderHighlightedText(rightDoc?.text || '', rightSearch, rightEvidenceSnippet)
               )}
             </div>
 
@@ -671,7 +766,7 @@ export function DocumentSplitViewer({
                 <span>SHA: {rightDocData.sha256?.slice(0, 12)}... · {(rightDocData.size_bytes / 1024).toFixed(1)} KB</span>
                 <button
                   onClick={() => {
-                    navigator.clipboard.writeText(rightDocData.text_content || '');
+                    navigator.clipboard.writeText(rightDoc?.text || '');
                     setCopiedRight(true);
                     setTimeout(() => setCopiedRight(false), 2000);
                   }}

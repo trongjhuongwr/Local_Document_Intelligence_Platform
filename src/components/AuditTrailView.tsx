@@ -25,7 +25,8 @@ import {
   ChevronRight,
   Sparkles
 } from 'lucide-react';
-import { AuditTrailEntry, CaseItem, AuditAction } from '../types';
+import { AuditTrailEntry, AuditTrailResponse, CaseItem, AuditAction } from '../types';
+import { apiGet, apiPost, errorMessage, isNotImplemented } from '../api';
 import { useThemeLanguage } from '../context/ThemeLanguageContext';
 
 interface AuditTrailViewProps {
@@ -44,8 +45,11 @@ export function AuditTrailView({
   const { lang, t } = useThemeLanguage();
   const [entries, setEntries] = useState<AuditTrailEntry[]>([]);
   const [totalRecords, setTotalRecords] = useState(0);
-  const [chainValid, setChainValid] = useState(true);
+  const [chainValid, setChainValid] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [chainNote, setChainNote] = useState<string | null>(null);
+  const [chainAlgorithm, setChainAlgorithm] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterAction, setFilterAction] = useState<string>('ALL');
   const [activeCaseFilter, setActiveCaseFilter] = useState<string>(selectedCaseId || 'ALL');
@@ -53,7 +57,7 @@ export function AuditTrailView({
   
   // Attestation modal
   const [attestationModalOpen, setAttestationModalOpen] = useState(false);
-  const [attestActor, setAttestActor] = useState(lang === 'vi' ? 'Trưởng nhóm Kiểm toán viên (Tuân thủ SOX)' : 'Senior Lead Auditor (SOX Compliance)');
+  const [attestActor, setAttestActor] = useState(lang === 'vi' ? 'Kiểm toán viên phụ trách' : 'Lead Auditor');
   const [attestCaseId, setAttestCaseId] = useState(selectedCaseId || (cases[0]?.case_id || ''));
   const [attestDetails, setAttestDetails] = useState('');
   const [submittingAttest, setSubmittingAttest] = useState(false);
@@ -67,6 +71,7 @@ export function AuditTrailView({
 
   const fetchAuditTrail = () => {
     setLoading(true);
+    setLoadError(null);
     const params = new URLSearchParams();
     if (activeCaseFilter && activeCaseFilter !== 'ALL') {
       params.append('case_id', activeCaseFilter);
@@ -79,15 +84,21 @@ export function AuditTrailView({
     }
     params.append('limit', '200');
 
-    fetch(`/api/audit-trail?${params.toString()}`)
-      .then(res => res.json())
+    apiGet<AuditTrailResponse>(`/api/audit-trail?${params.toString()}`)
       .then(data => {
         setEntries(data.entries || []);
         setTotalRecords(data.total || 0);
-        setChainValid(data.chain_valid !== false);
+        // Only claim the hash chain is valid when the backend says so.
+        setChainValid(data.chain_valid === true);
+        setChainNote(data.chain_note ?? null);
+        setChainAlgorithm(data.chain_algorithm ?? null);
       })
       .catch(err => {
-        console.error('Failed to fetch audit trail:', err);
+        // Honest empty state: no synthesised ledger entries, ever.
+        setEntries([]);
+        setTotalRecords(0);
+        setChainValid(false);
+        setLoadError(isNotImplemented(err) ? t.common.endpointMissing : errorMessage(err));
       })
       .finally(() => setLoading(false));
   };
@@ -116,29 +127,20 @@ export function AuditTrailView({
 
     setSubmittingAttest(true);
     try {
-      const res = await fetch('/api/audit-trail', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          case_id: attestCaseId || undefined,
-          actor: attestActor.trim(),
-          details: attestDetails.trim(),
-          metadata: {
-            standard: 'SOX-404-Attestation',
-            attestation_scope: 'Financial & Contractual Discrepancy Reconciliation',
-          },
-        }),
+      await apiPost('/api/audit-trail', {
+        case_id: attestCaseId || undefined,
+        actor: attestActor.trim(),
+        details: attestDetails.trim(),
+        metadata: {
+          attestation_scope: 'Financial & contractual discrepancy reconciliation',
+        },
       });
-
-      if (res.ok) {
-        showToast(lang === 'vi' ? 'Đã ghi nhận chứng thực tuân thủ vào sổ cái mã hóa' : 'Compliance attestation cryptographically recorded to ledger');
-        setAttestDetails('');
-        setAttestationModalOpen(false);
-        fetchAuditTrail();
-      }
+      showToast(lang === 'vi' ? 'Đã ghi nhận chứng thực vào sổ cái' : 'Attestation recorded to the ledger');
+      setAttestDetails('');
+      setAttestationModalOpen(false);
+      fetchAuditTrail();
     } catch (err) {
-      console.error(err);
-      showToast(lang === 'vi' ? 'Lỗi khi ghi nhận chứng thực' : 'Error recording attestation');
+      showToast(isNotImplemented(err) ? t.common.endpointMissing : errorMessage(err));
     } finally {
       setSubmittingAttest(false);
     }
@@ -167,6 +169,12 @@ export function AuditTrailView({
         return { label: lang === 'vi' ? 'Xử lý hàng loạt' : 'Batch Action', bg: 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800', icon: Layers };
       case 'CASE_CREATED':
         return { label: lang === 'vi' ? 'Tạo hồ sơ' : 'Case Created', bg: 'bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 border-neutral-200 dark:border-neutral-700', icon: FolderOpen };
+      case 'WORKFLOW_FAILED':
+        return { label: lang === 'vi' ? 'Kiểm toán thất bại' : 'Audit Failed', bg: 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800', icon: XCircle };
+      case 'QUERY_EXECUTED':
+        return { label: lang === 'vi' ? 'Truy vấn hỏi đáp' : 'Query Executed', bg: 'bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800', icon: Search };
+      case 'FINDING_FLAGGED':
+        return { label: lang === 'vi' ? 'Ghi nhận bất thường' : 'Finding Flagged', bg: 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800', icon: AlertCircle };
       case 'MANUAL_ATTESTATION':
         return { label: lang === 'vi' ? 'Xác nhận kiểm toán' : 'Auditor Sign-off', bg: 'bg-emerald-100 dark:bg-emerald-900/60 text-emerald-900 dark:text-emerald-200 border-emerald-300 dark:border-emerald-700 font-bold', icon: ShieldCheck };
       default:
@@ -195,9 +203,9 @@ export function AuditTrailView({
               <div>
                 <h1 className="text-xl font-bold text-neutral-900 dark:text-white flex items-center gap-2">
                   {t.audit.title}
-                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                    SOX 404 & ISO 27001
+                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700 font-mono">
+                    <KeyRound className="w-3.5 h-3.5 text-neutral-500 dark:text-neutral-400" />
+                    SHA-256
                   </span>
                 </h1>
                 <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
@@ -254,11 +262,14 @@ export function AuditTrailView({
               <div>
                 <p className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">{t.audit.cryptoIntegrity}</p>
                 <p className="text-xs font-bold text-neutral-900 dark:text-white">
-                  {chainValid ? t.audit.chainValid : t.audit.chainInvalid}
+                  {loadError ? '—' : chainValid ? t.audit.chainValid : t.audit.chainInvalid}
                 </p>
               </div>
             </div>
-            <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-300">
+            <span
+              className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-300 cursor-help"
+              title={chainNote ?? undefined}
+            >
               SHA-256
             </span>
           </div>
@@ -270,11 +281,13 @@ export function AuditTrailView({
               </div>
               <div>
                 <p className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">{t.audit.totalEvents}</p>
-                <p className="text-xs font-bold text-neutral-900 dark:text-white">{totalRecords} {lang === 'vi' ? 'Bản ghi bất biến' : 'Immutable Records'}</p>
+                <p className="text-xs font-bold text-neutral-900 dark:text-white">
+                  {totalRecords} {lang === 'vi' ? 'sự kiện' : 'events'}
+                </p>
               </div>
             </div>
             <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-              {lang === 'vi' ? 'Sổ cái đang ghi' : 'Ledger Active'}
+              {lang === 'vi' ? 'Theo bộ lọc' : 'Matching filters'}
             </span>
           </div>
 
@@ -285,14 +298,25 @@ export function AuditTrailView({
               </div>
               <div>
                 <p className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">{t.audit.complianceStandard}</p>
-                <p className="text-xs font-bold text-neutral-900 dark:text-white">SOX 404 & ISO/IEC 27001</p>
+                <p className="text-xs font-bold text-neutral-900 dark:text-white font-mono">
+                  {chainAlgorithm ?? 'sha256'}
+                </p>
               </div>
             </div>
             <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
-              {lang === 'vi' ? 'Được kiểm toán' : 'Auditable'}
+              {lang === 'vi' ? 'Tính khi đọc' : 'Computed on read'}
             </span>
           </div>
         </div>
+
+        {/* The backend's own statement of what this digest does and does not
+            guarantee. Shown verbatim so the UI never overstates it. */}
+        {chainNote && (
+          <div className="mt-3 p-3 rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-[11px] text-amber-900 dark:text-amber-300 flex items-start gap-2">
+            <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+            <span className="leading-relaxed">{chainNote}</span>
+          </div>
+        )}
 
         {/* Filter Controls Bar */}
         <div className="mt-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
@@ -343,7 +367,11 @@ export function AuditTrailView({
             >
               <option value="ALL">{t.audit.allActions}</option>
               <option value="DOCUMENT_INGESTED">{lang === 'vi' ? 'Nạp tài liệu' : 'Document Ingested'}</option>
+              <option value="WORKFLOW_STARTED">{lang === 'vi' ? 'Bắt đầu kiểm toán' : 'Workflow Started'}</option>
               <option value="WORKFLOW_COMPLETED">{lang === 'vi' ? 'Hoàn tất kiểm toán' : 'Workflow Completed'}</option>
+              <option value="WORKFLOW_FAILED">{lang === 'vi' ? 'Kiểm toán thất bại' : 'Workflow Failed'}</option>
+              <option value="QUERY_EXECUTED">{lang === 'vi' ? 'Truy vấn hỏi đáp' : 'Query Executed'}</option>
+              <option value="FINDING_FLAGGED">{lang === 'vi' ? 'Ghi nhận bất thường' : 'Finding Flagged'}</option>
               <option value="FINDING_APPROVED">{lang === 'vi' ? 'Phê duyệt bất thường' : 'Finding Approved'}</option>
               <option value="FINDING_REJECTED">{lang === 'vi' ? 'Bác bỏ bất thường' : 'Finding Rejected'}</option>
               <option value="MANUAL_ATTESTATION">{lang === 'vi' ? 'Xác nhận kiểm toán viên' : 'Auditor Sign-off'}</option>
@@ -359,6 +387,23 @@ export function AuditTrailView({
           <div className="flex flex-col items-center justify-center h-64 text-neutral-400 gap-3">
             <RefreshCw className="w-6 h-6 animate-spin text-neutral-900 dark:text-white" />
             <p className="text-xs font-medium">{lang === 'vi' ? 'Đang xác minh chuỗi băm mã hóa & tải dữ liệu sổ cái...' : 'Verifying cryptographic hash chain & loading ledger...'}</p>
+          </div>
+        ) : loadError ? (
+          <div className="bg-white dark:bg-neutral-900 rounded-2xl border border-rose-200 dark:border-rose-800 p-12 text-center max-w-lg mx-auto mt-8 space-y-3">
+            <ShieldAlert className="w-10 h-10 text-rose-400 mx-auto" />
+            <h3 className="text-sm font-bold text-rose-800 dark:text-rose-300">{t.common.apiUnavailable}</h3>
+            <p className="text-xs text-neutral-600 dark:text-neutral-400 break-words">{loadError}</p>
+            <p className="text-[11px] text-neutral-400 dark:text-neutral-500">
+              {lang === 'vi'
+                ? 'Không hiển thị dữ liệu sổ cái nào cho tới khi API trả về bản ghi thật.'
+                : 'No ledger data is shown until the API returns real records.'}
+            </p>
+            <button
+              onClick={fetchAuditTrail}
+              className="px-3.5 py-2 rounded-xl bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 text-xs font-semibold cursor-pointer"
+            >
+              {t.common.retry}
+            </button>
           </div>
         ) : entries.length === 0 ? (
           <div className="bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800 p-12 text-center max-w-lg mx-auto mt-8">
@@ -553,18 +598,18 @@ export function AuditTrailView({
                 </div>
               </div>
 
-              {/* Cryptographic Ledger Hashes */}
+              {/* SHA-256 digests computed over the projected event sequence */}
               <div>
                 <label className="block text-[11px] font-bold uppercase text-neutral-500 dark:text-neutral-400 tracking-wider mb-1">
-                  {lang === 'vi' ? 'Tính toàn vẹn Mã hóa (Chuỗi Khối Bất biến SOX 404)' : 'Cryptographic Integrity (SOX 404 Immutable Blockchain Chain)'}
+                  {lang === 'vi' ? 'Giá trị băm toàn vẹn (SHA-256)' : 'Integrity Digest (SHA-256)'}
                 </label>
                 <div className="p-3 bg-neutral-900 dark:bg-neutral-950 text-neutral-200 rounded-xl font-mono text-[11px] space-y-2 border border-neutral-800">
                   <div>
-                    <span className="text-neutral-400 block text-[10px]">CURRENT BLOCK SHA-256 SIGNATURE:</span>
+                    <span className="text-neutral-400 block text-[10px]">THIS EVENT'S DIGEST:</span>
                     <span className="text-emerald-400 break-all">{selectedEntry.integrity_hash}</span>
                   </div>
                   <div className="pt-2 border-t border-neutral-800">
-                    <span className="text-neutral-400 block text-[10px]">PREVIOUS BLOCK SHA-256 LINK:</span>
+                    <span className="text-neutral-400 block text-[10px]">PRECEDING EVENT'S DIGEST:</span>
                     <span className="text-amber-400 break-all">{selectedEntry.prev_hash}</span>
                   </div>
                 </div>
@@ -586,7 +631,10 @@ export function AuditTrailView({
             {/* Modal Footer */}
             <div className="px-6 py-3 bg-neutral-50 dark:bg-neutral-850 border-t border-neutral-200 dark:border-neutral-800 flex items-center justify-between">
               <span className="text-[11px] text-neutral-500 dark:text-neutral-400 flex items-center gap-1">
-                <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> {lang === 'vi' ? 'Bản ghi chống can thiệp đã được xác thực' : 'Tamper-evident ledger entry'}
+                <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />{' '}
+                {lang === 'vi'
+                  ? 'Giá trị băm được tính lại ở mỗi lần đọc'
+                  : 'Digest recomputed on every read'}
               </span>
               <button
                 onClick={() => setSelectedEntry(null)}
@@ -676,8 +724,8 @@ export function AuditTrailView({
                   <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
                   <p>
                     {lang === 'vi'
-                      ? 'Sau khi gửi, chứng thực này sẽ được băm SHA-256 và gắn vĩnh viễn vào nhật ký tuân thủ SOX. Bản ghi không thể bị thay đổi hoặc xóa bỏ.'
-                      : 'Once submitted, this attestation will be hashed with SHA-256 and immutably appended to the SOX compliance audit trail. It cannot be altered or deleted.'}
+                      ? 'Sau khi gửi, chứng thực được lưu vào cơ sở dữ liệu và xuất hiện trong nhật ký kiểm toán dưới dạng sự kiện MANUAL_ATTESTATION, kèm giá trị băm SHA-256 tính trên chuỗi sự kiện.'
+                      : 'Once submitted, the attestation is stored in the database and appears in the audit trail as a MANUAL_ATTESTATION event, covered by the SHA-256 digest computed over the event sequence.'}
                   </p>
                 </div>
               </div>

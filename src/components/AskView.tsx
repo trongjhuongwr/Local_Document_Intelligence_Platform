@@ -6,7 +6,10 @@ import {
   ChatMessage,
   QueryCitation,
   QueryResponse,
+  RetrievalMode,
 } from '../types';
+import { apiPost, errorMessage } from '../api';
+import { loadDocument } from '../utils/documentText';
 import {
   Send,
   Sparkles,
@@ -51,6 +54,22 @@ interface AskViewProps {
   cases: CaseItem[];
   selectedCaseId: string | null;
   onSelectCase: (caseId: string | null) => void;
+}
+
+/**
+ * The backend embeds citation markers like `[C1]` in the answer text and
+ * returns a matching `citations` map keyed by the same marker. Rewrite each
+ * marker that actually resolves into a markdown link so it can be rendered as
+ * a clickable chip; unresolvable markers are left as plain text.
+ */
+function linkCitationMarkers(
+  answer: string,
+  citations?: Record<string, QueryCitation>
+): string {
+  if (!citations || Object.keys(citations).length === 0) return answer;
+  return answer.replace(/\[(C\d+)\]/g, (whole, marker: string) =>
+    citations[marker] ? `[[${marker}]](#cite-${marker})` : whole
+  );
 }
 
 export function AskView({ cases, selectedCaseId, onSelectCase }: AskViewProps) {
@@ -133,9 +152,10 @@ export function AskView({ cases, selectedCaseId, onSelectCase }: AskViewProps) {
   ];
 
   const [searchAllCases, setSearchAllCases] = useState(false);
-  const [retrievalMode, setRetrievalMode] = useState<'bm25' | 'hybrid' | 'dense'>('bm25');
+  const [retrievalMode, setRetrievalMode] = useState<RetrievalMode>('bm25');
   const [inputQuestion, setInputQuestion] = useState('');
   const [loading, setLoading] = useState(false);
+  const [elapsedMs, setElapsedMs] = useState(0);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
   // Side Inspector Panel State
@@ -146,6 +166,9 @@ export function AskView({ cases, selectedCaseId, onSelectCase }: AskViewProps) {
   } | null>(null);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [selectedDocPreview, setSelectedDocPreview] = useState<CaseDocument | null>(null);
+  const [docPreviewText, setDocPreviewText] = useState<string | null>(null);
+  const [docPreviewError, setDocPreviewError] = useState<string | null>(null);
+  const [loadingDocPreview, setLoadingDocPreview] = useState(false);
   const [splitViewerOpen, setSplitViewerOpen] = useState(false);
   const [splitViewerDocs, setSplitViewerDocs] = useState<CaseDocument[]>([]);
 
@@ -237,35 +260,27 @@ export function AskView({ cases, selectedCaseId, onSelectCase }: AskViewProps) {
       textareaRef.current.style.height = 'auto';
     }
     setLoading(true);
+    setElapsedMs(0);
+    const startedAt = Date.now();
+    const ticker = setInterval(() => setElapsedMs(Date.now() - startedAt), 100);
 
     try {
-      // Build history payload for Gemini context
-      const historyPayload = newMessages.slice(-6).map(m => ({
-        role: m.role,
-        content: m.content,
-      }));
-
-      const res = await fetch('/api/query', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          question: text,
-          mode: retrievalMode,
-          filters: searchAllCases ? {} : { case_id: selectedCaseId || undefined },
-          history: historyPayload,
-        }),
+      // POST /api/query takes a QueryRequest: {question, mode, top_k, filters}.
+      // A grounded answer on the local 1B model typically takes 1-5s.
+      const data = await apiPost<QueryResponse>('/api/query', {
+        question: text,
+        mode: retrievalMode,
+        filters: searchAllCases || !selectedCaseId ? null : { case_id: selectedCaseId },
       });
-
-      if (!res.ok) {
-        throw new Error(lang === 'vi' ? 'Không thể truy vấn công cụ phân tích tài liệu' : 'Failed to query document intelligence engine');
-      }
-
-      const data: QueryResponse = await res.json();
 
       const assistantMessage: ChatMessage = {
         id: 'msg_' + (Date.now() + 1),
         role: 'assistant',
-        content: data.answer || (lang === 'vi' ? 'Không thể thiết lập câu trả lời từ các tài liệu hiện có.' : 'No answer could be formulated from the available documents.'),
+        content:
+          data.answer ||
+          (lang === 'vi'
+            ? 'Mô hình không trả về câu trả lời nào cho truy vấn này.'
+            : 'The model returned no answer for this query.'),
         created_at: new Date().toISOString(),
         responseMeta: {
           citations: data.citations || {},
@@ -276,6 +291,7 @@ export function AskView({ cases, selectedCaseId, onSelectCase }: AskViewProps) {
           retrieved_count: data.retrieved_count,
           context_chars: data.context_chars,
           latency_ms: data.latency_ms,
+          suggested_action: data.suggested_action ?? null,
         },
       };
 
@@ -290,18 +306,19 @@ export function AskView({ cases, selectedCaseId, onSelectCase }: AskViewProps) {
           sourceMessageId: assistantMessage.id,
         });
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
-      const errorMessage: ChatMessage = {
+      // Surface the backend's own {error, message, details} payload verbatim.
+      const failed: ChatMessage = {
         id: 'msg_' + (Date.now() + 1),
         role: 'assistant',
-        content: lang === 'vi' 
-          ? `**Lỗi**: Không thể hoàn tất phân tích tài liệu (${err.message || 'Lỗi mạng'}). Vui lòng thử lại.` 
-          : `**Error**: Unable to complete document analysis (${err.message || 'Network error'}). Please try again.`,
+        content: errorMessage(err),
         created_at: new Date().toISOString(),
+        isError: true,
       };
-      setMessages([...newMessages, errorMessage]);
+      setMessages([...newMessages, failed]);
     } finally {
+      clearInterval(ticker);
       setLoading(false);
     }
   };
@@ -351,10 +368,23 @@ export function AskView({ cases, selectedCaseId, onSelectCase }: AskViewProps) {
     setInspectorOpen(true);
   };
 
-  const openDocInInspector = (doc: CaseDocument) => {
+  // The API serves document metadata only; the parsed body is reassembled from
+  // GET /api/documents/{id}/chunks.
+  const openDocInInspector = async (doc: CaseDocument) => {
     setSelectedDocPreview(doc);
     setSelectedCitation(null);
     setInspectorOpen(true);
+    setDocPreviewText(null);
+    setDocPreviewError(null);
+    setLoadingDocPreview(true);
+    try {
+      const loaded = await loadDocument(doc.document_id);
+      setDocPreviewText(loaded.text);
+    } catch (err) {
+      setDocPreviewError(errorMessage(err));
+    } finally {
+      setLoadingDocPreview(false);
+    }
   };
 
   return (
@@ -380,9 +410,9 @@ export function AskView({ cases, selectedCaseId, onSelectCase }: AskViewProps) {
                 <h1 className="text-xs sm:text-sm font-bold text-neutral-900 dark:text-white tracking-tight">
                   {t.ask.copilotTitle}
                 </h1>
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                  Gemini 3.7 Flash Grounded
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  {lang === 'vi' ? 'Trích dẫn có kiểm chứng' : 'Citation-verified'}
                 </span>
               </div>
               <p className="text-[11px] text-neutral-500 dark:text-neutral-400 hidden sm:block">
@@ -519,7 +549,7 @@ export function AskView({ cases, selectedCaseId, onSelectCase }: AskViewProps) {
         )}
       </div>
 
-      {/* Main Content Workspace: Modern AI Chat (Claude / ChatGPT / Gemini Inspired) */}
+      {/* Main Content Workspace: chat thread + evidence inspector */}
       <div className="flex-1 flex gap-3 overflow-hidden">
         {/* Left / Center Column: Conversation Thread */}
         <div className="flex-1 flex flex-col min-w-0 bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200/90 dark:border-neutral-800 overflow-hidden shadow-xs relative">
@@ -635,9 +665,20 @@ export function AskView({ cases, selectedCaseId, onSelectCase }: AskViewProps) {
 
                         {/* Content Area */}
                         <div className="flex-1 min-w-0 space-y-3">
+                          {/* Failed request: show the backend error verbatim. */}
+                          {msg.isError && (
+                            <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300 text-xs space-y-1">
+                              <div className="font-bold flex items-center gap-1.5">
+                                <AlertTriangle className="w-3.5 h-3.5" />
+                                <span>{lang === 'vi' ? 'Truy vấn thất bại' : 'Query failed'}</span>
+                              </div>
+                              <div className="font-mono break-words">{msg.content}</div>
+                            </div>
+                          )}
+
                           {/* Verification & Metadata Header */}
-                          {msg.responseMeta?.verification && (
-                            <div className="flex items-center gap-2">
+                          {!msg.isError && msg.responseMeta?.verification && (
+                            <div className="flex flex-wrap items-center gap-2">
                               {msg.responseMeta.verification.valid ? (
                                 <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[11px] font-semibold">
                                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
@@ -650,18 +691,78 @@ export function AskView({ cases, selectedCaseId, onSelectCase }: AskViewProps) {
                                 </div>
                               )}
 
-                              {msg.responseMeta.latency_ms && (
+                              {typeof msg.responseMeta.latency_ms === 'number' && (
                                 <span className="text-[11px] text-neutral-400 dark:text-neutral-500 font-mono">
-                                  {msg.responseMeta.latency_ms}ms
+                                  {Math.round(msg.responseMeta.latency_ms)}ms
+                                </span>
+                              )}
+
+                              {msg.responseMeta.route && (
+                                <span
+                                  className="text-[11px] font-mono text-neutral-500 dark:text-neutral-400 px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700"
+                                  title={
+                                    msg.responseMeta.routing_method
+                                      ? `routing_method: ${msg.responseMeta.routing_method}`
+                                      : undefined
+                                  }
+                                >
+                                  {msg.responseMeta.route}
+                                </span>
+                              )}
+
+                              {/* Citations resolved but never referenced in the answer. */}
+                              {(msg.responseMeta.verification.unknown_citation_ids?.length ?? 0) > 0 && (
+                                <span className="text-[11px] font-mono text-rose-700 dark:text-rose-400">
+                                  {lang === 'vi' ? 'Trích dẫn không hợp lệ' : 'unknown citations'}:{' '}
+                                  {msg.responseMeta.verification.unknown_citation_ids!.join(', ')}
                                 </span>
                               )}
                             </div>
                           )}
 
-                          {/* Markdown Rendered Answer */}
-                          <div className="markdown-body text-sm text-neutral-900 dark:text-neutral-100 leading-relaxed">
-                            <Markdown>{msg.content}</Markdown>
-                          </div>
+                          {/* Markdown answer. [C1]-style markers are turned into
+                              links that open the matching evidence in the inspector. */}
+                          {!msg.isError && (
+                            <div className="markdown-body text-sm text-neutral-900 dark:text-neutral-100 leading-relaxed">
+                              <Markdown
+                                components={{
+                                  a: ({ href, children, ...props }) => {
+                                    const marker = href?.startsWith('#cite-') ? href.slice(6) : null;
+                                    const cite = marker
+                                      ? msg.responseMeta?.citations?.[marker]
+                                      : undefined;
+                                    if (!marker || !cite) {
+                                      return (
+                                        <a href={href} {...props}>
+                                          {children}
+                                        </a>
+                                      );
+                                    }
+                                    return (
+                                      <button
+                                        type="button"
+                                        onClick={() => openCitationInInspector(marker, cite, msg.id)}
+                                        title={`${cite.filename}${cite.page_number ? ` · p.${cite.page_number}` : ''}`}
+                                        className="align-baseline font-mono text-[11px] font-bold px-1 py-0.5 mx-0.5 rounded bg-amber-100 dark:bg-amber-950/70 text-amber-900 dark:text-amber-300 border border-amber-300 dark:border-amber-700 hover:bg-amber-200 dark:hover:bg-amber-900 cursor-pointer transition-colors"
+                                      >
+                                        {children}
+                                      </button>
+                                    );
+                                  },
+                                }}
+                              >
+                                {linkCitationMarkers(msg.content, msg.responseMeta?.citations)}
+                              </Markdown>
+                            </div>
+                          )}
+
+                          {/* Backend-provided next step, when it supplies one. */}
+                          {!msg.isError && msg.responseMeta?.suggested_action && (
+                            <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-[11px] text-blue-900 dark:text-blue-300 flex items-start gap-1.5">
+                              <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                              <span>{msg.responseMeta.suggested_action}</span>
+                            </div>
+                          )}
 
                           {/* Inline Evidence Citations Cards */}
                           {msg.responseMeta?.citations &&
@@ -785,7 +886,10 @@ export function AskView({ cases, selectedCaseId, onSelectCase }: AskViewProps) {
                     <div className="flex-1 space-y-2">
                       <div className="flex items-center gap-2 text-xs font-semibold text-neutral-600 dark:text-neutral-400">
                         <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
-                        <span>{lang === 'vi' ? 'Đang thẩm tra & đối chiếu chứng từ...' : 'Analyzing documents & verifying citations...'}</span>
+                        <span>{lang === 'vi' ? 'Đang truy hồi & tổng hợp câu trả lời...' : 'Retrieving and synthesising an answer...'}</span>
+                        <span className="font-mono text-neutral-400 dark:text-neutral-500">
+                          {(elapsedMs / 1000).toFixed(1)}s
+                        </span>
                       </div>
                       <div className="flex items-center space-x-1.5 py-1">
                         <div className="w-2.5 h-2.5 rounded-full bg-neutral-300 dark:bg-neutral-700 animate-bounce" />
@@ -891,7 +995,9 @@ export function AskView({ cases, selectedCaseId, onSelectCase }: AskViewProps) {
 
               {/* Sub-disclaimer */}
               <div className="text-center mt-1.5 text-[10.5px] text-neutral-400 dark:text-neutral-500">
-                {lang === 'vi' ? 'Hệ thống đối soát xác định 100% kèm trích dẫn chứng cứ SOX/ISO.' : 'Deterministic audit with 100% citation grounding and cryptographic integrity.'}
+                {lang === 'vi'
+                  ? 'Câu trả lời do mô hình cục bộ sinh ra; hãy đối chiếu với trích dẫn trước khi sử dụng.'
+                  : 'Answers are generated by a local model — check them against the cited evidence before relying on them.'}
               </div>
             </div>
           </div>
@@ -985,10 +1091,17 @@ export function AskView({ cases, selectedCaseId, onSelectCase }: AskViewProps) {
 
                   <div className="space-y-2">
                     <div className="text-[11px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
-                      {lang === 'vi' ? 'Nội dung chứng từ trích xuất' : 'Extracted Document Text'}
+                      {lang === 'vi' ? 'Nội dung chứng từ đã bóc tách' : 'Parsed Document Text'}
                     </div>
                     <div className="p-3 rounded-xl bg-neutral-50 dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800 text-[11px] font-mono text-neutral-800 dark:text-neutral-200 leading-relaxed max-h-96 overflow-y-auto whitespace-pre-wrap">
-                      {selectedDocPreview.content || (lang === 'vi' ? 'Không có nội dung văn bản trích xuất.' : 'No text extracted.')}
+                      {loadingDocPreview
+                        ? t.common.loading
+                        : docPreviewError
+                          ? docPreviewError
+                          : docPreviewText ||
+                            (lang === 'vi'
+                              ? 'Tài liệu này chưa có đoạn nào được lập chỉ mục.'
+                              : 'No indexed chunks for this document.')}
                     </div>
                   </div>
 

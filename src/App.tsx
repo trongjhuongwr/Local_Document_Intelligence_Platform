@@ -8,7 +8,8 @@ import { EvaluationView } from './components/EvaluationView';
 import { AuditTrailView } from './components/AuditTrailView';
 import { CommandPalette } from './components/CommandPalette';
 import { CaseItem } from './types';
-import { Menu, ShieldCheck, Search } from 'lucide-react';
+import { apiGet, apiPost, errorMessage } from './api';
+import { Menu, ShieldCheck, Search, AlertTriangle, X } from 'lucide-react';
 import { useThemeLanguage } from './context/ThemeLanguageContext';
 
 export function App() {
@@ -16,6 +17,7 @@ export function App() {
   const [currentTab, setCurrentTab] = useState<string>('home');
   const [activeCaseId, setActiveCaseId] = useState<string | null>(null);
   const [cases, setCases] = useState<CaseItem[]>([]);
+  const [casesError, setCasesError] = useState<string | null>(null);
   const [loadingSample, setLoadingSample] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -39,10 +41,16 @@ export function App() {
   }, []);
 
   const fetchCases = () => {
-    fetch('/api/cases')
-      .then(res => res.json())
-      .then(data => setCases(data.cases || []))
-      .catch(console.error);
+    apiGet<{ cases: CaseItem[]; total: number }>('/api/cases')
+      .then(data => {
+        setCases(data.cases || []);
+        setCasesError(null);
+      })
+      .catch(err => {
+        // No mock fallback: keep whatever was last loaded and show the real error.
+        setCasesError(errorMessage(err));
+        console.error(err);
+      });
   };
 
   useEffect(() => {
@@ -65,12 +73,13 @@ export function App() {
   const handleTrySampleCase = async () => {
     setLoadingSample(true);
     try {
-      const res = await fetch('/api/demo/cases', { method: 'POST' });
-      const newCase = await res.json();
+      const newCase = await apiPost<CaseItem>('/api/demo/cases');
+      setCasesError(null);
       fetchCases();
       setActiveCaseId(newCase.case_id);
       setCurrentTab('cases');
     } catch (err) {
+      setCasesError(errorMessage(err));
       console.error(err);
     } finally {
       setLoadingSample(false);
@@ -151,6 +160,24 @@ export function App() {
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
         onOpenCommandPalette={() => setCommandPaletteOpen(true)}
       />
+
+      {/* Backend connectivity banner: shown only on a real API failure. */}
+      {casesError && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-60 max-w-xl w-[calc(100%-2rem)] px-4 py-3 rounded-xl bg-rose-50 dark:bg-rose-950/80 border border-rose-300 dark:border-rose-800 text-rose-900 dark:text-rose-200 text-xs shadow-lg flex items-start gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600 dark:text-rose-400" />
+          <div className="flex-1 min-w-0">
+            <div className="font-bold">{t.common.apiUnavailable}</div>
+            <div className="mt-0.5 break-words opacity-90">{casesError}</div>
+          </div>
+          <button
+            onClick={() => setCasesError(null)}
+            className="p-0.5 rounded hover:bg-rose-100 dark:hover:bg-rose-900 cursor-pointer shrink-0"
+            title={t.common.close}
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* Main Content Area */}
       <main className="flex-1 overflow-hidden h-[calc(100vh-53px)] lg:h-screen bg-neutral-50/60 dark:bg-neutral-950">

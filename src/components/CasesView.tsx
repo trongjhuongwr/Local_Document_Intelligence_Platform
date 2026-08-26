@@ -1,5 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { CaseItem, DocumentType, WorkflowRun, Discrepancy, CaseReadiness } from '../types';
+import {
+  AnalysisAccepted,
+  AuditTrailResponse,
+  CaseItem,
+  DocumentType,
+  WorkflowRun,
+  Discrepancy,
+  CaseReadiness,
+  ReviewFinding,
+} from '../types';
+import { apiDelete, apiGet, apiPost, apiPostForm, errorMessage, isNotImplemented } from '../api';
+import { LoadedDocument, loadDocument } from '../utils/documentText';
 import { SeverityBadge, ReadinessChip } from './StatusBadges';
 import { DocumentSplitViewer } from './DocumentSplitViewer';
 import { printOrExportAuditDossier } from '../utils/exportUtils';
@@ -94,22 +105,16 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
   const [isDragging, setIsDragging] = useState(false);
 
   // Quick Peek Modal state
-  const [peekDoc, setPeekDoc] = useState<{
-    document_id: string;
-    filename: string;
-    document_type: string;
-    status: string;
-    size_bytes: number;
-    sha256: string;
-    text_content?: string;
-    extracted_data?: Record<string, any>;
-  } | null>(null);
+  const [peekDoc, setPeekDoc] = useState<LoadedDocument | null>(null);
+  const [peekError, setPeekError] = useState<string | null>(null);
   const [loadingPeek, setLoadingPeek] = useState(false);
   const [copiedHash, setCopiedHash] = useState(false);
 
   // Analysis / Workflow state
   const [activeWorkflow, setActiveWorkflow] = useState<WorkflowRun | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   // Delete state
   const [deleteConfirm, setDeleteConfirm] = useState(false);
@@ -122,65 +127,99 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
     finding?: Discrepancy | null;
   }>({ open: false });
 
-  // Load detailed case data when activeCaseId changes
+  // Load detailed case data when activeCaseId changes.
+  // GET /api/cases/{id} embeds only a *summary* of latest_workflow (id/status/
+  // timings), so the full run - steps, result, report - is fetched separately
+  // from GET /api/workflows/{id}.
   useEffect(() => {
     if (!activeCaseId) {
       setCaseDetail(null);
       setActiveWorkflow(null);
+      setDetailError(null);
       return;
     }
+    let cancelled = false;
     setLoadingDetail(true);
-    fetch(`/api/cases/${activeCaseId}`)
-      .then(res => res.json())
-      .then(data => {
+    setDetailError(null);
+    apiGet<CaseItem>(`/api/cases/${activeCaseId}`)
+      .then(async data => {
+        if (cancelled) return;
         setCaseDetail(data);
-        if (data.latest_workflow) {
-          setActiveWorkflow(data.latest_workflow);
+        if (data.latest_workflow?.workflow_id) {
+          try {
+            const run = await apiGet<WorkflowRun>(`/api/workflows/${data.latest_workflow.workflow_id}`);
+            if (!cancelled) setActiveWorkflow(run);
+          } catch (err) {
+            if (!cancelled) {
+              setActiveWorkflow(null);
+              setDetailError(errorMessage(err));
+            }
+          }
+        } else if (!cancelled) {
+          setActiveWorkflow(null);
         }
       })
-      .finally(() => setLoadingDetail(false));
+      .catch(err => {
+        if (cancelled) return;
+        setCaseDetail(null);
+        setDetailError(errorMessage(err));
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingDetail(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [activeCaseId]);
 
-  // Poll workflow if running
+  // Poll the asynchronous analysis workflow while it is queued or running.
   useEffect(() => {
     if (!activeWorkflow || (activeWorkflow.status !== 'running' && activeWorkflow.status !== 'queued')) {
       return;
     }
-    const interval = setInterval(() => {
-      fetch(`/api/workflows/${activeWorkflow.workflow_id}`)
-        .then(res => res.json())
-        .then(wf => {
-          setActiveWorkflow(wf);
-          if (wf.status === 'completed' || wf.status === 'failed') {
-            clearInterval(interval);
-            onRefreshCases();
-            if (activeCaseId) {
-              fetch(`/api/cases/${activeCaseId}`).then(r => r.json()).then(setCaseDetail);
+    const workflowId = activeWorkflow.workflow_id;
+    let stopped = false;
+    const interval = setInterval(async () => {
+      try {
+        const wf = await apiGet<WorkflowRun>(`/api/workflows/${workflowId}`);
+        if (stopped) return;
+        setActiveWorkflow(wf);
+        if (wf.status === 'completed' || wf.status === 'failed') {
+          clearInterval(interval);
+          onRefreshCases();
+          if (activeCaseId) {
+            try {
+              setCaseDetail(await apiGet<CaseItem>(`/api/cases/${activeCaseId}`));
+            } catch (err) {
+              setDetailError(errorMessage(err));
             }
           }
-        })
-        .catch(console.error);
-    }, 600);
-    return () => clearInterval(interval);
+        }
+      } catch (err) {
+        if (stopped) return;
+        clearInterval(interval);
+        setActionError(errorMessage(err));
+      }
+    }, 1500);
+    return () => {
+      stopped = true;
+      clearInterval(interval);
+    };
   }, [activeWorkflow?.status, activeWorkflow?.workflow_id]);
 
   const handleCreateCase = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCaseName.trim()) return;
     setCreating(true);
+    setActionError(null);
     try {
-      const res = await fetch('/api/cases', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newCaseName.trim() }),
-      });
-      const created = await res.json();
+      const created = await apiPost<CaseItem>('/api/cases', { name: newCaseName.trim() });
       setNewCaseName('');
       setCreateFormOpen(false);
       onRefreshCases();
       onSelectCase(created.case_id);
     } catch (err) {
-      console.error(err);
+      setActionError(errorMessage(err));
     } finally {
       setCreating(false);
     }
@@ -225,6 +264,7 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
     if (!caseDetail || selectedFiles.length === 0) return;
     setUploading(true);
     setUploadMessage(null);
+    setActionError(null);
     try {
       const formData = new FormData();
       selectedFiles.forEach(item => {
@@ -232,20 +272,30 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
         formData.append('document_types', item.type);
       });
 
-      const res = await fetch(`/api/cases/${caseDetail.case_id}/documents`, {
-        method: 'POST',
-        body: formData,
-      });
-      const data = await res.json();
-      setUploadMessage(lang === 'vi' ? `Đã nạp & mã hóa thành công ${data.success_count} tài liệu.` : `Successfully ingested ${data.success_count} document(s).`);
+      const data = await apiPostForm<{
+        success_count: number;
+        failure_count: number;
+        results: Array<{ filename: string; success: boolean; message?: string }>;
+      }>(`/api/cases/${caseDetail.case_id}/documents`, formData);
+
+      // Report per-file failures instead of a blanket success message.
+      const failures = (data.results || []).filter(r => !r.success);
+      setUploadMessage(
+        lang === 'vi'
+          ? `Đã nạp ${data.success_count} tài liệu.`
+          : `Ingested ${data.success_count} document(s).`
+      );
+      if (failures.length > 0) {
+        setActionError(
+          failures.map(f => `${f.filename}: ${f.message || 'upload failed'}`).join(' · ')
+        );
+      }
       setSelectedFiles([]);
-      // Refresh case details
-      const refreshed = await fetch(`/api/cases/${caseDetail.case_id}`).then(r => r.json());
-      setCaseDetail(refreshed);
+      setCaseDetail(await apiGet<CaseItem>(`/api/cases/${caseDetail.case_id}`));
       onRefreshCases();
     } catch (err) {
-      console.error(err);
-      setUploadMessage(lang === 'vi' ? 'Nạp tài liệu thất bại. Vui lòng thử lại.' : 'Upload failed. Please try again.');
+      setUploadMessage(null);
+      setActionError(errorMessage(err));
     } finally {
       setUploading(false);
     }
@@ -253,50 +303,44 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
 
   const handleOpenPeek = async (docId: string) => {
     setLoadingPeek(true);
+    setPeekError(null);
+    setPeekDoc(null);
     try {
-      const res = await fetch(`/api/documents/${docId}`);
-      if (res.ok) {
-        const data = await res.json();
-        setPeekDoc(data);
-      }
+      setPeekDoc(await loadDocument(docId));
     } catch (err) {
-      console.error(err);
+      setPeekError(errorMessage(err));
     } finally {
       setLoadingPeek(false);
     }
   };
 
   const handleCopySha256 = () => {
-    if (!peekDoc?.sha256) return;
-    navigator.clipboard.writeText(peekDoc.sha256);
+    if (!peekDoc?.detail.sha256) return;
+    navigator.clipboard.writeText(peekDoc.detail.sha256);
     setCopiedHash(true);
     setTimeout(() => setCopiedHash(false), 2000);
   };
 
+  // POST /api/cases/{id}/analyses answers 202 with a workflow id; the run itself
+  // happens in the background and is observed through GET /api/workflows/{id}.
   const handleRunAnalysis = async () => {
     if (!caseDetail) return;
     setAnalyzing(true);
+    setActionError(null);
     try {
-      const res = await fetch(`/api/cases/${caseDetail.case_id}/analyses`, {
-        method: 'POST',
-      });
-      const data = await res.json();
+      const accepted = await apiPost<AnalysisAccepted>(`/api/cases/${caseDetail.case_id}/analyses`);
+      // Seed from the real accepted payload, then let polling fill in the
+      // actual steps/progress reported by the backend.
       setActiveWorkflow({
-        workflow_id: data.workflow_id,
-        case_id: caseDetail.case_id,
-        status: 'running',
-        progress_percent: 15,
-        current_step: lang === 'vi' ? 'Khởi động quy trình thẩm định...' : 'Starting analysis...',
-        steps: [
-          { step: 'extract', label: lang === 'vi' ? 'Trích xuất cấu trúc trường dữ liệu tài liệu' : 'Extract document schema fields', status: 'running' },
-          { step: 'rules', label: lang === 'vi' ? 'Chạy các quy tắc đối soát số học tất định' : 'Run deterministic cross-document rules', status: 'pending' },
-          { step: 'review_tasks', label: lang === 'vi' ? 'Khởi tạo các hạng mục thẩm định cho con người' : 'Generate human audit tasks', status: 'pending' },
-        ],
-        requires_review: false,
-        started_at: new Date().toISOString(),
+        workflow_id: accepted.workflow_id,
+        case_id: accepted.case_id,
+        status: accepted.status || 'queued',
+        progress_percent: 0,
+        current_step: null,
+        steps: [],
       });
     } catch (err) {
-      console.error(err);
+      setActionError(errorMessage(err));
     } finally {
       setAnalyzing(false);
     }
@@ -304,36 +348,54 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
 
   const handleDeleteCase = async () => {
     if (!caseDetail || !deleteConfirm) return;
+    setActionError(null);
     try {
-      await fetch(`/api/cases/${caseDetail.case_id}`, { method: 'DELETE' });
+      await apiDelete(`/api/cases/${caseDetail.case_id}`);
       onSelectCase(null);
       onRefreshCases();
     } catch (err) {
-      console.error(err);
+      setActionError(errorMessage(err));
     }
   };
 
   const handleExportAuditDossier = async () => {
     if (!caseDetail) return;
-    try {
-      const [reviewsRes, auditRes] = await Promise.all([
-        fetch(`/api/reviews?case_id=${caseDetail.case_id}&limit=500`).then(r => r.json()),
-        fetch(`/api/audit-trail?case_id=${caseDetail.case_id}&limit=100`).then(r => r.json())
-      ]);
+    setActionError(null);
 
-      printOrExportAuditDossier({
-        caseDetail,
-        analysisResult: activeWorkflow?.result,
-        reviews: reviewsRes.reviews || [],
-        auditLogs: auditRes.entries || [],
-      });
+    let reviews: ReviewFinding[] = [];
+    let auditLogs: AuditTrailResponse['entries'] = [];
+    const problems: string[] = [];
+
+    try {
+      const res = await apiGet<{ reviews: ReviewFinding[] }>(
+        `/api/reviews?case_id=${encodeURIComponent(caseDetail.case_id)}&limit=500`
+      );
+      reviews = res.reviews || [];
     } catch (err) {
-      console.error('Failed to export audit dossier', err);
-      printOrExportAuditDossier({
-        caseDetail,
-        analysisResult: activeWorkflow?.result,
-      });
+      problems.push(`reviews: ${errorMessage(err)}`);
     }
+
+    try {
+      const res = await apiGet<AuditTrailResponse>(
+        `/api/audit-trail?case_id=${encodeURIComponent(caseDetail.case_id)}&limit=100`
+      );
+      auditLogs = res.entries || [];
+    } catch (err) {
+      // The audit-trail endpoint may not exist yet; the dossier is still
+      // exportable, but say so rather than silently omitting the section.
+      problems.push(
+        isNotImplemented(err) ? `audit trail: ${t.common.endpointMissing}` : `audit trail: ${errorMessage(err)}`
+      );
+    }
+
+    if (problems.length > 0) setActionError(problems.join(' · '));
+
+    printOrExportAuditDossier({
+      caseDetail,
+      analysisResult: activeWorkflow?.result ?? undefined,
+      reviews,
+      auditLogs,
+    });
   };
 
   const downloadMarkdownReport = () => {
@@ -377,6 +439,22 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
           </button>
         </div>
 
+        {(detailError || actionError) && (
+          <div className="p-3.5 rounded-lg bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300 text-xs flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0 break-words">{detailError || actionError}</div>
+            <button
+              onClick={() => {
+                setDetailError(null);
+                setActionError(null);
+              }}
+              className="p-0.5 rounded hover:bg-rose-100 dark:hover:bg-rose-900 cursor-pointer shrink-0"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
         {/* Search & Filter Bar */}
         <div className="flex flex-col sm:flex-row gap-3 items-center justify-between bg-white dark:bg-neutral-900 p-3 rounded-xl border border-neutral-200 dark:border-neutral-800 shadow-2xs">
           <div className="relative flex-1 w-full">
@@ -399,7 +477,7 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
               className="px-2.5 py-1.5 text-xs border border-neutral-200 dark:border-neutral-700 rounded-lg bg-neutral-50 dark:bg-neutral-800 focus:bg-white dark:focus:bg-neutral-700 focus:outline-hidden font-medium text-neutral-800 dark:text-neutral-200 w-full sm:w-auto"
             >
               <option value="ALL">{t.cases.filterAll} ({cases.length})</option>
-              <option value="ready">{t.cases.filterReady} ({cases.filter(c => c.readiness === 'ready').length})</option>
+              <option value="complete">{t.cases.filterReady} ({cases.filter(c => c.readiness === 'complete').length})</option>
               <option value="limited">{lang === 'vi' ? 'Thiếu tài liệu' : 'Limited (Partial Pack)'} ({cases.filter(c => c.readiness === 'limited').length})</option>
               <option value="blocked">{lang === 'vi' ? 'Bị khóa (Chưa đủ điều kiện)' : 'Blocked (Missing Docs)'} ({cases.filter(c => c.readiness === 'blocked').length})</option>
             </select>
@@ -521,6 +599,23 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
         </div>
       </div>
 
+      {/* Real API errors, never swallowed */}
+      {(detailError || actionError) && (
+        <div className="p-3.5 rounded-lg bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300 text-xs flex items-start gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0 break-words">{detailError || actionError}</div>
+          <button
+            onClick={() => {
+              setDetailError(null);
+              setActionError(null);
+            }}
+            className="p-0.5 rounded hover:bg-rose-100 dark:hover:bg-rose-900 cursor-pointer shrink-0"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* 4-Document Pack Checklist */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {checklist.map(docType => {
@@ -569,8 +664,8 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
           <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
           <span>
             {lang === 'vi' 
-              ? 'Bộ 4 chứng từ hoàn chỉnh! Đầy đủ điều kiện để thực hiện thẩm tra 100% các quy tắc đối soát.' 
-              : 'Complete 4-document pack ready! Fully qualified for deep cross-reconciliation and SOX compliance.'}
+              ? 'Bộ 4 chứng từ hoàn chỉnh, đủ điều kiện để đối soát chéo toàn bộ.'
+              : 'Complete 4-document pack ready for full cross-document reconciliation.'}
           </span>
         </div>
       )}
@@ -807,6 +902,39 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
         )}
       </div>
 
+      {/* Quick Peek: loading / failure states */}
+      {(loadingPeek || peekError) && !peekDoc && (
+        <div className="fixed inset-0 bg-neutral-950/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800 shadow-2xl max-w-md w-full p-6 space-y-3">
+            {loadingPeek ? (
+              <div className="text-xs text-neutral-600 dark:text-neutral-300 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-neutral-900 dark:bg-neutral-100 animate-ping" />
+                <span>{t.common.loading}</span>
+              </div>
+            ) : (
+              <>
+                <div className="text-xs font-bold text-rose-700 dark:text-rose-400 flex items-center gap-1.5">
+                  <AlertTriangle className="w-4 h-4" />
+                  <span>{t.common.loadFailed}</span>
+                </div>
+                <div className="text-xs text-neutral-600 dark:text-neutral-300 break-words">{peekError}</div>
+              </>
+            )}
+            <div className="flex justify-end">
+              <button
+                onClick={() => {
+                  setPeekError(null);
+                  setLoadingPeek(false);
+                }}
+                className="px-3.5 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 text-xs font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 cursor-pointer"
+              >
+                {t.common.close}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Quick Peek Modal */}
       {peekDoc && (
         <div className="fixed inset-0 bg-neutral-950/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
@@ -818,13 +946,17 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
                   <FileText className="w-4 h-4" />
                 </div>
                 <div className="min-w-0">
-                  <h3 className="text-sm font-bold text-neutral-900 dark:text-white truncate">{peekDoc.filename}</h3>
+                  <h3 className="text-sm font-bold text-neutral-900 dark:text-white truncate">{peekDoc.detail.filename}</h3>
                   <div className="flex items-center gap-2 text-[11px] text-neutral-500 dark:text-neutral-400">
-                    <span className="capitalize font-semibold text-neutral-700 dark:text-neutral-300">{docLabels[peekDoc.document_type] || peekDoc.document_type}</span>
+                    <span className="capitalize font-semibold text-neutral-700 dark:text-neutral-300">
+                      {docLabels[peekDoc.detail.document_type] || peekDoc.detail.document_type}
+                    </span>
                     <span>·</span>
-                    <span>{(peekDoc.size_bytes / 1024).toFixed(1)} KB</span>
+                    <span>{(peekDoc.detail.size_bytes / 1024).toFixed(1)} KB</span>
                     <span>·</span>
-                    <span className="text-emerald-700 dark:text-emerald-400 font-medium">SOX/ISO Hash Verified</span>
+                    <span className="font-mono">{peekDoc.detail.status}</span>
+                    <span>·</span>
+                    <span>{peekDoc.detail.chunk_count} {lang === 'vi' ? 'đoạn' : 'chunks'}</span>
                   </div>
                 </div>
               </div>
@@ -843,7 +975,7 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
                 <div className="flex items-center gap-2 font-mono text-[11px] text-neutral-600 dark:text-neutral-400">
                   <Hash className="w-3.5 h-3.5 text-neutral-400" />
                   <span className="font-semibold text-neutral-700 dark:text-neutral-300">SHA-256:</span>
-                  <span className="select-all">{peekDoc.sha256}</span>
+                  <span className="select-all">{peekDoc.detail.sha256}</span>
                 </div>
                 <button
                   onClick={handleCopySha256}
@@ -854,32 +986,44 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
                 </button>
               </div>
 
-              {/* Extracted Structured Schema if present */}
-              {peekDoc.extracted_data && Object.keys(peekDoc.extracted_data).length > 0 && (
-                <div>
-                  <h4 className="text-xs font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mb-2">
-                    {lang === 'vi' ? 'Dữ liệu bóc tách chuẩn hóa' : 'Normalized Extracted Schema'}
-                  </h4>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
-                    {Object.entries(peekDoc.extracted_data).map(([k, v]) => (
-                      <div key={k} className="p-2.5 rounded-lg bg-neutral-50 dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800">
-                        <span className="text-[10px] uppercase font-bold text-neutral-400 dark:text-neutral-500 block">{k.replace(/_/g, ' ')}</span>
-                        <span className="font-mono font-semibold text-neutral-900 dark:text-white mt-0.5 block truncate">
-                          {typeof v === 'object' ? JSON.stringify(v) : String(v || 'N/A')}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Raw Document Content */}
+              {/* Parser metadata reported by GET /api/documents/{id} */}
               <div>
                 <h4 className="text-xs font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mb-2">
-                  {lang === 'vi' ? 'Toàn văn chứng từ thô' : 'Raw Document Text'}
+                  {lang === 'vi' ? 'Siêu dữ liệu bóc tách' : 'Parser Metadata'}
+                </h4>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
+                  {[
+                    ['mime_type', peekDoc.detail.mime_type],
+                    ['parser_version', peekDoc.detail.parser_version],
+                    ['page_count', peekDoc.detail.page_count ?? '—'],
+                    ['element_count', peekDoc.detail.element_count],
+                    ['chunk_count', peekDoc.detail.chunk_count],
+                    ['status', peekDoc.detail.status],
+                  ].map(([k, v]) => (
+                    <div key={String(k)} className="p-2.5 rounded-lg bg-neutral-50 dark:bg-neutral-850 border border-neutral-200 dark:border-neutral-800">
+                      <span className="text-[10px] uppercase font-bold text-neutral-400 dark:text-neutral-500 block">
+                        {String(k).replace(/_/g, ' ')}
+                      </span>
+                      <span className="font-mono font-semibold text-neutral-900 dark:text-white mt-0.5 block truncate">
+                        {String(v)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                {peekDoc.detail.error_message && (
+                  <div className="mt-2 p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300 text-[11px]">
+                    {peekDoc.detail.error_message}
+                  </div>
+                )}
+              </div>
+
+              {/* Parsed text, reassembled from the indexed chunks */}
+              <div>
+                <h4 className="text-xs font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mb-2">
+                  {lang === 'vi' ? 'Toàn văn đã bóc tách (từ các đoạn đã lập chỉ mục)' : 'Parsed Text (reassembled from indexed chunks)'}
                 </h4>
                 <div className="p-4 rounded-xl bg-neutral-900 dark:bg-neutral-950 text-neutral-100 border border-neutral-800 font-mono text-xs leading-relaxed max-h-80 overflow-y-auto whitespace-pre-wrap select-text">
-                  {peekDoc.text_content || (lang === 'vi' ? 'Không có nội dung văn bản khả dụng.' : 'No text content available.')}
+                  {peekDoc.text || (lang === 'vi' ? 'Tài liệu này chưa có đoạn văn bản nào được lập chỉ mục.' : 'No indexed chunks for this document.')}
                 </div>
               </div>
             </div>
@@ -889,10 +1033,10 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
               {caseDetail.documents && caseDetail.documents.length >= 2 ? (
                 <button
                   onClick={() => {
-                    const otherDoc = caseDetail.documents!.find(d => d.document_id !== peekDoc.document_id);
+                    const otherDoc = caseDetail.documents!.find(d => d.document_id !== peekDoc.detail.document_id);
                     setSplitViewerConfig({
                       open: true,
-                      leftDocId: peekDoc.document_id,
+                      leftDocId: peekDoc.detail.document_id,
                       rightDocId: otherDoc?.document_id,
                     });
                     setPeekDoc(null);
@@ -924,7 +1068,12 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
           <button
             id="analyze-case-btn"
             onClick={handleRunAnalysis}
-            disabled={caseDetail.readiness === 'blocked' || activeWorkflow?.status === 'running'}
+            disabled={
+              analyzing ||
+              caseDetail.readiness === 'blocked' ||
+              activeWorkflow?.status === 'running' ||
+              activeWorkflow?.status === 'queued'
+            }
             className="px-6 py-2.5 rounded-lg bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 font-semibold text-sm hover:bg-neutral-800 dark:hover:bg-white disabled:opacity-50 transition-colors shadow-xs flex items-center gap-2 cursor-pointer"
           >
             <Play className="w-4 h-4 fill-current" />
@@ -935,33 +1084,63 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
           </span>
         </div>
 
-        {/* Active Analysis Progress */}
-        {activeWorkflow && activeWorkflow.status === 'running' && (
+        {/* Active Analysis Progress: progress_percent, current_step and steps
+            all come from GET /api/workflows/{id} while the run is in flight. */}
+        {activeWorkflow && (activeWorkflow.status === 'running' || activeWorkflow.status === 'queued') && (
           <div className="p-5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 space-y-4 shadow-xs">
             <div className="flex items-center justify-between text-xs font-bold text-neutral-800 dark:text-neutral-200">
-              <span>{activeWorkflow.current_step}</span>
-              <span>{activeWorkflow.progress_percent}%</span>
+              <span className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-neutral-900 dark:bg-neutral-100 animate-ping" />
+                <span>
+                  {activeWorkflow.current_step ||
+                    (activeWorkflow.status === 'queued'
+                      ? lang === 'vi'
+                        ? 'Đang chờ trong hàng đợi...'
+                        : 'Queued...'
+                      : lang === 'vi'
+                        ? 'Đang thực thi...'
+                        : 'Running...')}
+                </span>
+              </span>
+              <span className="font-mono">{activeWorkflow.progress_percent ?? 0}%</span>
             </div>
             <div className="w-full h-2 bg-neutral-100 dark:bg-neutral-800 rounded-full overflow-hidden">
               <div
                 className="h-full bg-neutral-900 dark:bg-neutral-100 transition-all duration-300"
-                style={{ width: `${activeWorkflow.progress_percent}%` }}
+                style={{ width: `${activeWorkflow.progress_percent ?? 0}%` }}
               />
             </div>
-            <div className="space-y-1.5 pt-2">
-              {activeWorkflow.steps.map(s => (
-                <div key={s.step} className="flex items-center gap-2 text-xs text-neutral-600 dark:text-neutral-400">
-                  {s.status === 'completed' ? (
-                    <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                  ) : s.status === 'running' ? (
-                    <span className="w-2 h-2 rounded-full bg-neutral-900 dark:bg-neutral-100 animate-ping" />
-                  ) : (
-                    <Circle className="w-3 h-3 text-neutral-300 dark:text-neutral-600" />
-                  )}
-                  <span>{s.label}</span>
-                </div>
-              ))}
+            {activeWorkflow.steps && activeWorkflow.steps.length > 0 && (
+              <div className="space-y-1.5 pt-2">
+                {activeWorkflow.steps.map(s => (
+                  <div key={s.step} className="flex items-center gap-2 text-xs text-neutral-600 dark:text-neutral-400">
+                    {s.status === 'completed' ? (
+                      <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                    ) : s.status === 'failed' ? (
+                      <AlertTriangle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+                    ) : s.status === 'running' ? (
+                      <span className="w-2 h-2 rounded-full bg-neutral-900 dark:bg-neutral-100 animate-ping" />
+                    ) : (
+                      <Circle className="w-3 h-3 text-neutral-300 dark:text-neutral-600" />
+                    )}
+                    <span>{s.label}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Failed run: surface the backend's own error strings. */}
+        {activeWorkflow && activeWorkflow.status === 'failed' && (
+          <div className="p-4 rounded-xl border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/40 text-rose-800 dark:text-rose-300 text-xs space-y-1">
+            <div className="font-bold flex items-center gap-1.5">
+              <AlertTriangle className="w-4 h-4" />
+              <span>{lang === 'vi' ? 'Quy trình thẩm định thất bại' : 'Analysis workflow failed'}</span>
             </div>
+            {(activeWorkflow.errors || []).map((e, i) => (
+              <div key={i} className="font-mono break-words">{e}</div>
+            ))}
           </div>
         )}
 
@@ -1086,7 +1265,7 @@ export function CasesView({ cases, activeCaseId, onSelectCase, onRefreshCases, o
                 <button
                   id="export-dossier-btn"
                   onClick={handleExportAuditDossier}
-                  title={lang === 'vi' ? 'In hoặc xuất Hồ sơ Kiểm toán SOX/ISO' : 'Print or export full official SOX/ISO Audit Dossier'}
+                  title={lang === 'vi' ? 'In hoặc xuất hồ sơ kiểm toán' : 'Print or export the audit dossier'}
                   className="px-4 py-2 rounded-lg bg-emerald-700 dark:bg-emerald-800 text-white font-semibold text-xs hover:bg-emerald-800 dark:hover:bg-emerald-700 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
                 >
                   <Printer className="w-3.5 h-3.5 text-emerald-200" />

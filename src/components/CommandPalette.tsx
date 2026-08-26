@@ -18,6 +18,7 @@ import {
   MessageSquare
 } from 'lucide-react';
 import { CaseItem, ReviewFinding } from '../types';
+import { apiGet } from '../api';
 import { useThemeLanguage } from '../context/ThemeLanguageContext';
 
 interface CommandPaletteProps {
@@ -58,9 +59,9 @@ export function CommandPalette({
   // Fetch all reviews for cross-finding search
   useEffect(() => {
     if (isOpen) {
-      fetch('/api/reviews?limit=200')
-        .then(res => res.json())
+      apiGet<{ reviews: ReviewFinding[] }>('/api/reviews?limit=200')
         .then(data => setReviews(data.reviews || []))
+        // Findings simply stay out of the palette if the API is unreachable.
         .catch(console.error);
     }
   }, [isOpen]);
@@ -107,8 +108,8 @@ export function CommandPalette({
       {
         id: 'action_audit_trail',
         category: isVi ? 'Thao tác nhanh' : 'Quick Actions',
-        title: isVi ? 'Nhật ký Kiểm toán & Sổ cái Tuân thủ' : 'Open Audit Trail & Compliance Ledger',
-        subtitle: isVi ? 'Lịch sử sự kiện mã hóa SHA-256 chuẩn SOX & ISO 27001' : 'SOX Section 404 & ISO 27001 tamper-evident event history',
+        title: isVi ? 'Mở Nhật ký Kiểm toán' : 'Open Audit Trail',
+        subtitle: isVi ? 'Lịch sử sự kiện kèm giá trị băm toàn vẹn SHA-256' : 'Event history with a SHA-256 integrity digest',
         icon: History,
         action: () => {
           if (onOpenAuditTrail) onOpenAuditTrail();
@@ -148,7 +149,7 @@ export function CommandPalette({
         title: c.name,
         subtitle: isVi ? `Mã: ${c.case_id} • ${c.document_count} tài liệu • ${c.open_review_count} sai lệch chờ duyệt` : `ID: ${c.case_id} • ${c.document_count} doc(s) • ${c.open_review_count} open finding(s)`,
         badge: c.readiness.toUpperCase(),
-        badgeColor: c.readiness === 'ready' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300' : c.readiness === 'limited' ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300' : 'bg-rose-100 text-rose-800 dark:bg-rose-950/80 dark:text-rose-300',
+        badgeColor: c.readiness === 'complete' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300' : c.readiness === 'limited' ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300' : 'bg-rose-100 text-rose-800 dark:bg-rose-950/80 dark:text-rose-300',
         icon: FolderOpen,
         action: () => {
           onSelectCase(c.case_id);
@@ -415,7 +416,7 @@ export function CommandPalette({
           </div>
           <div className="flex items-center gap-1 text-emerald-700 dark:text-emerald-400 font-medium">
             <ShieldCheck className="w-3.5 h-3.5" />
-            <span>{lang === 'vi' ? 'Truy vấn Kiểm toán Mã hóa Chuẩn SOX/ISO' : 'SOX / ISO 27001 Cryptographic Search'}</span>
+            <span>{lang === 'vi' ? 'Tìm kiếm hồ sơ, tài liệu và phát hiện' : 'Search cases, documents and findings'}</span>
           </div>
         </div>
       </div>

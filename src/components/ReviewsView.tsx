@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CaseItem, ReviewFinding, Severity, ReviewStatus } from '../types';
+import { apiGet, apiPost, errorMessage } from '../api';
 import { SeverityBadge, StatusChip } from './StatusBadges';
 import { DocumentSplitViewer } from './DocumentSplitViewer';
 import { exportReviewsToCSV, exportReviewsToMarkdown, printOrExportPDF } from '../utils/exportUtils';
@@ -76,20 +77,17 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
 
   const handleOpenSplitForFinding = async (finding: ReviewFinding, index?: number) => {
     try {
-      const res = await fetch(`/api/cases/${finding.case_id}`);
-      if (res.ok) {
-        const caseData = await res.json();
-        const currentIndex = index !== undefined ? index : reviews.findIndex(r => r.review_id === finding.review_id);
-        setSplitViewerConfig({
-          open: true,
-          caseId: finding.case_id,
-          documents: caseData.documents || [],
-          finding: finding.discrepancy,
-          findingIndex: currentIndex >= 0 ? currentIndex : 0,
-        });
-      }
+      const caseData = await apiGet<CaseItem>(`/api/cases/${finding.case_id}`);
+      const currentIndex = index !== undefined ? index : reviews.findIndex(r => r.review_id === finding.review_id);
+      setSplitViewerConfig({
+        open: true,
+        caseId: finding.case_id,
+        documents: caseData.documents || [],
+        finding: finding.discrepancy,
+        findingIndex: currentIndex >= 0 ? currentIndex : 0,
+      });
     } catch (err) {
-      console.error('Failed to load case documents for split viewer', err);
+      setLoadError(errorMessage(err));
     }
   };
 
@@ -101,18 +99,15 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
     try {
       // If navigating across different case documents, load the new case docs
       if (targetFinding.case_id !== splitViewerConfig.caseId) {
-        const res = await fetch(`/api/cases/${targetFinding.case_id}`);
-        if (res.ok) {
-          const caseData = await res.json();
-          setSplitViewerConfig({
-            open: true,
-            caseId: targetFinding.case_id,
-            documents: caseData.documents || [],
-            finding: targetFinding.discrepancy,
-            findingIndex: newIndex,
-          });
-          return;
-        }
+        const caseData = await apiGet<CaseItem>(`/api/cases/${targetFinding.case_id}`);
+        setSplitViewerConfig({
+          open: true,
+          caseId: targetFinding.case_id,
+          documents: caseData.documents || [],
+          finding: targetFinding.discrepancy,
+          findingIndex: newIndex,
+        });
+        return;
       }
 
       setSplitViewerConfig(prev => ({
@@ -121,7 +116,7 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
         findingIndex: newIndex,
       }));
     } catch (err) {
-      console.error('Failed to navigate discrepancy', err);
+      setLoadError(errorMessage(err));
     }
   };
 
@@ -130,23 +125,34 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
   const [page, setPage] = useState(1);
   const pageSize = 10;
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const fetchReviews = () => {
-    setLoading(true);
+  const buildReviewQuery = (limit: number, offset: number) => {
     const params = new URLSearchParams();
     if (selectedCaseId) params.append('case_id', selectedCaseId);
     if (statusFilter !== 'all') params.append('status', statusFilter);
     if (severityFilter !== 'all') params.append('severity', severityFilter);
-    params.append('limit', pageSize.toString());
-    params.append('offset', ((page - 1) * pageSize).toString());
+    params.append('limit', String(limit));
+    params.append('offset', String(offset));
+    return params.toString();
+  };
 
-    fetch(`/api/reviews?${params.toString()}`)
-      .then(res => res.json())
+  const fetchReviews = () => {
+    setLoading(true);
+    setLoadError(null);
+    apiGet<{ reviews: ReviewFinding[]; count: number; total: number }>(
+      `/api/reviews?${buildReviewQuery(pageSize, (page - 1) * pageSize)}`
+    )
       .then(data => {
         setReviews(data.reviews || []);
         setTotalReviews(data.total || 0);
       })
-      .catch(console.error)
+      .catch(err => {
+        // No stale/mock rows: clear the table and say why it is empty.
+        setReviews([]);
+        setTotalReviews(0);
+        setLoadError(errorMessage(err));
+      })
       .finally(() => setLoading(false));
   };
 
@@ -160,20 +166,25 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
     setTimeout(() => setToastMessage(null), 3500);
   };
 
+  // POST /api/reviews/{id}/approve|reject take {reviewer, note};
+  // /resolve takes no body.
+  const decideReview = (reviewId: string, action: 'approve' | 'reject' | 'resolve', note: string) =>
+    action === 'resolve'
+      ? apiPost<ReviewFinding>(`/api/reviews/${reviewId}/resolve`)
+      : apiPost<ReviewFinding>(`/api/reviews/${reviewId}/${action}`, {
+          reviewer: reviewerName,
+          note: note || null,
+        });
+
   const handleAction = async (reviewId: string, action: 'approve' | 'reject' | 'resolve') => {
-    const note = notes[reviewId] || '';
     try {
-      await fetch(`/api/reviews/${reviewId}/${action}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reviewer: reviewerName, note }),
-      });
+      await decideReview(reviewId, action, notes[reviewId] || '');
       fetchReviews();
       onRefreshCases();
       const actionLabel = action === 'approve' ? (lang === 'vi' ? 'CHẤP THUẬN' : 'APPROVED') : action === 'reject' ? (lang === 'vi' ? 'BÁC BỎ' : 'REJECTED') : (lang === 'vi' ? 'ĐÃ XỬ LÝ' : 'RESOLVED');
       showToast(lang === 'vi' ? `Đã ghi nhận quyết định: ${actionLabel}` : `Finding ${action.toUpperCase()} recorded.`);
     } catch (err) {
-      console.error(err);
+      showToast(errorMessage(err));
     }
   };
 
@@ -195,29 +206,54 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
     }
   };
 
-  // Batch action handler
+  // Batch action handler.
+  //
+  // POST /api/reviews/batch applies one decision across many findings and
+  // reports each outcome separately; the toast repeats the backend's real
+  // updated/failed counts rather than assuming every selection succeeded.
   const handleBatchAction = async (action: 'approve' | 'reject' | 'resolve') => {
     if (selectedReviewIds.length === 0) return;
     setBatchActionLoading(true);
+    const note =
+      batchNote ||
+      (lang === 'vi'
+        ? `Xử lý hàng loạt (${action}) bởi ${reviewerName}`
+        : `Bulk ${action} applied by ${reviewerName}`);
+
     try {
-      const res = await fetch('/api/reviews/batch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          review_ids: selectedReviewIds,
-          action,
-          reviewer: reviewerName,
-          note: batchNote || (lang === 'vi' ? `Xử lý hàng loạt (${action}) bởi ${reviewerName}` : `Bulk ${action} applied by ${reviewerName}`),
-        }),
+      const data = await apiPost<{
+        updated_count: number;
+        failed_count: number;
+        requested_count: number;
+        failed: Array<{ review_id: string; error: string; message: string }>;
+      }>('/api/reviews/batch', {
+        review_ids: selectedReviewIds,
+        action,
+        reviewer: reviewerName,
+        note,
       });
-      const data = await res.json();
+
       fetchReviews();
       onRefreshCases();
-      showToast(lang === 'vi' ? `Đã áp dụng quyết định hàng loạt cho ${data.updated_count || selectedReviewIds.length} hạng mục.` : `Batch ${action.toUpperCase()} applied to ${data.updated_count || selectedReviewIds.length} findings.`);
+
+      if (data.failed_count > 0) {
+        showToast(
+          (lang === 'vi'
+            ? `Đã áp dụng ${data.updated_count}/${data.requested_count}; ${data.failed_count} lỗi: `
+            : `Applied ${data.updated_count}/${data.requested_count}; ${data.failed_count} failed: `) +
+            (data.failed[0]?.message ?? '')
+        );
+      } else {
+        showToast(
+          lang === 'vi'
+            ? `Đã áp dụng quyết định hàng loạt cho ${data.updated_count} hạng mục.`
+            : `Batch ${action.toUpperCase()} applied to ${data.updated_count} finding(s).`
+        );
+      }
       setSelectedReviewIds([]);
       setBatchNote('');
     } catch (err) {
-      console.error('Batch action failed', err);
+      showToast(errorMessage(err));
     } finally {
       setBatchActionLoading(false);
     }
@@ -231,21 +267,28 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
     }));
   };
 
-  // Fetch all findings for comprehensive export
+  // Fetch every finding matching the current filters for export.
+  // The API caps `limit` at 500, so page through until the reported total is
+  // covered rather than silently truncating the export.
   const fetchAllFindingsForExport = async (): Promise<ReviewFinding[]> => {
-    const params = new URLSearchParams();
-    if (selectedCaseId) params.append('case_id', selectedCaseId);
-    if (statusFilter !== 'all') params.append('status', statusFilter);
-    if (severityFilter !== 'all') params.append('severity', severityFilter);
-    params.append('limit', '2000');
-    params.append('offset', '0');
-
+    const pageLimit = 500;
+    const all: ReviewFinding[] = [];
     try {
-      const res = await fetch(`/api/reviews?${params.toString()}`);
-      const data = await res.json();
-      return data.reviews || reviews;
-    } catch {
-      return reviews;
+      let offset = 0;
+      for (;;) {
+        const data = await apiGet<{ reviews: ReviewFinding[]; total: number }>(
+          `/api/reviews?${buildReviewQuery(pageLimit, offset)}`
+        );
+        const batch = data.reviews || [];
+        all.push(...batch);
+        offset += batch.length;
+        if (batch.length < pageLimit || offset >= (data.total ?? all.length)) break;
+      }
+      return all;
+    } catch (err) {
+      setLoadError(errorMessage(err));
+      // Export whatever was already fetched rather than inventing rows.
+      return all.length > 0 ? all : reviews;
     }
   };
 
@@ -521,6 +564,20 @@ export function ReviewsView({ cases, selectedCaseId, onSelectCase, onRefreshCase
       {loading ? (
         <div className="p-12 text-center text-xs text-neutral-500 dark:text-neutral-400">
           {lang === 'vi' ? 'Đang tải danh sách bất thường...' : 'Loading discrepancy findings...'}
+        </div>
+      ) : loadError ? (
+        <div className="p-8 text-center rounded-xl border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/40 space-y-2">
+          <h4 className="text-sm font-semibold text-rose-800 dark:text-rose-300 flex items-center justify-center gap-1.5">
+            <AlertCircle className="w-4 h-4" />
+            <span>{t.common.loadFailed}</span>
+          </h4>
+          <p className="text-xs text-rose-700 dark:text-rose-400 break-words">{loadError}</p>
+          <button
+            onClick={fetchReviews}
+            className="px-3.5 py-1.5 rounded-lg bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 text-xs font-semibold cursor-pointer"
+          >
+            {t.common.retry}
+          </button>
         </div>
       ) : reviews.length === 0 ? (
         <div className="p-12 text-center rounded-xl border border-dashed border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900">

@@ -30,6 +30,8 @@ import {
   Globe
 } from 'lucide-react';
 import { useThemeLanguage } from '../context/ThemeLanguageContext';
+import { ReadyStatus } from '../types';
+import { apiPost, errorMessage } from '../api';
 
 interface SidebarProps {
   currentTab: string;
@@ -60,21 +62,28 @@ export function Sidebar({
   const [defaultCurrency, setDefaultCurrency] = useState<'USD' | 'EUR' | 'VND'>(lang === 'vi' ? 'VND' : 'USD');
   const [feedbackToast, setFeedbackToast] = useState<string | null>(null);
 
-  const [readyStatus, setReadyStatus] = useState<{ 
-    status: string; 
-    engine_summary?: string;
-    ai_model?: string;
-    deterministic_rules_count?: number;
-    checks?: any 
-  } | null>(null);
+  const [readyStatus, setReadyStatus] = useState<ReadyStatus | null>(null);
+  const [readyError, setReadyError] = useState<string | null>(null);
 
   const popoverRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  const refreshReadyStatus = () => {
+    // /api/ready answers 503 with the same body when a dependency is down,
+    // so read the payload in both cases instead of treating 503 as no data.
     fetch('/api/ready')
-      .then(res => res.json())
-      .then(data => setReadyStatus(data))
-      .catch(() => setReadyStatus({ status: 'offline' }));
+      .then(async res => {
+        const data = (await res.json()) as ReadyStatus;
+        setReadyStatus(data);
+        setReadyError(null);
+      })
+      .catch(err => {
+        setReadyStatus(null);
+        setReadyError(errorMessage(err));
+      });
+  };
+
+  useEffect(() => {
+    refreshReadyStatus();
   }, []);
 
   // Close popover when clicking outside
@@ -91,7 +100,15 @@ export function Sidebar({
   }, [accountMenuOpen]);
 
   const isReady = readyStatus?.status === 'ready';
-  const activeEngineLabel = readyStatus?.engine_summary || 'Gemini 3.7 Flash + Local Deterministic Engine';
+  // Only ever name the model the backend actually reports (/api/ready ->
+  // checks.ollama.llm_model.model, currently llama3.2:1b served by Ollama).
+  const llmModel = readyStatus?.checks?.ollama?.llm_model?.model ?? null;
+  const embeddingModel = readyStatus?.checks?.ollama?.embedding_model?.model ?? null;
+  const activeEngineLabel = llmModel
+    ? `${llmModel} (Ollama, local)`
+    : lang === 'vi'
+      ? 'Chưa xác định được mô hình'
+      : 'Model not reported by /api/ready';
 
   const showToast = (msg: string) => {
     setFeedbackToast(msg);
@@ -137,12 +154,12 @@ export function Sidebar({
 
   const handleResetData = async () => {
     try {
-      await fetch('/api/demo/cases', { method: 'POST' });
-      showToast(lang === 'vi' ? 'Đã làm mới dữ liệu hồ sơ mẫu' : 'Sample cases refreshed successfully');
+      await apiPost('/api/demo/cases');
+      showToast(lang === 'vi' ? 'Đã nạp lại hồ sơ mẫu' : 'Demo case provisioned');
       setAccountMenuOpen(false);
       window.location.reload();
     } catch (e) {
-      showToast(lang === 'vi' ? 'Lỗi khi làm mới dữ liệu' : 'Error resetting workspace');
+      showToast(errorMessage(e));
     }
   };
 
@@ -188,7 +205,8 @@ export function Sidebar({
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <span className={`w-1.5 h-1.5 rounded-full ${isReady ? 'bg-emerald-500' : 'bg-red-500'}`} />
                     <span className="text-[10px] text-neutral-500 dark:text-neutral-400 font-medium truncate">
-                      {isReady ? t.common.statusReady : t.common.statusOffline} · {t.common.version}
+                      {isReady ? t.common.statusReady : t.common.statusOffline}
+                      {llmModel ? ` · ${llmModel}` : ''}
                     </span>
                   </div>
                 </div>
@@ -750,93 +768,144 @@ export function Sidebar({
                 </div>
               )}
 
-              {/* TAB 3: AI ENGINE DIAGNOSTICS */}
+              {/* TAB 3: LIVE ENGINE DIAGNOSTICS (everything here comes from /api/ready) */}
               {settingsActiveTab === 'diagnostics' && (
                 <div className="space-y-4 animate-in fade-in duration-150">
                   {/* Active Engine Card */}
                   <div className="p-4 rounded-xl bg-neutral-900 dark:bg-neutral-800 text-white space-y-2 border border-neutral-800 dark:border-neutral-700">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] uppercase font-bold text-neutral-400 tracking-wider">
-                        {lang === 'vi' ? 'ĐỘNG CƠ KẾT NỐI' : 'CONNECTED ENGINE'}
+                        {lang === 'vi' ? 'MÔ HÌNH NGÔN NGỮ' : 'LANGUAGE MODEL'}
                       </span>
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-mono text-[10px] font-bold">
-                        ACTIVE · 100% HEALTHY
+                      <span
+                        className={`px-2 py-0.5 rounded-full font-mono text-[10px] font-bold ${
+                          isReady
+                            ? 'bg-emerald-500/20 text-emerald-400'
+                            : 'bg-rose-500/20 text-rose-400'
+                        }`}
+                      >
+                        {readyStatus ? readyStatus.status.toUpperCase() : 'UNREACHABLE'}
                       </span>
                     </div>
                     <div className="text-sm font-bold flex items-center gap-2 text-white">
-                      <Sparkles className="w-4 h-4 text-amber-400" />
+                      <Cpu className="w-4 h-4 text-amber-400" />
                       <span>{activeEngineLabel}</span>
                     </div>
                     <p className="text-[11px] text-neutral-400 leading-relaxed">
-                      {lang === 'vi' 
-                        ? 'Kiến trúc lai kết hợp sinh ngôn ngữ Gemini 3.7 Flash với lớp tính toán số học xác định 100% không ảo giác.'
-                        : 'Hybrid architecture pairing Gemini 3.7 Flash generation with deterministic cross-document mathematical verification.'}
+                      {lang === 'vi'
+                        ? 'Mô hình chạy hoàn toàn cục bộ qua Ollama; phần đối soát số học do bộ quy tắc xác định của máy chủ thực hiện.'
+                        : 'The model runs entirely locally through Ollama; cross-document arithmetic is handled by the backend rule engine.'}
                     </p>
                   </div>
 
-                  {/* Engine Spec Grid */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="p-3 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-850/60 space-y-1">
-                      <div className="flex items-center gap-1.5 text-neutral-500 dark:text-neutral-400 font-bold text-[11px]">
-                        <Layers className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                        <span>{lang === 'vi' ? 'Quy tắc Xác định' : 'Rule Engine'}</span>
-                      </div>
-                      <div className="text-sm font-bold text-neutral-900 dark:text-white">
-                        {lang === 'vi' ? '12 Quy tắc Nghiệp vụ' : '12 Deterministic Rules'}
-                      </div>
-                      <div className="text-[10px] text-neutral-500 dark:text-neutral-400">
-                        {lang === 'vi' ? 'Loại bỏ hoàn toàn ảo giác tính toán' : 'Zero arithmetic hallucinations'}
-                      </div>
+                  {readyError && (
+                    <div className="p-3 rounded-xl border border-rose-300 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/40 text-rose-800 dark:text-rose-300 text-[11px] font-medium">
+                      {readyError}
+                    </div>
+                  )}
+
+                  {/* Live dependency checks straight from /api/ready */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider">
+                        {lang === 'vi' ? 'Kiểm tra phụ thuộc' : 'Dependency Checks'}
+                      </h4>
+                      <button
+                        onClick={refreshReadyStatus}
+                        className="text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white flex items-center gap-1 cursor-pointer"
+                      >
+                        <RefreshCw className="w-3 h-3" />
+                        <span>{t.common.refresh}</span>
+                      </button>
                     </div>
 
-                    <div className="p-3 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-850/60 space-y-1">
-                      <div className="flex items-center gap-1.5 text-neutral-500 dark:text-neutral-400 font-bold text-[11px]">
-                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                        <span>{lang === 'vi' ? 'Chế độ Trích dẫn' : 'Grounding Mode'}</span>
+                    {!readyStatus ? (
+                      <div className="p-3 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-850/60 text-[11px] text-neutral-500 dark:text-neutral-400">
+                        {t.common.loadFailed}
                       </div>
-                      <div className="text-sm font-bold text-emerald-700 dark:text-emerald-400">Strict Citations [1..n]</div>
-                      <div className="text-[10px] text-neutral-500 dark:text-neutral-400">
-                        {lang === 'vi' ? 'Gắn kết trực tiếp văn bản nguồn' : 'Side inspector binding'}
-                      </div>
-                    </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="p-3 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-850/60 space-y-1">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1.5 text-neutral-600 dark:text-neutral-300 font-bold text-[11px]">
+                              <Database className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                              <span>PostgreSQL / pgvector</span>
+                            </div>
+                            <span
+                              className={`font-mono text-[10px] font-bold ${
+                                readyStatus.checks?.database?.status === 'ok'
+                                  ? 'text-emerald-600 dark:text-emerald-400'
+                                  : 'text-rose-600 dark:text-rose-400'
+                              }`}
+                            >
+                              {readyStatus.checks?.database?.status ?? 'unknown'}
+                            </span>
+                          </div>
+                          {readyStatus.checks?.database?.detail && (
+                            <div className="text-[10px] text-neutral-500 dark:text-neutral-400">
+                              {readyStatus.checks.database.detail}
+                            </div>
+                          )}
+                          {readyStatus.checks?.database?.hint && (
+                            <div className="text-[10px] font-mono text-amber-700 dark:text-amber-400">
+                              {readyStatus.checks.database.hint}
+                            </div>
+                          )}
+                        </div>
 
-                    <div className="p-3 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-850/60 space-y-1">
-                      <div className="flex items-center gap-1.5 text-neutral-500 dark:text-neutral-400 font-bold text-[11px]">
-                        <Database className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-                        <span>{lang === 'vi' ? 'Truy xuất Vector' : 'Vector Retrieval'}</span>
+                        <div className="p-3 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-850/60 space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1.5 text-neutral-600 dark:text-neutral-300 font-bold text-[11px]">
+                              <Cpu className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                              <span>Ollama</span>
+                            </div>
+                            <span
+                              className={`font-mono text-[10px] font-bold ${
+                                readyStatus.checks?.ollama?.status === 'ok'
+                                  ? 'text-emerald-600 dark:text-emerald-400'
+                                  : 'text-rose-600 dark:text-rose-400'
+                              }`}
+                            >
+                              {readyStatus.checks?.ollama?.status ?? 'unknown'}
+                            </span>
+                          </div>
+                          {readyStatus.checks?.ollama?.detail && (
+                            <div className="text-[10px] text-neutral-500 dark:text-neutral-400">
+                              {readyStatus.checks.ollama.detail}
+                            </div>
+                          )}
+                          {llmModel && (
+                            <div className="flex items-center justify-between text-[10px]">
+                              <span className="text-neutral-500 dark:text-neutral-400">
+                                {lang === 'vi' ? 'Mô hình sinh' : 'Generation model'}
+                              </span>
+                              <span className="font-mono font-bold text-neutral-800 dark:text-neutral-200">
+                                {llmModel}
+                                {readyStatus.checks?.ollama?.llm_model?.available === false && ' · missing'}
+                              </span>
+                            </div>
+                          )}
+                          {embeddingModel && (
+                            <div className="flex items-center justify-between text-[10px]">
+                              <span className="text-neutral-500 dark:text-neutral-400">
+                                {lang === 'vi' ? 'Mô hình nhúng' : 'Embedding model'}
+                              </span>
+                              <span className="font-mono font-bold text-neutral-800 dark:text-neutral-200">
+                                {embeddingModel}
+                                {readyStatus.checks?.ollama?.embedding_model?.available === false && ' · missing'}
+                              </span>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <div className="text-sm font-bold text-neutral-900 dark:text-white">Hybrid (BM25 + Dense)</div>
-                      <div className="text-[10px] text-neutral-500 dark:text-neutral-400">Latency ~33ms · Recall 93.3%</div>
-                    </div>
-
-                    <div className="p-3 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-850/60 space-y-1">
-                      <div className="flex items-center gap-1.5 text-neutral-500 dark:text-neutral-400 font-bold text-[11px]">
-                        <Info className="w-3.5 h-3.5 text-neutral-600 dark:text-neutral-400" />
-                        <span>{lang === 'vi' ? 'Tính Toàn vẹn' : 'Doc Integrity'}</span>
-                      </div>
-                      <div className="text-sm font-bold text-neutral-900 dark:text-white">SHA-256 Checksums</div>
-                      <div className="text-[10px] text-neutral-500 dark:text-neutral-400">
-                        {lang === 'vi' ? 'Sổ cái nhật ký bất biến' : 'Immutable audit trails'}
-                      </div>
-                    </div>
+                    )}
                   </div>
 
-                  {/* 12 Rule Specifications Summary */}
-                  <div className="p-3.5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-850/60">
-                    <h4 className="text-[11px] font-bold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider mb-2">
-                      {lang === 'vi' ? 'Các Quy Tắc Đối Soát Tự Động Kích Hoạt' : 'Active Deterministic Audit Checks'}
-                    </h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[11px] text-neutral-600 dark:text-neutral-300">
-                      <div>✓ {lang === 'vi' ? 'Hạn mức giá trị hợp đồng tối đa' : 'Contract total value cap'}</div>
-                      <div>✓ {lang === 'vi' ? 'Tính toán từng dòng & thuế VAT hóa đơn' : 'Invoice line item math & VAT'}</div>
-                      <div>✓ {lang === 'vi' ? 'Điều khoản thanh toán (Net 30/60)' : 'Payment terms (Net 30/60)'}</div>
-                      <div>✓ {lang === 'vi' ? 'Thời hạn mốc nghiệm thu giai đoạn' : 'Performance milestone dates'}</div>
-                      <div>✓ {lang === 'vi' ? 'Bất đồng loại tiền tệ (EUR/USD/VND)' : 'Currency mismatch (EUR/USD/VND)'}</div>
-                      <div>✓ {lang === 'vi' ? 'Khớp mã đơn đặt hàng PO bắt buộc' : 'Mandatory PO number match'}</div>
-                      <div>✓ {lang === 'vi' ? 'Phát hiện trùng lặp hóa đơn' : 'Duplicate invoice detection'}</div>
-                      <div>✓ {lang === 'vi' ? 'Phạt chậm trả & thời gian ân hạn' : 'Grace period & penalty fees'}</div>
-                    </div>
-                  </div>
+                  <p className="text-[11px] text-neutral-500 dark:text-neutral-400 leading-relaxed">
+                    {lang === 'vi'
+                      ? 'Các chỉ số chất lượng (recall, độ chính xác, độ trễ) chỉ hiển thị trong tab Đánh giá và chỉ khi bộ đo kiểm đã thực sự được chạy.'
+                      : 'Quality metrics (recall, accuracy, latency) live in the Evaluation tab and only appear once the benchmark has actually been run.'}
+                  </p>
                 </div>
               )}
             </div>

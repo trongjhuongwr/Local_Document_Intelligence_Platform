@@ -63,14 +63,16 @@ export function ReadinessChip({ readiness }: { readiness: CaseReadiness | string
   const { lang } = useThemeLanguage();
   const r = readiness.toLowerCase();
 
-  if (r === 'ready') {
+  // The backend (app/services/cases.py calculate_readiness) returns
+  // "complete" | "limited" | "blocked".
+  if (r === 'complete') {
     return (
       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/50">
         {lang === 'vi' ? 'Sẵn sàng kiểm toán' : 'Audit Ready'}
       </span>
     );
   }
-  if (r === 'limited' || r === 'needs_review') {
+  if (r === 'limited') {
     return (
       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200 dark:border-amber-800/50">
         {lang === 'vi' ? 'Cần thẩm định' : 'Needs Review'}
@@ -79,7 +81,7 @@ export function ReadinessChip({ readiness }: { readiness: CaseReadiness | string
   }
   return (
     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700">
-      {lang === 'vi' ? 'Hồ sơ nháp' : 'Draft'}
+      {lang === 'vi' ? 'Chưa đủ chứng từ' : 'Blocked'}
     </span>
   );
 }

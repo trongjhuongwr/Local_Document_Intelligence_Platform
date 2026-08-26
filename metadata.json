@@ -1,6 +1,0 @@
-{
-  "name": "Document Intelligence",
-  "description": "Local-first document audit and discrepancy intelligence workspace for business document packs",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
