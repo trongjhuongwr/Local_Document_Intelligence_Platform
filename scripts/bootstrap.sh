@@ -41,4 +41,4 @@ if ! ollama list | grep -q "all-minilm"; then echo "WARNING: run 'ollama pull al
 
 echo
 echo "Done. Start the API:  ./.venv/bin/uvicorn app.api.main:app --reload"
-echo "Start the UI:        ./.venv/bin/streamlit run ui/app.py"
+echo "Start the UI:        npm install && npm run dev   # http://localhost:5173"

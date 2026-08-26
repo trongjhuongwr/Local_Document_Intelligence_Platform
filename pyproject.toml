@@ -9,7 +9,7 @@ description = "Local-first document intelligence & AI workflow automation platfo
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "MIT" }
-authors = [{ name = "Arthur Nguyen", email = "nguyentronghuong05@gmail.com" }]
+authors = [{ name = "Nguyen Trong Huong", email = "nguyentronghuong05@gmail.com" }]
 dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
@@ -23,13 +23,13 @@ dependencies = [
     "structlog>=24.1",
     "reportlab>=4.1",
     "pymupdf>=1.24",
-    "pdfplumber>=0.11",
     "python-docx>=1.1",
     "pandas>=2.2",
+    # Imported by FastAPI, not by this codebase: required to parse multipart
+    # uploads on POST /api/documents and POST /api/cases/{id}/documents.
     "python-multipart>=0.0.9",
     "rank-bm25>=0.2.2",
     "langgraph>=0.2",
-    "streamlit>=1.36",
     "mcp>=1.0",
 ]
 

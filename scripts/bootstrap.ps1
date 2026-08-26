@@ -45,4 +45,4 @@ ollama list | Out-String | ForEach-Object {
 
 Write-Host ""
 Write-Host "Done. Start the API:  .\.venv\Scripts\python.exe -m uvicorn app.api.main:app --reload"
-Write-Host "Start the UI:        .\.venv\Scripts\python.exe -m streamlit run ui/app.py"
+Write-Host "Start the UI:        npm install; npm run dev   # http://localhost:5173"
