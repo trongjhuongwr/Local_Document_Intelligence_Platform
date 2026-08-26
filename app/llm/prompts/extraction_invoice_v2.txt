@@ -12,7 +12,7 @@ Field guide:
 - issue_date / due_date: from the "Issue Date:" and "Due Date:" lines, YYYY-MM-DD.
 - currency: the 3-letter code (USD, EUR or GBP).
 - subtotal: copy the value after "Subtotal:" exactly, e.g. "EUR 8,050.00".
-- tax_rate_percent: the percentage inside "Tax (...%)", e.g. "10".
+- tax_rate_percent: copy the exact number printed inside the parentheses of the "Tax (...%)" line. Do not assume a common rate.
 - tax: copy the amount after "Tax (...%):" exactly, e.g. "EUR 805.00".
 - total: copy the value after "Total Due:" exactly, e.g. "EUR 8,855.00".
 - payment_terms: copy the value after "Payment Terms:", e.g. "Net 30".

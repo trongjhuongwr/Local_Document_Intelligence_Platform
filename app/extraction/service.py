@@ -15,6 +15,7 @@ full-schema extraction.
 from pydantic import BaseModel, ValidationError, create_model
 
 from app.core.logging import get_logger
+from app.extraction.patterns import deterministic_fields
 from app.extraction.schemas import EXTRACTION_SCHEMAS
 from app.llm.base import LLMProvider, LLMTelemetry
 from app.llm.prompts.registry import PromptRegistry
@@ -30,7 +31,9 @@ FIELD_HINTS: dict[tuple[str, str], str] = {
     ("invoice", "due_date"): 'Copy the date after "Due Date:" (YYYY-MM-DD).',
     ("invoice", "currency"): 'Copy the 3-letter code after "Currency:".',
     ("invoice", "subtotal"): 'Copy the value after "Subtotal:".',
-    ("invoice", "tax_rate_percent"): 'Copy the percentage inside "Tax (...%)".',
+    ("invoice", "tax_rate_percent"): (
+        'Copy the exact number printed inside the parentheses of the "Tax (...%)" line.'
+    ),
     ("invoice", "tax"): 'Copy the amount after "Tax (...%):".',
     ("invoice", "total"): 'Copy the value after "Total Due:".',
     ("invoice", "payment_terms"): 'Copy the value after "Payment Terms:".',
@@ -87,6 +90,7 @@ class ExtractionOutcome(BaseModel):
     prompt_version: str
     truncated: bool
     repaired_fields: list[str] = []
+    deterministic_fields: list[str] = []
     telemetry: LLMTelemetry
 
 
@@ -121,6 +125,12 @@ class ExtractionService:
             document_type, document_text, schema, data
         )
 
+        # Labelled numeric fields are read from the document text itself; a
+        # deterministic match always wins over the model's transcription.
+        data, resolved_fields = self._apply_deterministic_fields(
+            document_type, document_text, schema, data
+        )
+
         logger.info(
             "extraction_completed",
             document_type=document_type,
@@ -128,6 +138,7 @@ class ExtractionService:
             schema_valid=telemetry.schema_valid,
             retry_count=telemetry.retry_count,
             repaired_fields=repaired_fields,
+            deterministic_fields=resolved_fields,
         )
         return ExtractionOutcome(
             document_type=document_type,
@@ -136,8 +147,32 @@ class ExtractionService:
             prompt_version=str(_PROMPT_VERSION),
             truncated=truncated,
             repaired_fields=repaired_fields,
+            deterministic_fields=resolved_fields,
             telemetry=telemetry,
         )
+
+    def _apply_deterministic_fields(
+        self,
+        document_type: str,
+        document_text: str,
+        schema: type[BaseModel],
+        data: BaseModel,
+    ) -> tuple[BaseModel, list[str]]:
+        """Override model output with values parsed directly from the text.
+
+        A labelled value present in the document is evidence, not a guess, so it
+        takes precedence over the model's transcription of the same field.
+        """
+        resolved = deterministic_fields(document_type, document_text)
+        if not resolved:
+            return data, []
+        values = data.model_dump()
+        changed = [field for field, value in resolved.items() if values.get(field) != value]
+        values.update(resolved)
+        try:
+            return schema.model_validate(values), changed
+        except ValidationError:  # pragma: no cover - parsed values are already typed
+            return data, []
 
     async def _repair_missing_fields(
         self,
